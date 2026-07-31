@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect, useMemo, Suspense } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 
@@ -159,9 +159,9 @@ function TagPill({ label }: { label: string }) {
 // ─── Question Cards ───────────────────────────────────────────────────────────
 
 function TopQuestionCard({
-  q, view, isNew, showFlash, onEcho, onPin, onAnswer,
+  q, view, isNew, showFlash, noCredits, onEcho, onPin, onAnswer,
 }: {
-  q: Q; view: 'audience' | 'host'; isNew?: boolean; showFlash?: boolean;
+  q: Q; view: 'audience' | 'host'; isNew?: boolean; showFlash?: boolean; noCredits?: boolean;
   onEcho(): void; onPin(): void; onAnswer(): void;
 }) {
   return (
@@ -206,10 +206,12 @@ function TopQuestionCard({
             )}
             <button
               onClick={onEcho}
-              disabled={q.echoed}
+              disabled={q.echoed || !!noCredits}
               className={`w-full flex flex-col items-center gap-1 px-3 py-3 rounded-xl border transition-all duration-150 active:scale-95 ${
                 q.echoed
                   ? 'border-brand-amber/50 bg-brand-amber/10 text-brand-amber'
+                  : noCredits
+                  ? 'border-brand-border/30 text-white/20 cursor-not-allowed'
                   : 'border-brand-border text-white/50 hover:border-brand-orange/60 hover:bg-brand-orange/10 hover:text-brand-orange'
               }`}
             >
@@ -246,9 +248,9 @@ function TopQuestionCard({
 }
 
 function QuestionCard({
-  q, view, isNew, showFlash, onEcho, onPin, onAnswer,
+  q, view, isNew, showFlash, noCredits, onEcho, onPin, onAnswer,
 }: {
-  q: Q; view: 'audience' | 'host'; isNew?: boolean; showFlash?: boolean;
+  q: Q; view: 'audience' | 'host'; isNew?: boolean; showFlash?: boolean; noCredits?: boolean;
   onEcho(): void; onPin(): void; onAnswer(): void;
 }) {
   return (
@@ -274,9 +276,9 @@ function QuestionCard({
         ) : (
           <button
             onClick={onEcho}
-            disabled={q.echoed}
+            disabled={q.echoed || !!noCredits}
             className={`flex flex-col items-center gap-0.5 w-full py-2 rounded-xl transition-all active:scale-95 ${
-              q.echoed ? 'text-brand-amber' : 'text-white/35 hover:text-brand-orange'
+              q.echoed ? 'text-brand-amber' : noCredits ? 'text-white/20 cursor-not-allowed' : 'text-white/35 hover:text-brand-orange'
             }`}
           >
             <span className="text-lg font-black leading-none">↑</span>
@@ -408,7 +410,9 @@ function SessionPageInner() {
   }, []);
 
   function echo(id: number) {
+    if (view === 'audience' && credits <= 0) return;
     setQs(prev => prev.map(q => q.id === id && !q.echoed ? { ...q, echoes: q.echoes + 1, echoed: true } : q));
+    if (view === 'audience') setCredits(c => c - 1);
     setEchoFlash(prev => ({ ...prev, [id]: true }));
     setTimeout(() => setEchoFlash(prev => ({ ...prev, [id]: false })), 650);
   }
@@ -456,6 +460,17 @@ function SessionPageInner() {
   const totalAsked  = qs.length;
   const awaitingAns = qs.filter(q => !q.answered).length;
   const answeredCnt = qs.filter(q => q.answered).length;
+
+  // ── Duplicate detection ───────────────────────────────────────────────────
+  const similar = useMemo(() => {
+    if (draft.length < 12) return [];
+    const words = draft.toLowerCase().split(/\s+/).filter(w => w.length > 4);
+    if (!words.length) return [];
+    return qs
+      .filter(q => !q.answered)
+      .filter(q => words.some(w => q.text.toLowerCase().includes(w)))
+      .slice(0, 2);
+  }, [draft, qs]);
 
   return (
     <>
@@ -606,6 +621,7 @@ function SessionPageInner() {
                   view={view}
                   isNew={newIds.has(featuredQ.id)}
                   showFlash={!!echoFlash[featuredQ.id]}
+                  noCredits={credits === 0 && view === 'audience'}
                   onEcho={() => echo(featuredQ.id)}
                   onPin={() => togglePin(featuredQ.id)}
                   onAnswer={() => toggleAnswer(featuredQ.id)}
@@ -623,6 +639,7 @@ function SessionPageInner() {
                   view={view}
                   isNew={newIds.has(q.id)}
                   showFlash={!!echoFlash[q.id]}
+                  noCredits={credits === 0 && view === 'audience'}
                   onEcho={() => echo(q.id)}
                   onPin={() => togglePin(q.id)}
                   onAnswer={() => toggleAnswer(q.id)}
@@ -691,6 +708,29 @@ function SessionPageInner() {
 
         {/* Bottom Ask Bar */}
         <div className="border-t border-brand-border bg-brand-bg/95 backdrop-blur shrink-0 z-20 sticky bottom-0 lg:relative">
+          {/* Duplicate detection panel */}
+          {view === 'audience' && similar.length > 0 && draft.length > 0 && (
+            <div className="border-b border-brand-border/60 px-4 sm:px-6 py-3 bg-brand-amber/5">
+              <p className="text-[11px] font-bold text-brand-amber uppercase tracking-widest mb-2.5 flex items-center gap-1.5">
+                <span>💡</span> Similar questions already asked
+              </p>
+              <div className="flex flex-col gap-2">
+                {similar.map(q => (
+                  <div key={q.id} className="flex items-center gap-3">
+                    <span className="text-brand-orange/60 text-xs font-bold shrink-0">↑ {q.echoes}</span>
+                    <p className="flex-1 text-xs text-white/55 line-clamp-1">{q.text}</p>
+                    <button
+                      onClick={() => { echo(q.id); setDraft(''); }}
+                      disabled={q.echoed || credits === 0}
+                      className="shrink-0 text-[11px] font-semibold px-3 py-1.5 rounded-lg bg-brand-orange/10 border border-brand-orange/30 text-brand-orange hover:bg-brand-orange/20 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      {q.echoed ? '✓ Echoed' : '↑ Echo instead'}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
           {view === 'audience' ? (
             <div className="px-4 sm:px-6 py-3 flex items-center gap-3 sm:gap-4">
               <div className="hidden sm:block shrink-0">
