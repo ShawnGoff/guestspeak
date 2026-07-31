@@ -71,7 +71,7 @@ function TagPill({ label }: { label: string }) {
 function LiveCard({ session }: { session: typeof LIVE_SESSIONS[0] }) {
   return (
     <Link
-      href="/demo/session"
+      href={`/demo/session?title=${encodeURIComponent(session.title)}`}
       className="card group p-5 hover:border-brand-orange/40 transition-all flex flex-col gap-4"
     >
       {/* Top row */}
@@ -151,8 +151,10 @@ export default function DiscoverPage() {
 
   function handleJoin(e: React.FormEvent) {
     e.preventDefault();
-    // Any code goes to the demo session
-    if (code.trim()) router.push('/demo/session');
+    if (!code.trim()) return;
+    const match = [...LIVE_SESSIONS].find(s => s.code === code.trim().toUpperCase());
+    const title = match ? match.title : 'Live Session';
+    router.push(`/demo/session?title=${encodeURIComponent(title)}`);
   }
 
   return (
