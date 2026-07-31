@@ -354,6 +354,7 @@ function SessionPageInner() {
   const [view, setView]         = useState<'audience' | 'host'>(isHostParam ? 'host' : 'audience');
   const [draft, setDraft]       = useState('');
   const [isAnon, setIsAnon]     = useState(false);
+  const [anonCounter, setAnonCounter] = useState(0);
   const [credits, setCredits]   = useState(creditsParam);
   const [submitted, setSubmitted] = useState(false);
   const [activity, setActivity] = useState<ActivityItem[]>(INIT_ACTIVITY);
@@ -426,9 +427,11 @@ function SessionPageInner() {
     const text = draft.trim();
     if (!text || credits === 0) return;
     const id = Date.now();
+    const anonLabel = isAnon ? `Anon${anonCounter + 1}` : null;
+    if (isAnon) setAnonCounter(c => c + 1);
     setQs(prev => [...prev, {
       id, text, echoes: 0, echoed: false, answered: false, pinned: false,
-      author: isAnon ? 'anonymous' : guestName, authorColor: '#0891B2',
+      author: anonLabel ?? guestName, authorColor: isAnon ? '#6B7280' : '#0891B2',
       ago: 'just now', tags: [], comments: 0, ts: Date.now(),
     }]);
     setNewIds(prev => new Set([...prev, id]));
@@ -437,7 +440,7 @@ function SessionPageInner() {
     setSubmitted(true);
     setTimeout(() => setSubmitted(false), 3000);
     setActivity(prev => [
-      { id: Date.now(), kind: 'question', text: `${isAnon ? 'Someone' : guestName} asked a question`, time: 'just now' },
+      { id: Date.now(), kind: 'question', text: `${anonLabel ?? guestName} asked a question`, time: 'just now' },
       ...prev.slice(0, 4),
     ]);
   }
