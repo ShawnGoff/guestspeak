@@ -123,9 +123,18 @@ function Hero() {
 
         {joinError && <p className="text-red-400 text-sm mb-3">{joinError}</p>}
 
-        <p className="text-brand-orange-dim text-sm">
+        <p className="text-brand-orange-dim text-sm mb-3">
           Free to use · No account needed to join sessions or ask questions · Account required to host
         </p>
+
+        <Link
+          href="/demo"
+          className="inline-flex items-center gap-1.5 text-brand-amber/70 hover:text-brand-amber text-sm font-medium transition-colors"
+        >
+          <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
+          Try the interactive demo
+          <span className="opacity-60">→</span>
+        </Link>
       </div>
 
     </section>
