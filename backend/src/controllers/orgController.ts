@@ -1,0 +1,363 @@
+import { Request, Response, NextFunction } from 'express';
+import { z } from 'zod';
+import slugify from 'slugify';
+import { randomBytes } from 'crypto';
+import { pool } from '../db/pool';
+import { AppError } from '../middleware/errorHandler';
+
+const CreateOrgSchema = z.object({
+  name: z.string().min(1).max(255),
+  description: z.string().optional(),
+  avatar_url: z.string().url().optional(),
+  website: z.string().url().optional(),
+  city:    z.string().max(100).optional(),
+  region:  z.string().max(100).optional(),
+  country: z.string().max(100).optional(),
+  lat:     z.number().min(-90).max(90).optional(),
+  lng:     z.number().min(-180).max(180).optional(),
+  categories: z.array(z.string().max(50)).max(12).optional(),
+  is_online:  z.boolean().optional(),
+});
+
+const UpdateOrgSchema = CreateOrgSchema.partial();
+
+const AddMemberSchema = z.object({
+  user_id: z.string().uuid(),
+  role: z.enum(['owner', 'admin', 'member']).default('member'),
+});
+
+function makeOrgSlug(name: string) {
+  const base = slugify(name, { lower: true, strict: true }).slice(0, 80);
+  const suffix = randomBytes(3).toString('hex');
+  return `${base}-${suffix}`;
+}
+
+async function requireOrgOwner(orgId: string, callerId: string) {
+  const result = await pool.query(
+    `SELECT role FROM organization_members WHERE org_id = $1 AND user_id = $2`,
+    [orgId, callerId],
+  );
+  if (result.rows[0]?.role !== 'owner') throw new AppError(403, 'Only a channel owner can do this');
+}
+
+async function requireOrgOwnerOrAdmin(orgId: string, callerId: string) {
+  const result = await pool.query(
+    `SELECT role FROM organization_members WHERE org_id = $1 AND user_id = $2`,
+    [orgId, callerId],
+  );
+  const role = result.rows[0]?.role;
+  if (role !== 'owner' && role !== 'admin') throw new AppError(403, 'Only a channel owner or admin can do this');
+}
+
+/** POST /api/orgs — create an org, caller becomes owner */
+export async function createOrg(req: Request, res: Response, next: NextFunction) {
+  try {
+    const data = CreateOrgSchema.parse(req.body);
+    const callerId = req.user!.userId;
+
+    // Cap: free accounts can own at most 3 channels
+    const countResult = await pool.query(
+      `SELECT COUNT(*) FROM organization_members WHERE user_id = $1 AND role = 'owner'`,
+      [callerId],
+    );
+    if (parseInt(countResult.rows[0].count, 10) >= 3) {
+      throw new AppError(403, 'You can only own up to 3 channels. Upgrade to Pro for unlimited.');
+    }
+
+    const slug = makeOrgSlug(data.name);
+
+    const orgResult = await pool.query(
+      `INSERT INTO organizations (name, slug, description, avatar_url, website, city, region, country, lat, lng, categories, is_online)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
+      [data.name, slug, data.description ?? null, data.avatar_url ?? null, data.website ?? null,
+       data.city ?? null, data.region ?? null, data.country ?? null, data.lat ?? null, data.lng ?? null,
+       data.categories ?? [], data.is_online ?? false],
+    );
+
+    const org = orgResult.rows[0];
+
+    // Automatically add creator as owner
+    await pool.query(
+      `INSERT INTO organization_members (org_id, user_id, role) VALUES ($1,$2,'owner')`,
+      [org.id, callerId],
+    );
+
+    res.status(201).json(org);
+  } catch (err: any) {
+    if (err?.code === '23505') next(new AppError(409, 'An organization with that name already exists'));
+    else next(err);
+  }
+}
+
+/** GET /api/orgs/:slug — public org profile + upcoming/live sessions */
+export async function getOrg(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { slug } = req.params;
+    const callerId = req.user?.isGuest === false ? req.user.userId : null;
+
+    const orgResult = await pool.query(
+      `SELECT o.*,
+              COUNT(DISTINCT of2.user_id)::int AS follower_count
+       FROM organizations o
+       LEFT JOIN org_followers of2 ON of2.org_id = o.id
+       WHERE o.slug = $1
+       GROUP BY o.id`,
+      [slug],
+    );
+    if (!orgResult.rows[0]) throw new AppError(404, 'Channel not found');
+    const org = orgResult.rows[0];
+
+    const sessionsResult = await pool.query(
+      `SELECT s.id, s.title, s.slug, s.status, s.visibility,
+              s.city, s.region, s.starts_at, s.created_at,
+              u.username as host_username
+       FROM sessions s
+       JOIN users u ON u.id = s.host_id
+       WHERE s.org_id = $1 AND s.visibility = 'public' AND s.status != 'closed'
+       ORDER BY s.starts_at ASC NULLS LAST, s.created_at DESC
+       LIMIT 20`,
+      [org.id],
+    );
+
+    const pastSessionsResult = await pool.query(
+      `SELECT s.id, s.title, s.slug, s.status, s.visibility,
+              s.city, s.ends_at, s.created_at,
+              u.username as host_username,
+              COUNT(DISTINCT sp.id)::int AS participant_count,
+              COUNT(DISTINCT q.id)::int  AS question_count
+       FROM sessions s
+       JOIN users u ON u.id = s.host_id
+       LEFT JOIN session_participants sp ON sp.session_id = s.id
+       LEFT JOIN questions q ON q.session_id = s.id AND q.status != 'hidden'
+       WHERE s.org_id = $1 AND s.visibility = 'public' AND s.status = 'closed'
+       GROUP BY s.id, u.username
+       ORDER BY s.ends_at DESC NULLS LAST, s.created_at DESC
+       LIMIT 50`,
+      [org.id],
+    );
+
+    // Include caller's membership role so the frontend can show management controls
+    let caller_role: string = 'none';
+    if (callerId) {
+      const memberResult = await pool.query(
+        `SELECT role FROM organization_members WHERE org_id = $1 AND user_id = $2`,
+        [org.id, callerId],
+      );
+      caller_role = memberResult.rows[0]?.role ?? 'none';
+    }
+
+    res.json({
+      org: { ...org, caller_role },
+      sessions: sessionsResult.rows,
+      past_sessions: pastSessionsResult.rows,
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/** PATCH /api/orgs/:id — update org details (owner or admin) */
+export async function updateOrg(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { id } = req.params;
+    await requireOrgOwnerOrAdmin(id, req.user!.userId);
+
+    const data = UpdateOrgSchema.parse(req.body);
+    const fields = Object.keys(data).filter(k => (data as any)[k] !== undefined);
+    if (!fields.length) { res.json({ message: 'No changes' }); return; }
+
+    const setClauses = fields.map((f, i) => `${f} = $${i + 2}`).join(', ');
+    const values = fields.map(f => (data as any)[f]);
+
+    const result = await pool.query(
+      `UPDATE organizations SET ${setClauses} WHERE id = $1 RETURNING *`,
+      [id, ...values],
+    );
+    res.json(result.rows[0]);
+  } catch (err) {
+    next(err);
+  }
+}
+
+/** GET /api/orgs/:id/members — list members (owner or admin only) */
+export async function listMembers(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { id } = req.params;
+    await requireOrgOwnerOrAdmin(id, req.user!.userId);
+
+    const result = await pool.query(
+      `SELECT om.id, om.user_id, om.role, om.joined_at, u.username, u.email
+       FROM organization_members om
+       JOIN users u ON u.id = om.user_id
+       WHERE om.org_id = $1
+       ORDER BY CASE om.role WHEN 'owner' THEN 0 WHEN 'admin' THEN 1 ELSE 2 END, om.joined_at`,
+      [id],
+    );
+    res.json(result.rows);
+  } catch (err) {
+    next(err);
+  }
+}
+
+/** POST /api/orgs/:id/members — add a member (owner or admin) */
+export async function addMember(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { id } = req.params;
+    await requireOrgOwnerOrAdmin(id, req.user!.userId);
+
+    const { user_id, role } = AddMemberSchema.parse(req.body);
+
+    // Only owners can promote to owner or admin
+    if (role === 'owner' || role === 'admin') {
+      await requireOrgOwner(id, req.user!.userId);
+    }
+
+    const userCheck = await pool.query('SELECT id FROM users WHERE id = $1 AND is_guest = false', [user_id]);
+    if (!userCheck.rows[0]) throw new AppError(404, 'User not found');
+
+    const result = await pool.query(
+      `INSERT INTO organization_members (org_id, user_id, role)
+       VALUES ($1,$2,$3)
+       ON CONFLICT (org_id, user_id) DO UPDATE SET role = EXCLUDED.role
+       RETURNING *`,
+      [id, user_id, role],
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (err: any) {
+    if (err?.code === '23505') next(new AppError(409, 'User is already a member'));
+    else next(err);
+  }
+}
+
+/** POST /api/orgs/:id/follow — follow an org (registered users only) */
+export async function followOrg(req: Request, res: Response, next: NextFunction) {
+  try {
+    const org = await pool.query('SELECT id FROM organizations WHERE id = $1', [req.params.id]);
+    if (!org.rows[0]) throw new AppError(404, 'Channel not found');
+    await pool.query(
+      `INSERT INTO org_followers (org_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+      [req.params.id, req.user!.userId],
+    );
+    res.json({ following: true });
+  } catch (err) { next(err); }
+}
+
+/** DELETE /api/orgs/:id/follow — unfollow an org */
+export async function unfollowOrg(req: Request, res: Response, next: NextFunction) {
+  try {
+    await pool.query(
+      `DELETE FROM org_followers WHERE org_id = $1 AND user_id = $2`,
+      [req.params.id, req.user!.userId],
+    );
+    res.json({ following: false });
+  } catch (err) { next(err); }
+}
+
+/** GET /api/orgs/mine — orgs where the caller is owner or admin */
+export async function listMyOrgs(req: Request, res: Response, next: NextFunction) {
+  try {
+    const callerId = req.user!.userId;
+    const result = await pool.query(
+      `SELECT o.id, o.name, o.slug, o.avatar_url, om.role
+       FROM organizations o
+       JOIN organization_members om ON om.org_id = o.id AND om.user_id = $1
+       WHERE om.role IN ('owner','admin')
+       ORDER BY o.name`,
+      [callerId],
+    );
+    res.json({ orgs: result.rows });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/** DELETE /api/orgs/:id/members/:userId — remove a member (owner only) */
+export async function removeMember(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { id, userId: targetId } = req.params;
+    await requireOrgOwner(id, req.user!.userId);
+
+    if (targetId === req.user!.userId) throw new AppError(400, 'Cannot remove yourself as owner');
+
+    const result = await pool.query(
+      `DELETE FROM organization_members WHERE org_id = $1 AND user_id = $2 RETURNING id`,
+      [id, targetId],
+    );
+    if (!result.rows[0]) throw new AppError(404, 'Member not found');
+    res.json({ removed: true });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/** GET /api/orgs/search — public channel discovery */
+export async function searchOrgs(req: Request, res: Response, next: NextFunction) {
+  try {
+    const q        = typeof req.query.q        === 'string' ? req.query.q.slice(0, 100)        : null;
+    const city     = typeof req.query.city     === 'string' ? req.query.city.slice(0, 100)     : null;
+    const category = typeof req.query.category === 'string' ? req.query.category.slice(0, 50)  : null;
+    const lat      = req.query.lat  ? parseFloat(req.query.lat  as string) : null;
+    const lng      = req.query.lng  ? parseFloat(req.query.lng  as string) : null;
+    const radiusKm = parseFloat(req.query.radius_km as string) || 100;
+
+    let rows;
+
+    if (lat !== null && lng !== null) {
+      rows = await pool.query(
+        `SELECT o.id, o.name, o.slug, o.description, o.avatar_url,
+                o.city, o.region, o.country, o.categories, o.is_online,
+                COUNT(DISTINCT om.user_id)::int AS member_count,
+                CASE WHEN o.is_online THEN NULL
+                     ELSE earth_distance(ll_to_earth($1, $2), ll_to_earth(o.lat, o.lng)) / 1000
+                END AS distance_km
+         FROM organizations o
+         LEFT JOIN organization_members om ON om.org_id = o.id
+         WHERE (
+           o.is_online = true
+           OR (o.lat IS NOT NULL AND o.lng IS NOT NULL
+               AND earth_distance(ll_to_earth($1, $2), ll_to_earth(o.lat, o.lng)) / 1000 <= $3)
+         )
+           AND ($4::TEXT IS NULL OR o.name ILIKE '%' || $4 || '%')
+           AND ($5::TEXT IS NULL OR $5 = ANY(o.categories))
+         GROUP BY o.id
+         ORDER BY o.is_online ASC, distance_km ASC NULLS LAST, o.name ASC
+         LIMIT 24`,
+        [lat, lng, radiusKm, q, category],
+      );
+    } else {
+      rows = await pool.query(
+        `SELECT o.id, o.name, o.slug, o.description, o.avatar_url,
+                o.city, o.region, o.country, o.categories, o.is_online,
+                COUNT(DISTINCT om.user_id)::int AS member_count
+         FROM organizations o
+         LEFT JOIN organization_members om ON om.org_id = o.id
+         WHERE ($1::TEXT IS NULL OR o.name ILIKE '%' || $1 || '%')
+           AND ($2::TEXT IS NULL OR $2 = ANY(o.categories))
+           AND ($3::TEXT IS NULL OR o.city ILIKE '%' || $3 || '%' OR o.is_online = true)
+         GROUP BY o.id
+         ORDER BY o.name ASC
+         LIMIT 24`,
+        [q, category, city],
+      );
+    }
+
+    res.json({ orgs: rows.rows });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/** DELETE /api/orgs/:id — permanently delete a channel (owner only) */
+export async function deleteOrg(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { id } = req.params;
+    const orgResult = await pool.query('SELECT id FROM organizations WHERE id = $1', [id]);
+    if (!orgResult.rows[0]) throw new AppError(404, 'Channel not found');
+    await requireOrgOwner(id, req.user!.userId);
+    // Cascades to org_members, org_followers; sessions get org_id = NULL
+    await pool.query('DELETE FROM organizations WHERE id = $1', [id]);
+    res.json({ deleted: true });
+  } catch (err) {
+    next(err);
+  }
+}

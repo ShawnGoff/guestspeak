@@ -1,0 +1,99 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Fraunces:wght@700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --bg:           #1A0A2E;
+    --card:         #2D1650;
+    --border:       #5B2D8E;
+    --orange:       #F5921E;
+    --amber:        #FFB74D;
+    --purple:       #5B21B6;
+    --purple-light: #7C3AED;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background-color: #1A0A2E;
+    color: #F3F0FF;
+    font-family: 'Inter', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  ::selection {
+    background: #5B21B6;
+    color: #FFB74D;
+  }
+}
+
+@layer components {
+  /* Primary orange CTA button */
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2
+           bg-orange-gradient text-white font-bold
+           px-6 py-3 rounded-xl
+           shadow-orange-glow
+           hover:brightness-110 active:scale-95
+           transition-all duration-150
+           focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-amber;
+  }
+
+  /* Ghost / secondary button */
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2
+           border border-brand-border text-brand-amber font-semibold
+           px-6 py-3 rounded-xl
+           hover:border-brand-purple hover:bg-brand-card
+           transition-all duration-150
+           focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-purple;
+  }
+
+  /* Card surface */
+  .card {
+    @apply bg-brand-card border border-brand-border rounded-2xl shadow-card;
+  }
+
+  /* Shared form input — used across all pages and LocationAutocomplete */
+  .input {
+    width: 100%;
+    background: #1A0A2E;
+    border: 1px solid #3B1F6A;
+    border-radius: 12px;
+    padding: 12px 16px;
+    color: white;
+    font-size: 14px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .input::placeholder { color: rgba(200,180,255,0.3); }
+  .input:focus { border-color: #5B21B6; }
+  .input option { background: #1A0A2E; }
+  .input::-webkit-calendar-picker-indicator { filter: invert(0.7); cursor: pointer; }
+
+  /* Orange text gradient — for display headings */
+  .text-orange-gradient {
+    @apply bg-clip-text text-transparent;
+    background-image: linear-gradient(135deg, #FFB74D 0%, #F5921E 60%, #E07010 100%);
+  }
+
+  /* Live status badge */
+  .badge-live {
+    @apply inline-flex items-center gap-1.5 px-3 py-1 rounded-full
+           bg-red-500/20 text-red-400 text-xs font-semibold uppercase tracking-wide;
+  }
+
+  .badge-live::before {
+    content: '';
+    @apply block w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse;
+  }
+}
