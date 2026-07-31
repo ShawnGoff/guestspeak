@@ -156,7 +156,7 @@ export default function DiscoverPage() {
   }
 
   return (
-    <div className="min-h-screen bg-brand-bg text-white">
+    <div className="min-h-screen bg-brand-bg text-white overflow-x-hidden">
 
       {/* Header */}
       <header className="border-b border-brand-border bg-brand-bg/95 backdrop-blur sticky top-0 z-20">
@@ -209,14 +209,14 @@ export default function DiscoverPage() {
             </div>
 
             {/* Join by code */}
-            <form onSubmit={handleJoin} className="flex gap-0 shrink-0">
+            <form onSubmit={handleJoin} className="flex gap-0 w-full md:w-auto">
               <input
                 type="text"
                 value={code}
                 onChange={e => setCode(e.target.value.toUpperCase())}
                 placeholder="Enter session code"
                 maxLength={12}
-                className="w-44 bg-brand-card border border-brand-border border-r-0 rounded-l-xl px-4 py-3
+                className="flex-1 md:w-44 bg-brand-card border border-brand-border border-r-0 rounded-l-xl px-4 py-3
                            text-white placeholder-brand-border/60 text-sm font-medium
                            focus:outline-none focus:border-brand-purple transition-colors"
               />

@@ -513,18 +513,19 @@ function SessionPageInner() {
 
         {/* Header */}
         <header className="border-b border-brand-border bg-brand-bg/95 backdrop-blur shrink-0 z-20 sticky top-0">
-          <div className="px-4 sm:px-6 py-3 flex items-center gap-3">
+          <div className="px-4 sm:px-6 py-3 flex items-center gap-2 sm:gap-3">
             <Link
               href="/demo"
               className="text-white/35 hover:text-white/70 transition-colors text-sm font-medium flex items-center gap-1 shrink-0"
             >
-              ← Discover
+              <span className="sm:hidden">←</span>
+              <span className="hidden sm:inline">← Discover</span>
             </Link>
-            <span className="text-brand-border/40 shrink-0">/</span>
+            <span className="hidden sm:block text-brand-border/40 shrink-0">/</span>
             <Link href="/" className="font-display text-lg font-bold shrink-0">
               Guest<span className="text-brand-orange">Speak</span>
             </Link>
-            <span className="text-[10px] font-bold text-brand-orange/60 bg-brand-orange/10 border border-brand-orange/20 px-1.5 py-0.5 rounded-full tracking-wider shrink-0">
+            <span className="hidden sm:block text-[10px] font-bold text-brand-orange/60 bg-brand-orange/10 border border-brand-orange/20 px-1.5 py-0.5 rounded-full tracking-wider shrink-0">
               DEMO
             </span>
 
@@ -635,7 +636,7 @@ function SessionPageInner() {
               {view === 'audience' && (
                 <button
                   onClick={() => document.getElementById('ask-input')?.focus()}
-                  className="ml-auto flex items-center gap-1.5 bg-orange-gradient text-white font-bold text-xs sm:text-sm px-3 sm:px-4 py-1.5 rounded-lg shadow-orange-glow hover:brightness-110 transition-all my-2 shrink-0"
+                  className="ml-auto hidden sm:flex items-center gap-1.5 bg-orange-gradient text-white font-bold text-xs sm:text-sm px-3 sm:px-4 py-1.5 rounded-lg shadow-orange-glow hover:brightness-110 transition-all my-2 shrink-0"
                 >
                   ✏️ Ask a question
                 </button>
