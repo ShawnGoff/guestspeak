@@ -694,8 +694,20 @@ function SessionPageInner() {
           {view === 'audience' ? (
             <div className="px-4 sm:px-6 py-3 flex items-center gap-3 sm:gap-4">
               <div className="hidden sm:block shrink-0">
-                <p className="text-xs font-bold text-white/60">Ask a question</p>
-                <p className="text-[11px] text-white/25">Get it answered by the host</p>
+                <p className="text-xs font-bold text-white/60 mb-1.5">Ask a question</p>
+                <div className="flex items-center gap-1.5">
+                  {Array.from({ length: 5 }).map((_, i) => (
+                    <div
+                      key={i}
+                      className={`w-2 h-2 rounded-full transition-colors ${
+                        i < credits ? 'bg-brand-orange' : 'bg-brand-border/40'
+                      }`}
+                    />
+                  ))}
+                  <span className="text-[10px] text-white/30 ml-0.5">
+                    {credits} echo{credits !== 1 ? 's' : ''} left
+                  </span>
+                </div>
               </div>
 
               {submitted ? (
@@ -708,13 +720,22 @@ function SessionPageInner() {
                 </div>
               ) : (
                 <form onSubmit={submit} className="flex-1 flex items-center gap-2">
-                  <input
-                    id="ask-input"
-                    className="input text-sm !py-2.5 flex-1"
-                    placeholder="Type your question here..."
-                    value={draft}
-                    onChange={e => setDraft(e.target.value.slice(0, 300))}
-                  />
+                  <div className="relative flex-1">
+                    <input
+                      id="ask-input"
+                      className="input text-sm !py-2.5 w-full pr-14"
+                      placeholder="Type your question here..."
+                      value={draft}
+                      onChange={e => setDraft(e.target.value.slice(0, 300))}
+                    />
+                    {draft.length > 0 && (
+                      <span className={`absolute right-3 top-1/2 -translate-y-1/2 text-[11px] tabular-nums pointer-events-none ${
+                        draft.length >= 280 ? 'text-red-400' : 'text-white/25'
+                      }`}>
+                        {300 - draft.length}
+                      </span>
+                    )}
+                  </div>
                   <button
                     type="button"
                     onClick={() => setIsAnon(v => !v)}
