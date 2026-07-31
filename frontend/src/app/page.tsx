@@ -1,10 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
-import type { Session } from '@ask-away/shared/types';
 
 // ─── Nav ────────────────────────────────────────────────────────────────────
 
@@ -32,11 +31,169 @@ function Nav() {
 function Logo() {
   return (
     <Link href="/" className="flex items-center gap-2 select-none">
-      {/* Inline SVG icon: sparkle + question bubble matching logo 2 */}
       <span className="text-xl font-bold tracking-tight text-orange-gradient leading-none">
         GuestSpeak
       </span>
     </Link>
+  );
+}
+
+// ─── Mock Q&A Widget ─────────────────────────────────────────────────────────
+
+const MOCK_QUESTIONS = [
+  { text: "What's your take on AI replacing white-collar jobs in the next decade?", author: "Jordan M.", ago: "2m", top: true },
+  { text: "How do companies balance automation with protecting existing employees?", author: "Priya K.", ago: "4m", top: false },
+  { text: "Which industries will face the most disruption from AI in 2025?", author: "anon", ago: "6m", top: false },
+];
+
+function MockQAWidget() {
+  const [echoes, setEchoes] = useState([127, 84, 61]);
+  const [flash, setFlash] = useState<number | null>(null);
+  const [typed, setTyped] = useState('');
+  const [activity, setActivity] = useState<string[]>([
+    'Lena just echoed a question',
+    '42 people attending',
+    'New question submitted',
+  ]);
+  const frameRef = useRef(0);
+
+  // Animate echo counts up
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const idx = Math.floor(Math.random() * 3);
+      setEchoes(prev => {
+        const next = [...prev];
+        next[idx] = next[idx] + 1;
+        return next;
+      });
+      setFlash(idx);
+      setTimeout(() => setFlash(null), 700);
+    }, 2200);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Simulate typing in the ask field
+  const DEMO_TEXT = 'Will AI tools replace developers?';
+  useEffect(() => {
+    let i = 0;
+    let typing = true;
+    const tick = () => {
+      if (typing) {
+        i++;
+        setTyped(DEMO_TEXT.slice(0, i));
+        if (i >= DEMO_TEXT.length) {
+          typing = false;
+          frameRef.current = window.setTimeout(tick, 2000);
+          return;
+        }
+      } else {
+        i--;
+        setTyped(DEMO_TEXT.slice(0, i));
+        if (i <= 0) {
+          typing = true;
+          frameRef.current = window.setTimeout(tick, 800);
+          return;
+        }
+      }
+      frameRef.current = window.setTimeout(tick, typing ? 55 : 30);
+    };
+    frameRef.current = window.setTimeout(tick, 1500);
+    return () => clearTimeout(frameRef.current);
+  }, []);
+
+  return (
+    <div className="relative">
+      {/* Ambient glow */}
+      <div className="absolute -inset-4 bg-brand-orange/10 blur-[70px] rounded-3xl pointer-events-none" />
+
+      <div className="relative rounded-2xl overflow-hidden border border-brand-orange/30 bg-brand-card shadow-[0_0_40px_rgba(245,146,30,0.15)]">
+        {/* Session header */}
+        <div className="px-4 py-3 bg-brand-bg/60 border-b border-brand-border/60 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="badge-live shrink-0">LIVE</span>
+            <span className="text-white text-sm font-semibold truncate">AI &amp; The Future of Work</span>
+          </div>
+          <div className="flex items-center gap-1.5 shrink-0 text-purple-200/40 text-xs">
+            <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
+            <span>42 attending</span>
+          </div>
+        </div>
+
+        {/* Question feed */}
+        <div className="divide-y divide-brand-border/30">
+          {MOCK_QUESTIONS.map((q, i) => (
+            <div
+              key={i}
+              className={`flex gap-3 px-4 py-3.5 transition-colors ${i === 0 ? 'bg-brand-orange/5' : ''}`}
+            >
+              {/* Echo column */}
+              <div className="flex flex-col items-center gap-1 pt-0.5 shrink-0">
+                <div
+                  className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold transition-all duration-300 ${
+                    i === 0
+                      ? 'bg-brand-orange/20 text-brand-orange border border-brand-orange/30'
+                      : 'bg-brand-bg text-purple-200/40 border border-brand-border/40'
+                  } ${flash === i ? 'scale-110' : ''}`}
+                >
+                  ↑
+                </div>
+                <span
+                  className={`text-xs font-bold tabular-nums transition-all duration-300 ${
+                    flash === i ? 'text-brand-orange scale-110' : i === 0 ? 'text-brand-amber' : 'text-purple-200/50'
+                  }`}
+                >
+                  {echoes[i]}
+                </span>
+              </div>
+
+              {/* Content */}
+              <div className="flex-1 min-w-0">
+                {q.top && (
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <span className="text-[10px] font-bold text-brand-orange uppercase tracking-wider">★ Top question</span>
+                  </div>
+                )}
+                <p className="text-white text-xs leading-relaxed">{q.text}</p>
+                <p className="text-purple-200/35 text-[10px] mt-1.5">{q.author} · {q.ago} ago</p>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Ask bar */}
+        <div className="px-3 py-3 border-t border-brand-border/60 bg-brand-bg/40">
+          <div className="flex gap-2 items-center">
+            <div className="flex-1 bg-brand-bg border border-brand-border rounded-xl px-3 py-2.5 text-xs text-white flex items-center">
+              <span>{typed}</span>
+              <span className="w-0.5 h-3 bg-brand-orange animate-pulse ml-px" />
+            </div>
+            <button className="btn-primary text-xs px-4 py-2.5 rounded-xl shrink-0">Ask</button>
+          </div>
+          <div className="flex items-center justify-between mt-2 px-0.5">
+            <span className="text-purple-200/30 text-[10px]">3 credits remaining</span>
+            <span className="text-purple-200/30 text-[10px]">Ask anonymously</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Floating echo notification */}
+      {flash !== null && (
+        <div
+          key={`flash-${flash}-${echoes[flash]}`}
+          className="absolute -right-3 top-1/3 bg-brand-orange text-white text-[10px] font-bold px-2 py-1 rounded-full shadow-lg pointer-events-none"
+          style={{ animation: 'floatBadge 0.7s ease-out forwards' }}
+        >
+          +1 echo
+        </div>
+      )}
+
+      <style>{`
+        @keyframes floatBadge {
+          0% { opacity: 1; transform: translateY(0) scale(1); }
+          100% { opacity: 0; transform: translateY(-24px) scale(0.9); }
+        }
+      `}</style>
+    </div>
   );
 }
 
@@ -63,144 +220,109 @@ function Hero() {
   }
 
   return (
-    <section className="relative pt-32 pb-10 px-4 overflow-hidden">
+    <section className="relative pt-28 pb-12 px-4 overflow-hidden">
       {/* Background glows */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[400px] rounded-full bg-brand-purple/20 blur-[120px] pointer-events-none" />
-      <div className="absolute top-20 left-1/3 w-[300px] h-[300px] rounded-full bg-brand-orange/10 blur-[100px] pointer-events-none" />
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[700px] h-[500px] rounded-full bg-brand-purple/20 blur-[140px] pointer-events-none" />
+      <div className="absolute top-20 left-1/4 w-[300px] h-[300px] rounded-full bg-brand-orange/8 blur-[100px] pointer-events-none" />
+      <div className="absolute top-40 right-1/4 w-[250px] h-[250px] rounded-full bg-brand-purple/15 blur-[80px] pointer-events-none" />
 
-      <div className="relative max-w-4xl mx-auto text-center">
-        {/* Logo */}
-        <div className="mb-6">
-          <span className="text-5xl sm:text-7xl font-display font-bold text-orange-gradient">
-            GuestSpeak
-          </span>
-        </div>
+      <div className="relative max-w-6xl mx-auto">
+        <div className="flex flex-col lg:flex-row items-center gap-12 lg:gap-16">
 
-        {/* Eyebrow */}
-        <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-brand-purple/50 bg-brand-purple/10 text-brand-amber text-sm font-medium mb-6">
-          <span className="w-1.5 h-1.5 rounded-full bg-brand-amber animate-pulse-slow" />
-          Live Audience Q&amp;A Platform
-        </div>
+          {/* Left: copy */}
+          <div className="flex-1 text-center lg:text-left max-w-2xl lg:max-w-none">
+            {/* Eyebrow */}
+            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-brand-purple/50 bg-brand-purple/10 text-brand-amber text-sm font-medium mb-6">
+              <span className="w-1.5 h-1.5 rounded-full bg-brand-amber animate-pulse-slow" />
+              Live Audience Q&amp;A Platform
+            </div>
 
-        {/* Headline */}
-        <h1 className="text-5xl sm:text-6xl md:text-7xl font-extrabold leading-tight mb-6">
-          <span className="text-white">Give your audience</span>
-          <br />
-          <span className="text-orange-gradient">a voice.</span>
-        </h1>
+            {/* Headline */}
+            <h1 className="text-5xl sm:text-6xl xl:text-7xl font-extrabold leading-[1.05] mb-6">
+              <span className="text-white">Give your audience</span>
+              <br />
+              <span className="text-orange-gradient">a voice.</span>
+            </h1>
 
-        <p className="text-lg sm:text-xl text-purple-200/70 max-w-2xl mx-auto mb-10">
-          Let your audience ask questions, support their favorites, and help shape the conversation.
-        </p>
+            <p className="text-lg sm:text-xl text-purple-200/70 mb-10 max-w-xl lg:max-w-none">
+              Real-time Q&amp;A where the crowd surfaces the best questions — no apps, no accounts, no friction.
+            </p>
 
-        {/* Join / Create CTAs */}
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-3">
-          <Link href="/create" className="btn-primary text-base px-8 py-3.5 w-full sm:w-auto">
-            <SparkleIcon />
-            Create a session
-          </Link>
-          <span className="text-brand-border hidden sm:block">or</span>
-          <form onSubmit={handleJoin} className="flex w-full sm:w-auto">
-            <input
-              type="text"
-              value={code}
-              onChange={e => { setCode(e.target.value.toUpperCase()); setJoinError(null); }}
-              placeholder="Enter session code"
-              maxLength={12}
-              className="flex-1 sm:w-48 bg-brand-card border border-brand-border rounded-l-xl px-4 py-3.5
-                         text-white placeholder-brand-border text-sm font-medium
-                         focus:outline-none focus:border-brand-purple transition-colors"
-            />
-            <button
-              type="submit"
-              disabled={joining || !code.trim()}
-              className="btn-primary rounded-l-none px-5 py-3.5 text-sm disabled:opacity-40"
+            {/* CTAs */}
+            <div className="flex flex-col sm:flex-row items-center lg:items-start justify-center lg:justify-start gap-4 mb-4">
+              <Link href="/create" className="btn-primary text-base px-8 py-3.5 w-full sm:w-auto">
+                <SparkleIcon />
+                Create a session
+              </Link>
+              <span className="text-brand-border hidden sm:block self-center">or</span>
+              <form onSubmit={handleJoin} className="flex w-full sm:w-auto">
+                <input
+                  type="text"
+                  value={code}
+                  onChange={e => { setCode(e.target.value.toUpperCase()); setJoinError(null); }}
+                  placeholder="Enter session code"
+                  maxLength={12}
+                  className="flex-1 sm:w-48 bg-brand-card border border-brand-border rounded-l-xl px-4 py-3.5
+                             text-white placeholder-brand-border text-sm font-medium
+                             focus:outline-none focus:border-brand-purple transition-colors"
+                />
+                <button
+                  type="submit"
+                  disabled={joining || !code.trim()}
+                  className="btn-primary rounded-l-none px-5 py-3.5 text-sm disabled:opacity-40"
+                >
+                  {joining ? '…' : 'Join'}
+                </button>
+              </form>
+            </div>
+
+            {joinError && <p className="text-red-400 text-sm mb-3">{joinError}</p>}
+
+            <p className="text-purple-200/40 text-sm mb-4">
+              Free to use · No account needed to join or ask · Account required to host
+            </p>
+
+            <Link
+              href="/demo"
+              className="inline-flex items-center gap-1.5 text-brand-amber/70 hover:text-brand-amber text-sm font-medium transition-colors"
             >
-              {joining ? '…' : 'Join'}
-            </button>
-          </form>
+              <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
+              Try the interactive demo
+              <span className="opacity-60">→</span>
+            </Link>
+          </div>
+
+          {/* Right: animated Q&A widget */}
+          <div className="w-full max-w-sm sm:max-w-md lg:w-[400px] xl:w-[440px] shrink-0">
+            <MockQAWidget />
+          </div>
+
         </div>
-
-        {joinError && <p className="text-red-400 text-sm mb-3">{joinError}</p>}
-
-        <p className="text-brand-orange-dim text-sm mb-3">
-          Free to use · No account needed to join sessions or ask questions · Account required to host
-        </p>
-
-        <Link
-          href="/demo"
-          className="inline-flex items-center gap-1.5 text-brand-amber/70 hover:text-brand-amber text-sm font-medium transition-colors"
-        >
-          <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
-          Try the interactive demo
-          <span className="opacity-60">→</span>
-        </Link>
       </div>
-
     </section>
   );
 }
 
-// ─── Live Now ────────────────────────────────────────────────────────────────
+// ─── Demo Strip ──────────────────────────────────────────────────────────────
 
-function LiveNow() {
-  const [sessions, setSessions] = useState<Session[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    api.get<{ live_now: Session[] }>('/discover')
-      .then(r => setSessions(r.live_now.slice(0, 6)))
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, []);
-
-  if (!loading && sessions.length === 0) return null;
-
+function DemoStrip() {
   return (
-    <section className="py-16 px-4 border-t border-brand-border/40">
+    <section className="py-10 px-4 border-y border-brand-border/40">
       <div className="max-w-6xl mx-auto">
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-3">
-            <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-red-500/20 text-red-400 text-xs font-semibold">
-              <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse" />
-              Live now
-            </span>
-            <h2 className="text-xl font-bold text-white">Happening right now</h2>
+        <div className="rounded-2xl bg-gradient-to-r from-brand-orange/10 via-brand-purple/10 to-brand-orange/5 border border-brand-orange/20 px-6 sm:px-10 py-7 flex flex-col sm:flex-row items-center justify-between gap-6">
+          <div>
+            <p className="text-xs text-brand-orange font-semibold uppercase tracking-widest mb-1">Interactive demo</p>
+            <p className="text-white font-bold text-lg leading-snug">See the full audience experience</p>
+            <p className="text-purple-200/55 text-sm mt-1">Submit questions, add Echoes, and watch the feed update in real time — no account needed.</p>
           </div>
-          <Link href="/discover" className="text-sm text-brand-orange hover:text-brand-amber transition-colors font-medium">
-            See all →
+          <Link
+            href="/demo"
+            className="btn-primary px-8 py-3.5 shrink-0 whitespace-nowrap text-sm"
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse mr-1.5" />
+            Try the demo →
           </Link>
         </div>
-
-        {loading ? (
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {Array.from({ length: 3 }).map((_, i) => (
-              <div key={i} className="card p-5 h-28 animate-pulse bg-brand-card/50" />
-            ))}
-          </div>
-        ) : (
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {sessions.map(s => (
-              <Link key={s.id} href={`/s/${s.slug}`} className="card p-5 flex flex-col gap-2 hover:border-brand-purple/50 transition-colors group">
-                {(s as any).org_name && (
-                  <p className="text-xs text-brand-orange/70 truncate">{(s as any).org_name}</p>
-                )}
-                <h3 className="font-bold text-white text-sm leading-snug group-hover:text-brand-amber transition-colors line-clamp-2">
-                  {s.title}
-                </h3>
-                <div className="flex items-center justify-between text-xs text-purple-200/40 mt-auto pt-1">
-                  <span>{s.host_username}</span>
-                  <div className="flex items-center gap-2">
-                    {(s as any).participant_count > 0 && (
-                      <span>{(s as any).participant_count} joined</span>
-                    )}
-                    {s.city && <span>{s.city}</span>}
-                  </div>
-                </div>
-              </Link>
-            ))}
-          </div>
-        )}
       </div>
     </section>
   );
@@ -213,7 +335,7 @@ const HOW_IT_WORKS = [
     step: '01',
     icon: <LinkIcon />,
     title: 'Host shares a link',
-    desc: 'Create a session in seconds. Share the link or code with your audience — no app install required.',
+    desc: 'Create a session in seconds. Share the link or join code with your audience — no app install required.',
   },
   {
     step: '02',
@@ -231,21 +353,21 @@ const HOW_IT_WORKS = [
 
 function HowItWorks() {
   return (
-    <section className="py-16 px-4">
+    <section className="py-20 px-4">
       <div className="max-w-6xl mx-auto">
         <SectionLabel>How it works</SectionLabel>
         <h2 className="text-4xl sm:text-5xl font-extrabold text-white text-center mb-4">
           Simple for everyone
         </h2>
-        <p className="text-brand-orange-dim text-center text-lg mb-16 max-w-xl mx-auto">
-          Hosts get signal. Audiences get a voice. Three steps.
+        <p className="text-purple-200/55 text-center text-lg mb-16 max-w-xl mx-auto">
+          Hosts get signal. Audiences get a voice. Three steps, that's it.
         </p>
 
         <div className="grid md:grid-cols-3 gap-6">
           {HOW_IT_WORKS.map((item) => (
             <div key={item.step} className="card p-7 relative overflow-hidden group hover:border-brand-purple/60 transition-colors">
-              {/* Step number — watermark */}
-              <span className="absolute top-4 right-5 text-6xl font-extrabold text-brand-border/30 select-none leading-none">
+              {/* Step number watermark */}
+              <span className="absolute top-4 right-5 text-6xl font-extrabold text-brand-border/25 select-none leading-none">
                 {item.step}
               </span>
 
@@ -304,9 +426,9 @@ function Features() {
       <div className="max-w-6xl mx-auto">
         <SectionLabel>Features</SectionLabel>
         <h2 className="text-4xl sm:text-5xl font-extrabold text-white text-center mb-4">
-          Everything you need,<br />nothing you don't
+          Everything you need,<br />nothing you don&apos;t
         </h2>
-        <p className="text-brand-orange-dim text-center text-lg mb-16 max-w-xl mx-auto">
+        <p className="text-purple-200/55 text-center text-lg mb-16 max-w-xl mx-auto">
           Built for live events, conferences, AMAs, classrooms, and anywhere questions matter.
         </p>
 
@@ -328,12 +450,6 @@ function Features() {
 
 // ─── Early access ─────────────────────────────────────────────────────────────
 
-// To wire up email capture:
-// 1. Mailchimp: copy your form's `action` URL and set NEXT_PUBLIC_WAITLIST_URL in Vercel
-// 2. Beehiiv / ConvertKit / any other provider: same — paste the POST endpoint
-// 3. If NEXT_PUBLIC_WAITLIST_URL is not set, the form shows a success state immediately
-//    so the page looks great even before you've picked a provider.
-
 function EarlyAccess() {
   const [email, setEmail] = useState('');
   const [status, setStatus] = useState<'idle' | 'loading' | 'done' | 'error'>('idle');
@@ -345,13 +461,11 @@ function EarlyAccess() {
 
     const formUrl = process.env.NEXT_PUBLIC_WAITLIST_URL;
     if (!formUrl) {
-      // No endpoint configured yet — show success state anyway
       setTimeout(() => setStatus('done'), 600);
       return;
     }
 
     try {
-      // Works with Mailchimp (application/x-www-form-urlencoded) and most providers
       await fetch(formUrl, {
         method: 'POST',
         mode: 'no-cors',
@@ -360,18 +474,16 @@ function EarlyAccess() {
       });
       setStatus('done');
     } catch {
-      setStatus('done'); // no-cors always throws — treat as success
+      setStatus('done');
     }
   }
 
   return (
     <section className="py-24 px-4 border-t border-brand-border/40">
-      <div className="max-w-xl mx-auto text-center">
-        {/* Glow */}
+      <div className="max-w-xl mx-auto text-center relative">
         <div className="absolute left-1/2 -translate-x-1/2 w-[500px] h-[200px] bg-brand-orange/8 blur-[100px] pointer-events-none" />
 
         <div className="relative">
-          {/* Badge */}
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-brand-orange/30 bg-brand-orange/10 text-brand-amber text-sm font-medium mb-6">
             <span className="w-1.5 h-1.5 rounded-full bg-brand-orange animate-pulse-slow" />
             Launching soon
@@ -418,7 +530,6 @@ function EarlyAccess() {
             <p className="text-purple-200/30 text-xs mt-4">No spam. One email when we launch.</p>
           )}
 
-          {/* Feature pills */}
           <div className="flex flex-wrap justify-center gap-2 mt-10">
             {['Real-time Q&A', 'No app install needed', 'Free to start', 'Built for live events'].map(f => (
               <span key={f} className="px-3 py-1.5 rounded-full border border-brand-border text-purple-200/50 text-xs">
@@ -439,7 +550,6 @@ function CTA() {
     <section className="py-24 px-4">
       <div className="max-w-2xl mx-auto text-center">
         <div className="relative card p-10 sm:p-14 overflow-hidden">
-          {/* Background glow */}
           <div className="absolute inset-0 bg-purple-gradient opacity-5 pointer-events-none" />
           <div className="absolute top-0 left-1/2 -translate-x-1/2 w-64 h-40 bg-brand-orange/10 blur-3xl pointer-events-none" />
 
@@ -459,7 +569,6 @@ function CTA() {
             </Link>
           </div>
 
-          {/* Decorative sparkles */}
           <span className="absolute top-6 left-8 text-brand-purple text-xl select-none">✦</span>
           <span className="absolute bottom-8 right-10 text-brand-purple/60 text-lg select-none">✦</span>
           <span className="absolute top-10 right-16 text-brand-orange/40 text-sm select-none">✦</span>
@@ -478,7 +587,7 @@ function Footer() {
         <span className="text-brand-orange font-bold tracking-tight text-lg">GuestSpeak</span>
         <p className="text-purple-200/40 text-sm">© {new Date().getFullYear()} GuestSpeak. Built for live events.</p>
         <div className="flex gap-6 text-purple-200/50 text-sm">
-          <span>Privacy & Terms coming soon</span>
+          <span>Privacy &amp; Terms coming soon</span>
         </div>
       </div>
     </footer>
@@ -495,7 +604,7 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
   );
 }
 
-// ─── Icons (inline SVG) ──────────────────────────────────────────────────────
+// ─── Icons ───────────────────────────────────────────────────────────────────
 
 function SparkleIcon() {
   return (
@@ -581,10 +690,11 @@ export default function HomePage() {
     <main>
       <Nav />
       <Hero />
-      <LiveNow />
+      <DemoStrip />
       <HowItWorks />
       <Features />
       <EarlyAccess />
+      <CTA />
       <Footer />
     </main>
   );
