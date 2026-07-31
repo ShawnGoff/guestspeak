@@ -74,7 +74,7 @@ function MockQAWidget() {
   }, []);
 
   // Simulate typing in the ask field
-  const DEMO_TEXT = 'Will AI tools replace developers?';
+  const DEMO_TEXT = 'How is your team getting the most out of AI tools?';
   useEffect(() => {
     let i = 0;
     let typing = true;
