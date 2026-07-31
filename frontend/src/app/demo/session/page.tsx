@@ -100,22 +100,26 @@ const SEED: Q[] = [
 ];
 
 const INIT_ACTIVITY: ActivityItem[] = [
-  { id: 1, kind: 'echo',     text: '+3 echoes for the top question',        time: 'just now' },
-  { id: 2, kind: 'question', text: 'luma_builds asked a question',           time: 'just now' },
-  { id: 3, kind: 'echo',     text: 'design_thinker_77 echoed a question',    time: 'just now' },
-  { id: 4, kind: 'move',     text: 'Question moved up the feed',             time: 'just now' },
-  { id: 5, kind: 'host',     text: 'Host is answering a question',           time: 'just now' },
+  { id: 1, kind: 'host',     text: 'Host is answering a question',           time: 'just now' },
+  { id: 2, kind: 'echo',     text: '+3 echoes for the top question',         time: '6s ago' },
+  { id: 3, kind: 'question', text: 'luma_builds asked a question',           time: '11s ago' },
+  { id: 4, kind: 'echo',     text: 'design_thinker_77 echoed a question',    time: '18s ago' },
+  { id: 5, kind: 'move',     text: 'Question moved up the feed',             time: '25s ago' },
 ];
 
 const ACTIVITY_POOL: Pick<ActivityItem, 'kind' | 'text'>[] = [
   { kind: 'echo',     text: 'syntax_seeker echoed a question' },
+  { kind: 'echo',     text: 'metric_mind_33 echoed the top question' },
+  { kind: 'echo',     text: '+2 echoes for question #2' },
+  { kind: 'echo',     text: 'token_engineer echoed a question' },
+  { kind: 'echo',     text: '+3 echoes in the last 30s' },
   { kind: 'question', text: 'new_arrival_52 asked a question' },
-  { kind: 'echo',     text: '+2 echoes for question #3' },
+  { kind: 'question', text: 'curious_dev_91 asked a follow-up' },
   { kind: 'move',     text: 'Question moved up the feed' },
-  { kind: 'echo',     text: 'credit_curious echoed the top question' },
+  { kind: 'move',     text: 'A question climbed to #2' },
   { kind: 'host',     text: 'Host pinned a new question' },
-  { kind: 'echo',     text: '+4 echoes in the last minute' },
-  { kind: 'question', text: 'stellar_wave_88 asked a question' },
+  { kind: 'host',     text: 'Host marked a question answered' },
+  { kind: 'answer',   text: 'Host is responding live' },
 ];
 
 // Static color lookup for known seed authors (used for supporter avatars)
@@ -353,7 +357,6 @@ function SessionPageInner() {
   const [credits, setCredits]   = useState(creditsParam);
   const [submitted, setSubmitted] = useState(false);
   const [activity, setActivity] = useState<ActivityItem[]>(INIT_ACTIVITY);
-  const [actNextId, setActNextId] = useState(100);
   const [attending, setAttending] = useState(143);
   const [newCount, setNewCount] = useState(7);
   const [newIds, setNewIds]     = useState<Set<number>>(new Set());
@@ -383,14 +386,10 @@ function SessionPageInner() {
   useEffect(() => {
     const t = setInterval(() => {
       const evt = ACTIVITY_POOL[Math.floor(Math.random() * ACTIVITY_POOL.length)];
-      setActNextId(id => {
-        const next = id + 1;
-        setActivity(prev => [
-          { id: next, kind: evt.kind, text: evt.text, time: 'just now' },
-          ...prev.slice(0, 5),
-        ]);
-        return next;
-      });
+      setActivity(prev => [
+        { id: Date.now(), kind: evt.kind, text: evt.text, time: 'just now' },
+        ...prev.slice(0, 4),
+      ]);
     }, 3200);
     return () => clearInterval(t);
   }, []);
@@ -407,8 +406,8 @@ function SessionPageInner() {
       setQs(prev => prev.some(x => x.id === 99) ? prev : [...prev, newQ]);
       setNewIds(prev => new Set([...prev, 99]));
       setActivity(prev => [
-        { id: 998, kind: 'question', text: 'new_arrival_52 asked a question', time: 'just now' },
-        ...prev.slice(0, 5),
+        { id: Date.now(), kind: 'question', text: 'new_arrival_52 asked a question', time: 'just now' },
+        ...prev.slice(0, 4),
       ]);
     }, 9000);
     return () => clearTimeout(t);
@@ -438,8 +437,8 @@ function SessionPageInner() {
     setSubmitted(true);
     setTimeout(() => setSubmitted(false), 3000);
     setActivity(prev => [
-      { id: actNextId + 1, kind: 'question', text: `${isAnon ? 'Someone' : guestName} asked a question`, time: 'just now' },
-      ...prev.slice(0, 5),
+      { id: Date.now(), kind: 'question', text: `${isAnon ? 'Someone' : guestName} asked a question`, time: 'just now' },
+      ...prev.slice(0, 4),
     ]);
   }
 
@@ -671,11 +670,11 @@ function SessionPageInner() {
           </main>
 
           {/* Right Sidebar */}
-          <aside className="hidden xl:flex flex-col w-[272px] border-l border-brand-border shrink-0 overflow-y-auto">
-            <div className="p-4 border-b border-brand-border/40">
+          <aside className="hidden xl:flex flex-col w-[272px] border-l border-brand-border shrink-0 overflow-y-auto min-h-0">
+            <div className="p-4 border-b border-brand-border/40 shrink-0">
               <p className="text-[10px] font-bold text-white/25 uppercase tracking-widest mb-3">📊 Live Activity</p>
-              <div className="flex flex-col gap-2.5">
-                {activity.map(a => {
+              <div className="flex flex-col gap-2.5 overflow-hidden">
+                {activity.slice(0, 5).map(a => {
                   const s = ACTIVITY_STYLES[a.kind];
                   return (
                     <div key={a.id} className="flex items-start gap-2.5 text-xs">
@@ -693,9 +692,6 @@ function SessionPageInner() {
                   );
                 })}
               </div>
-              <button className="mt-3 text-xs text-brand-orange/70 hover:text-brand-orange transition-colors flex items-center gap-1">
-                View all activity <span className="text-white/25">›</span>
-              </button>
             </div>
 
             <div className="p-4">
