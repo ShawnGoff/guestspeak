@@ -41,9 +41,9 @@ function Logo() {
 // ─── Mock Q&A Widget ─────────────────────────────────────────────────────────
 
 const MOCK_QUESTIONS = [
-  { text: "What's your take on AI replacing white-collar jobs in the next decade?", author: "Jordan M.", ago: "2m", top: true },
-  { text: "How do companies balance automation with protecting existing employees?", author: "Priya K.", ago: "4m", top: false },
-  { text: "Which industries will face the most disruption from AI in 2025?", author: "anon", ago: "6m", top: false },
+  { text: "How do you handle prompt injection and untrusted user input in production?", author: "Jordan M.", ago: "2m", top: true },
+  { text: "What's your strategy for keeping AI inference costs manageable at scale?", author: "Priya K.", ago: "4m", top: false },
+  { text: "How are you versioning and testing prompt changes across releases?", author: "anon", ago: "6m", top: false },
 ];
 
 function MockQAWidget() {
