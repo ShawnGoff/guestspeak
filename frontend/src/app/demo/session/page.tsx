@@ -39,7 +39,7 @@ type Participant = {
 
 const BASE_TS = Date.now();
 
-const SEED: Q[] = [
+const SEED_TECH: Q[] = [
   {
     id: 1,
     text: 'How do you decide between fine-tuning, RAG, and prompt engineering for a given feature?',
@@ -98,6 +98,117 @@ const SEED: Q[] = [
     ts: BASE_TS - 840000,
   },
 ];
+
+const SEED_NBA: Q[] = [
+  {
+    id: 1,
+    text: 'What adjustments did you make at halftime that turned the game around tonight?',
+    echoes: 87, echoed: false, answered: false, pinned: true,
+    author: 'courtside_kai', authorColor: '#DC2626',
+    ago: '2m ago', tags: ['Strategy', 'Adjustments'], comments: 9,
+    ts: BASE_TS - 120000,
+    supporters: ['hoop_dreams_4', 'lakeshow_liv', 'the_stat_line', 'bench_mob_77'],
+  },
+  {
+    id: 2,
+    text: "How do you manage player minutes when the schedule gets brutal — 4 games in 6 nights?",
+    echoes: 54, echoed: false, answered: false, pinned: false,
+    author: 'hoop_dreams_4', authorColor: '#059669',
+    ago: '4m ago', tags: ['Load Management', 'Rotation'], comments: 7,
+    ts: BASE_TS - 240000,
+  },
+  {
+    id: 3,
+    text: "What's your philosophy on developing young talent vs. playing to win right now?",
+    echoes: 41, echoed: false, answered: false, pinned: false,
+    author: 'lakeshow_liv', authorColor: '#7C3AED',
+    ago: '5m ago', tags: ['Development', 'Culture'], comments: 11,
+    ts: BASE_TS - 300000,
+  },
+  {
+    id: 4,
+    text: "How involved are you in trade deadline conversations with the front office?",
+    echoes: 33, echoed: false, answered: false, pinned: false,
+    author: 'the_stat_line', authorColor: '#D97706',
+    ago: '8m ago', tags: ['Front Office', 'Trades'], comments: 5,
+    ts: BASE_TS - 480000,
+  },
+  {
+    id: 5,
+    text: "What does your film room process look like — how far ahead do you prep for opponents?",
+    echoes: 98, echoed: false, answered: true, pinned: false,
+    author: 'bench_mob_77', authorColor: '#2563EB',
+    ago: '10m ago', tags: ['Film', 'Preparation'], comments: 4,
+    ts: BASE_TS - 600000,
+  },
+  {
+    id: 6,
+    text: "How do you keep veteran players bought in when their roles change late in their careers?",
+    echoes: 19, echoed: false, answered: false, pinned: false,
+    author: 'paint_and_pick', authorColor: '#0891B2',
+    ago: '13m ago', tags: ['Leadership', 'Veterans'], comments: 3,
+    ts: BASE_TS - 780000,
+  },
+];
+
+const SEED_STARTUP: Q[] = [
+  {
+    id: 1,
+    text: "What's your biggest differentiator and why hasn't a larger player built this already?",
+    echoes: 74, echoed: false, answered: false, pinned: true,
+    author: 'venture_vince', authorColor: '#7C3AED',
+    ago: '2m ago', tags: ['Competitive Moat', 'Strategy'], comments: 8,
+    ts: BASE_TS - 120000,
+    supporters: ['founding_vibes', 'seed_round_sue', 'angel_alicia', 'cap_table_cal'],
+  },
+  {
+    id: 2,
+    text: "How did you validate demand before writing a single line of code?",
+    echoes: 61, echoed: false, answered: false, pinned: false,
+    author: 'founding_vibes', authorColor: '#059669',
+    ago: '3m ago', tags: ['Validation', 'PMF'], comments: 10,
+    ts: BASE_TS - 180000,
+  },
+  {
+    id: 3,
+    text: "What does your path to profitability look like and what's your runway right now?",
+    echoes: 39, echoed: false, answered: false, pinned: false,
+    author: 'seed_round_sue', authorColor: '#DC2626',
+    ago: '6m ago', tags: ['Financials', 'Runway'], comments: 6,
+    ts: BASE_TS - 360000,
+  },
+  {
+    id: 4,
+    text: "Are you going enterprise or consumer first — and why?",
+    echoes: 28, echoed: false, answered: false, pinned: false,
+    author: 'angel_alicia', authorColor: '#D97706',
+    ago: '8m ago', tags: ['GTM', 'Sales'], comments: 4,
+    ts: BASE_TS - 480000,
+  },
+  {
+    id: 5,
+    text: "What's your fundraising plan after today — Seed extension or straight to Series A?",
+    echoes: 103, echoed: false, answered: true, pinned: false,
+    author: 'cap_table_cal', authorColor: '#2563EB',
+    ago: '11m ago', tags: ['Fundraising', 'Strategy'], comments: 3,
+    ts: BASE_TS - 660000,
+  },
+  {
+    id: 6,
+    text: "How are you thinking about hiring — when do you bring on your first non-technical role?",
+    echoes: 12, echoed: false, answered: false, pinned: false,
+    author: 'operator_opal', authorColor: '#0891B2',
+    ago: '14m ago', tags: ['Team', 'Hiring'], comments: 2,
+    ts: BASE_TS - 840000,
+  },
+];
+
+function getSeed(title: string): Q[] {
+  const t = title.toLowerCase();
+  if (t.includes('coach') || t.includes('nba') || t.includes('playoff') || t.includes('pulse')) return SEED_NBA;
+  if (t.includes('startup') || t.includes('demo day') || t.includes('pitch') || t.includes('founder')) return SEED_STARTUP;
+  return SEED_TECH;
+}
 
 const INIT_ACTIVITY: ActivityItem[] = [
   { id: 1, kind: 'host',     text: 'Host is answering a question',           time: 'just now' },
@@ -349,7 +460,7 @@ function SessionPageInner() {
   const isHostParam = params.get('host') === 'true';
   const creditsParam = Number(params.get('credits') ?? 3);
 
-  const [qs, setQs]             = useState<Q[]>(SEED);
+  const [qs, setQs]             = useState<Q[]>(() => getSeed(titleParam));
   const [sort, setSort]         = useState<'top' | 'rising' | 'newest' | 'answered'>('top');
   const [view, setView]         = useState<'audience' | 'host'>(isHostParam ? 'host' : 'audience');
   const [draft, setDraft]       = useState('');
