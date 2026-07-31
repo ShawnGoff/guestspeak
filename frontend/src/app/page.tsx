@@ -12,15 +12,16 @@ function Nav() {
     <nav className="fixed top-0 inset-x-0 z-50 border-b border-brand-border/50 backdrop-blur-md bg-brand-bg/80">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 flex items-center justify-between h-16">
         <Logo />
-        <div className="flex items-center gap-3">
-          <Link href="/discover" className="btn-ghost text-sm py-2 px-4">
+        <div className="flex items-center gap-2">
+          <Link href="/discover" className="hidden sm:block btn-ghost text-sm py-2 px-4">
             Discover
           </Link>
           <Link href="/login" className="btn-ghost text-sm py-2 px-4">
             Sign in
           </Link>
           <Link href="/create" className="btn-primary text-sm py-2 px-4">
-            Create session
+            <span className="sm:hidden">Create</span>
+            <span className="hidden sm:inline">Create session</span>
           </Link>
         </div>
       </div>
@@ -687,7 +688,7 @@ function GuestIcon() {
 
 export default function HomePage() {
   return (
-    <main>
+    <main className="overflow-x-hidden">
       <Nav />
       <Hero />
       <DemoStrip />

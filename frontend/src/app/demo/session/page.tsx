@@ -461,8 +461,12 @@ function SessionPageInner() {
 
   const unanswered   = allSorted.filter(q => !q.answered);
   const answeredList = allSorted.filter(q => q.answered);
-  const featuredQ    = sort === 'answered' ? null : unanswered[0] ?? null;
-  const listQs       = sort === 'answered' ? answeredList : [...unanswered.slice(1), ...answeredList];
+  const featuredQ    = sort === 'top' ? (unanswered[0] ?? null) : null;
+  const listQs       = sort === 'answered'
+    ? answeredList
+    : sort === 'top'
+      ? [...unanswered.slice(1), ...answeredList]
+      : [...unanswered, ...answeredList];
 
   const totalAsked  = qs.length;
   const awaitingAns = qs.filter(q => !q.answered).length;
@@ -788,7 +792,7 @@ function SessionPageInner() {
                     <input
                       id="ask-input"
                       className="input text-sm !py-2.5 w-full pr-14"
-                      placeholder="Type your question here..."
+                      placeholder="Ask a question..."
                       value={draft}
                       onChange={e => setDraft(e.target.value.slice(0, 300))}
                     />
@@ -820,7 +824,8 @@ function SessionPageInner() {
                         : 'bg-brand-card border border-brand-border text-white/20 cursor-default'
                     }`}
                   >
-                    ↑ Submit question
+                    <span className="sm:hidden">↑ Ask</span>
+                    <span className="hidden sm:inline">↑ Submit</span>
                   </button>
                 </form>
               )}
