@@ -210,6 +210,15 @@ function getSeed(title: string): Q[] {
   return SEED_TECH;
 }
 
+function getAutoQ(title: string): Pick<Q, 'text' | 'tags'> {
+  const t = title.toLowerCase();
+  if (t.includes('coach') || t.includes('nba') || t.includes('playoff') || t.includes('pulse'))
+    return { text: 'Which young player on your roster has surprised you the most this season?', tags: ['Roster', 'Development'] };
+  if (t.includes('startup') || t.includes('demo day') || t.includes('pitch') || t.includes('founder'))
+    return { text: "What's the one metric you obsess over above all others right now?", tags: ['Metrics', 'Focus'] };
+  return { text: 'How do you keep the team aligned when priorities shift quickly?', tags: ['Team', 'Strategy'] };
+}
+
 const INIT_ACTIVITY: ActivityItem[] = [
   { id: 1, kind: 'host',     text: 'Host is answering a question',           time: 'just now' },
   { id: 2, kind: 'echo',     text: '+3 echoes for the top question',         time: '6s ago' },
@@ -508,12 +517,13 @@ function SessionPageInner() {
 
   useEffect(() => {
     const t = setTimeout(() => {
+      const autoQ = getAutoQ(titleParam);
       const newQ: Q = {
         id: 99,
-        text: 'What latency targets are you aiming for on streaming AI responses in the UI?',
+        text: autoQ.text,
         echoes: 0, echoed: false, answered: false, pinned: false,
         author: 'new_arrival_52', authorColor: '#0891B2',
-        ago: 'just now', tags: ['AI', 'Live Demo'], comments: 0, ts: Date.now(),
+        ago: 'just now', tags: autoQ.tags, comments: 0, ts: Date.now(),
       };
       setQs(prev => prev.some(x => x.id === 99) ? prev : [...prev, newQ]);
       setNewIds(prev => new Set([...prev, 99]));
