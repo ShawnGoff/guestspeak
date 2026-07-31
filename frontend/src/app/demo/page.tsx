@@ -219,7 +219,7 @@ export default function DiscoverPage() {
                 placeholder="Enter session code"
                 maxLength={12}
                 className="flex-1 md:w-44 bg-brand-card border border-brand-border border-r-0 rounded-l-xl px-4 py-3
-                           text-white placeholder-brand-border/60 text-sm font-medium
+                           text-white placeholder-white/30 text-sm font-medium
                            focus:outline-none focus:border-brand-purple transition-colors"
               />
               <button

@@ -86,7 +86,7 @@ export default function DemoCreatePage() {
               placeholder="e.g. Q3 Product Roadmap AMA"
               maxLength={80}
               className="w-full bg-brand-card border border-brand-border rounded-xl px-4 py-3.5
-                         text-white placeholder-brand-border/60 text-base
+                         text-white placeholder-white/30 text-base
                          focus:outline-none focus:border-brand-purple transition-colors"
             />
             <p className="text-white/25 text-xs mt-1.5">{80 - title.length} characters remaining</p>
@@ -104,7 +104,7 @@ export default function DemoCreatePage() {
               rows={3}
               maxLength={300}
               className="w-full bg-brand-card border border-brand-border rounded-xl px-4 py-3.5
-                         text-white placeholder-brand-border/60 text-sm resize-none
+                         text-white placeholder-white/30 text-sm resize-none
                          focus:outline-none focus:border-brand-purple transition-colors"
             />
           </div>
