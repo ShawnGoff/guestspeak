@@ -118,13 +118,18 @@ const ACTIVITY_POOL: Pick<ActivityItem, 'kind' | 'text'>[] = [
   { kind: 'question', text: 'stellar_wave_88 asked a question' },
 ];
 
-const PARTICIPANTS: Participant[] = [
-  { name: 'design_thinker_77', color: '#059669', echoes: 24 },
-  { name: 'curious_dev_91',    color: '#7C3AED', echoes: 18 },
-  { name: 'luma_builds',       color: '#DC2626', echoes: 15 },
-  { name: 'syntax_seeker',     color: '#D97706', echoes: 11 },
-  { name: 'metric_mind_33',    color: '#2563EB', echoes: 9  },
-];
+// Static color lookup for known seed authors (used for supporter avatars)
+const AUTHOR_COLORS: Record<string, string> = {
+  'design_thinker_77': '#059669',
+  'curious_dev_91':    '#7C3AED',
+  'luma_builds':       '#DC2626',
+  'syntax_seeker':     '#D97706',
+  'metric_mind_33':    '#2563EB',
+  'token_engineer':    '#7C3AED',
+  'credit_curious':    '#DC2626',
+  'new_arrival_52':    '#0891B2',
+  'stellar_wave_88':   '#0891B2',
+};
 
 const ACTIVITY_STYLES: Record<ActivityItem['kind'], { bg: string; color: string; icon: string }> = {
   echo:     { bg: 'rgba(245,146,30,0.15)',  color: '#F5921E', icon: '↑' },
@@ -227,7 +232,7 @@ function TopQuestionCard({
                 <div
                   key={i}
                   className="w-5 h-5 rounded-full border-2 border-brand-bg flex items-center justify-center text-[8px] font-bold text-white"
-                  style={{ backgroundColor: PARTICIPANTS.find(p => p.name === s)?.color ?? '#7C3AED' }}
+                  style={{ backgroundColor: AUTHOR_COLORS[s] ?? '#7C3AED' }}
                 >
                   {s[0].toUpperCase()}
                 </div>
@@ -461,6 +466,23 @@ function SessionPageInner() {
   const awaitingAns = qs.filter(q => !q.answered).length;
   const answeredCnt = qs.filter(q => q.answered).length;
 
+  // ── Leaderboard: echoes received per author ───────────────────────────────
+  const leaderboard = useMemo((): Participant[] => {
+    const map = new Map<string, { color: string; echoes: number }>();
+    qs.forEach(q => {
+      if (q.author === 'anonymous') return;
+      const prev = map.get(q.author);
+      map.set(q.author, {
+        color: q.authorColor,
+        echoes: (prev?.echoes ?? 0) + q.echoes,
+      });
+    });
+    return [...map.entries()]
+      .map(([name, { color, echoes }]) => ({ name, color, echoes }))
+      .sort((a, b) => b.echoes - a.echoes)
+      .slice(0, 5);
+  }, [qs]);
+
   // ── Duplicate detection ───────────────────────────────────────────────────
   const similar = useMemo(() => {
     if (draft.length < 12) return [];
@@ -677,9 +699,12 @@ function SessionPageInner() {
             </div>
 
             <div className="p-4">
-              <p className="text-[10px] font-bold text-white/25 uppercase tracking-widest mb-3">🏆 Top Participants</p>
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-[10px] font-bold text-white/25 uppercase tracking-widest">🏆 Top Participants</p>
+                <p className="text-[10px] text-white/20">echoes received</p>
+              </div>
               <div className="flex flex-col gap-3">
-                {PARTICIPANTS.map((p, i) => (
+                {leaderboard.map((p, i) => (
                   <div key={p.name} className="flex items-center gap-2.5">
                     <span className={`text-xs font-bold w-4 text-center shrink-0 ${i === 0 ? 'text-brand-amber' : 'text-white/25'}`}>
                       {i + 1}
@@ -687,7 +712,7 @@ function SessionPageInner() {
                     <Avatar name={p.name} color={p.color} size="xs" />
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-semibold text-white/70 truncate">{p.name}</p>
-                      <p className="text-[11px] text-white/30">{p.echoes} echoes</p>
+                      <p className="text-[11px] text-white/30">{p.echoes} echoes received</p>
                     </div>
                     <div
                       className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
