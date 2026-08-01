@@ -6,7 +6,7 @@ export type OrgRole = 'owner' | 'admin' | 'member';
 export type SessionVisibility = 'public' | 'unlisted' | 'private';
 export type CallerRole = 'host' | 'org_owner' | 'org_admin' | 'moderator' | 'participant' | 'none';
 export type SessionStatus = 'upcoming' | 'live' | 'closed';
-export type QuestionStatus = 'new' | 'starred' | 'answered' | 'hidden';
+export type QuestionStatus = 'pending' | 'new' | 'starred' | 'answered' | 'hidden';
 export type FlagReason = 'spam' | 'offensive' | 'harassment' | 'off_topic' | 'other';
 export type SortOption = 'echoes' | 'recent' | 'answered' | 'starred';
 
@@ -113,6 +113,7 @@ export interface Session {
   starts_at?: string;
   ends_at?: string;
   submission_cutoff_at?: string;
+  requires_approval?: boolean;
   created_at: string;
   updated_at: string;
   caller_role?: CallerRole;
@@ -125,6 +126,10 @@ export interface Question {
   session_id: string;
   author_id?: string;
   author_username?: string;
+  /** Session participant row ID — present for hosts/mods to enable mute/ban */
+  participant_id?: string;
+  /** True if the question author is currently muted in this session */
+  author_is_muted?: boolean;
   body: string;
   status: QuestionStatus;
   /** Internal field — displayed publicly as "Echoes" */
@@ -164,6 +169,9 @@ export interface SessionModerator {
   can_star: boolean;
   can_flag: boolean;
   can_hide: boolean;
+  can_mute: boolean;
+  can_remove: boolean;
+  can_approve: boolean;
   assigned_at: string;
 }
 

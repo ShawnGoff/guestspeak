@@ -260,6 +260,27 @@ export default function SessionPage({ params }: SessionPageProps) {
     } catch (err: any) { setError(err.message); }
   }
 
+  async function muteAuthor(participantId: string, currentlyMuted: boolean) {
+    if (!session) return;
+    try {
+      await api.patch(`/sessions/${session.id}/participants/${participantId}/mute`, { mute: !currentlyMuted });
+      // Optimistically update muted state on all questions by this participant
+      setQuestions(prev => prev.map(q =>
+        q.participant_id === participantId ? { ...q, author_is_muted: !currentlyMuted } : q
+      ));
+    } catch (err: any) { setError(err.message); }
+  }
+
+  async function removeAuthor(participantId: string) {
+    if (!session) return;
+    if (!confirm('Remove this person from the session? They will not be able to rejoin.')) return;
+    try {
+      await api.delete(`/sessions/${session.id}/participants/${participantId}`);
+      // Remove their questions from the local feed
+      setQuestions(prev => prev.filter(q => q.participant_id !== participantId));
+    } catch (err: any) { setError(err.message); }
+  }
+
   function dismissWelcome() {
     sessionStorage.setItem(`seen_${params.slug}`, '1');
     setShowWelcome(false);
@@ -475,6 +496,8 @@ export default function SessionPage({ params }: SessionPageProps) {
               onPin={() => togglePin(q.id)}
               onSpotlight={() => toggleSpotlight(q.id)}
               onReply={() => { setReplyTarget(q); setReplyText(q.host_reply ?? ''); }}
+              onMute={q.participant_id && !myQuestionIds.has(q.id) ? () => muteAuthor(q.participant_id!, !!q.author_is_muted) : undefined}
+              onRemove={q.participant_id && !myQuestionIds.has(q.id) ? () => removeAuthor(q.participant_id!) : undefined}
               sessionClosed={session.status === 'closed'}
             />
           ))}
@@ -864,7 +887,8 @@ function SortTabs({ sort, onChange }: { sort: SortOption; onChange: (s: SortOpti
 // ─── Question card ────────────────────────────────────────────────────────────
 
 function QuestionCard({ question, isEchoed, isMine, creditsLeft, onEcho,
-  hostView, onStar, onAnswered, onHide, onPin, onSpotlight, onReply, sessionClosed }: {
+  hostView, onStar, onAnswered, onHide, onPin, onSpotlight, onReply,
+  onMute, onRemove, sessionClosed }: {
   question: Question & { is_pinned?: boolean; is_spotlighted?: boolean };
   isEchoed: boolean;
   isMine: boolean;
@@ -877,6 +901,8 @@ function QuestionCard({ question, isEchoed, isMine, creditsLeft, onEcho,
   onPin: () => void;
   onSpotlight: () => void;
   onReply: () => void;
+  onMute?: () => void;
+  onRemove?: () => void;
   sessionClosed: boolean;
 }) {
   const canEcho = !isEchoed && !isMine && creditsLeft > 0 && question.status !== 'hidden';
@@ -969,6 +995,21 @@ function QuestionCard({ question, isEchoed, isMine, creditsLeft, onEcho,
               <ModButton onClick={onReply} title="Add host reply">
                 Reply
               </ModButton>
+              {onMute && (
+                <ModButton
+                  onClick={onMute}
+                  title={question.author_is_muted ? 'Unmute — allow them to ask again' : 'Mute — prevent further questions'}
+                  active={!!question.author_is_muted}
+                  danger={!question.author_is_muted}
+                >
+                  {question.author_is_muted ? 'Unmute' : '🔇 Mute'}
+                </ModButton>
+              )}
+              {onRemove && (
+                <ModButton onClick={onRemove} title="Remove from session" danger>
+                  Remove
+                </ModButton>
+              )}
             </div>
           )}
         </div>

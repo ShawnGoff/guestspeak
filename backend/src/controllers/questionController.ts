@@ -64,13 +64,18 @@ export async function getQuestions(req: Request, res: Response, next: NextFuncti
     const result = await pool.query(
       `SELECT q.id, q.body, q.status, q.is_pinned, q.is_spotlighted, q.vote_count,
               q.host_reply, q.host_replied_at, q.created_at,
-              COALESCE(u.username, sp.guest_username) AS author_username
+              COALESCE(u.username, sp.guest_username) AS author_username,
+              sp.id   AS participant_id,
+              sp.is_muted AS author_is_muted
        FROM questions q
        LEFT JOIN users u ON u.id = q.author_id
        LEFT JOIN session_participants sp
          ON sp.session_id = q.session_id
-         AND sp.guest_token = q.author_guest_token
-         AND q.author_guest_token IS NOT NULL
+         AND (
+           (q.author_guest_token IS NOT NULL AND sp.guest_token = q.author_guest_token)
+           OR
+           (q.author_id IS NOT NULL AND sp.user_id = q.author_id)
+         )
        WHERE ${conditions.join(' AND ')}
        ORDER BY ${orderBy}
        ${limitClause}`,
