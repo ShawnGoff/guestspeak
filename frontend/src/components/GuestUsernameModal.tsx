@@ -112,7 +112,10 @@ export default function GuestUsernameModal({
     try {
       await onJoin(username.trim());
     } catch (err: any) {
-      setError(err.message ?? 'Failed to join');
+      const isNetworkError = err instanceof TypeError && err.message === 'Failed to fetch';
+      setError(isNetworkError
+        ? 'No internet connection. Check your connection and try again.'
+        : (err.message ?? 'Failed to join. Please try again.'));
       setJoining(false);
     }
   }
@@ -135,12 +138,12 @@ export default function GuestUsernameModal({
         {/* Auto-name pill */}
         {isAuto && (
           <div className="flex items-center justify-between mb-3 bg-brand-bg border border-brand-border rounded-xl px-4 py-3">
-            <span className="text-white font-mono font-semibold text-sm tracking-wide">{username}</span>
+            <span className="text-white font-mono font-semibold text-sm tracking-wide truncate min-w-0 mr-3">{username}</span>
             <button
               type="button"
               onClick={shuffle}
               title="Try another name"
-              className="flex items-center gap-1.5 text-xs text-purple-200/50 hover:text-purple-200 transition-colors ml-3 shrink-0"
+              className="flex items-center gap-1.5 text-xs text-purple-200/50 hover:text-purple-200 transition-colors shrink-0 py-1.5 px-2 -mr-2 min-h-[44px]"
             >
               {/* Shuffle icon */}
               <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -167,7 +170,7 @@ export default function GuestUsernameModal({
                 setAvailability('idle');
                 setTimeout(() => inputRef.current?.focus(), 0);
               }}
-              className="text-xs text-purple-200/40 hover:text-purple-200/70 transition-colors w-full text-center py-1"
+              className="text-xs text-purple-200/40 hover:text-purple-200/70 transition-colors w-full text-center py-3 min-h-[44px] flex items-center justify-center"
             >
               Or type your own name →
             </button>
@@ -181,7 +184,7 @@ export default function GuestUsernameModal({
                   onChange={handleInputChange}
                   placeholder="your_name"
                   maxLength={30}
-                  className="w-full bg-brand-bg border border-brand-border rounded-xl px-4 py-3 text-white
+                  className="w-full bg-brand-bg border border-brand-border rounded-xl px-4 py-3 text-white text-base
                              placeholder-white/25 focus:outline-none focus:border-brand-purple transition-colors pr-10"
                 />
                 {/* Status icon */}
@@ -216,7 +219,7 @@ export default function GuestUsernameModal({
               <button
                 type="button"
                 onClick={shuffle}
-                className="text-xs text-purple-200/40 hover:text-purple-200/70 transition-colors w-full text-center py-1"
+                className="text-xs text-purple-200/40 hover:text-purple-200/70 transition-colors w-full text-center py-3 min-h-[44px] flex items-center justify-center"
               >
                 ← Back to a suggested name
               </button>

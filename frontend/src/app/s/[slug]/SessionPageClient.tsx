@@ -216,6 +216,14 @@ export default function SessionPageClient({ params }: SessionPageProps) {
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
+  // ── Auto-dismiss error toast ──────────────────────────────────────────────
+
+  useEffect(() => {
+    if (!error) return;
+    const t = setTimeout(() => setError(null), 5000);
+    return () => clearTimeout(t);
+  }, [error]);
+
   // ── Similar detection ─────────────────────────────────────────────────────
 
   const fetchSimilar = useCallback((q: string) => {
@@ -442,7 +450,7 @@ export default function SessionPageClient({ params }: SessionPageProps) {
   if (!session) return null;
 
   return (
-    <div className="min-h-screen bg-brand-bg flex flex-col">
+    <div className="min-h-[100dvh] bg-brand-bg flex flex-col">
       <SessionHeader
         session={session}
         isLiveSoon={!!isLiveSoon}
@@ -470,7 +478,7 @@ export default function SessionPageClient({ params }: SessionPageProps) {
         />
       )}
 
-      <main className="flex-1 max-w-2xl w-full mx-auto px-3 sm:px-4 pb-32 pt-4">
+      <main className="flex-1 max-w-2xl w-full mx-auto px-3 sm:px-4 pb-[calc(8rem+env(safe-area-inset-bottom))] pt-4">
 
         {/* Closed session stats banner */}
         {session.status === 'closed' && (
@@ -504,7 +512,7 @@ export default function SessionPageClient({ params }: SessionPageProps) {
             onChange={e => setSearchQuery(e.target.value)}
             placeholder="Search questions…"
             className="w-full bg-brand-card border border-brand-border rounded-xl pl-9 pr-4 py-3
-                       text-white text-sm placeholder-purple-200/40 focus:outline-none focus:border-brand-purple transition-colors"
+                       text-white text-base placeholder-purple-200/40 focus:outline-none focus:border-brand-purple transition-colors"
           />
         </div>
 
@@ -546,15 +554,15 @@ export default function SessionPageClient({ params }: SessionPageProps) {
                     <div className="flex gap-2">
                       <button
                         onClick={() => approveQuestion(q.id)}
-                        className="flex-1 text-xs py-2 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-semibold hover:bg-emerald-500/20 transition-colors"
+                        className="flex-1 text-sm py-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-semibold hover:bg-emerald-500/20 transition-colors min-h-[44px]"
                       >
                         ✓ Approve
                       </button>
                       <button
-                        onClick={() => rejectQuestion(q.id)}
-                        className="flex-1 text-xs py-2 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 font-semibold hover:bg-red-500/20 transition-colors"
+                        onClick={() => { if (confirm('Reject this question?')) rejectQuestion(q.id); }}
+                        className="flex-1 text-sm py-2.5 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 font-semibold hover:bg-red-500/20 transition-colors min-h-[44px]"
                       >
-                        Reject
+                        ✕ Reject
                       </button>
                     </div>
                   </div>
@@ -616,20 +624,23 @@ export default function SessionPageClient({ params }: SessionPageProps) {
       )}
 
       {submissionClosed && session.status !== 'closed' && (
-        <div className="fixed bottom-0 inset-x-0 bg-brand-card border-t border-brand-border p-4 text-center text-sm text-purple-200/60">
+        <div className="fixed bottom-0 inset-x-0 bg-brand-card border-t border-brand-border px-4 pt-4 pb-[calc(1rem+env(safe-area-inset-bottom))] text-center text-sm text-purple-200/60">
           Question submission has closed for this session.
         </div>
       )}
 
       {session.status === 'closed' && (
-        <div className="fixed bottom-0 inset-x-0 bg-brand-card border-t border-brand-border p-4 text-center text-sm text-purple-200/60">
+        <div className="fixed bottom-0 inset-x-0 bg-brand-card border-t border-brand-border px-4 pt-4 pb-[calc(1rem+env(safe-area-inset-bottom))] text-center text-sm text-purple-200/60">
           This session has ended. Questions are archived below.
         </div>
       )}
 
       {error && (
-        <div className="fixed top-20 left-1/2 -translate-x-1/2 bg-red-900/80 text-red-300 text-sm px-4 py-2 rounded-xl border border-red-700 z-50">
-          {error}
+        <div className="fixed top-20 left-1/2 -translate-x-1/2 w-max max-w-[calc(100vw-2rem)] bg-red-900/90 text-red-300 text-sm px-4 py-2.5 rounded-xl border border-red-700 z-50 flex items-center gap-3 shadow-xl">
+          <span>{error}</span>
+          <button onClick={() => setError(null)} className="text-red-400/60 hover:text-red-300 transition-colors flex-shrink-0" aria-label="Dismiss">
+            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+          </button>
         </div>
       )}
 
@@ -641,9 +652,9 @@ export default function SessionPageClient({ params }: SessionPageProps) {
             setNewQuestionsCount(0);
           }}
           className="fixed top-[4.5rem] left-1/2 -translate-x-1/2 z-40
-                     bg-brand-purple text-white text-xs font-bold
-                     px-4 py-2 rounded-full shadow-xl border border-brand-purple/60
-                     hover:bg-brand-purple/90 transition-colors flex items-center gap-1.5"
+                     bg-brand-purple text-white text-sm font-bold
+                     px-5 py-3 rounded-full shadow-xl border border-brand-purple/60
+                     hover:bg-brand-purple/90 transition-colors flex items-center gap-1.5 min-h-[44px]"
         >
           ↑ {newQuestionsCount} new question{newQuestionsCount !== 1 ? 's' : ''}
         </button>
@@ -826,15 +837,12 @@ function HostControlBar({ session, closing, reopening, deleting, onGoLive, onClo
             </div>
           )}
 
-          {/* Spacer */}
-          <div className="flex-1" />
-
           {/* Join code — tappable to copy */}
           {joinCode && session.status !== 'closed' && (
             <button
               onClick={copyCode}
               title="Tap to copy join code"
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border font-mono transition-colors ${
+              className={`flex items-center gap-2 px-3 py-2.5 rounded-lg border font-mono transition-colors ml-auto min-h-[44px] ${
                 copied ? 'border-emerald-500/50 text-emerald-400' : 'border-brand-border text-white hover:border-brand-purple'
               }`}
             >
@@ -849,7 +857,7 @@ function HostControlBar({ session, closing, reopening, deleting, onGoLive, onClo
             <button
               onClick={() => setShowQR(v => !v)}
               title="Show QR code"
-              className={`p-1.5 rounded-lg border transition-colors ${showQR ? 'border-brand-purple text-brand-purple' : 'border-brand-border text-purple-200/40 hover:text-white hover:border-brand-border'}`}
+              className={`p-2.5 rounded-lg border transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center ${showQR ? 'border-brand-purple text-brand-purple' : 'border-brand-border text-purple-200/40 hover:text-white hover:border-brand-border'}`}
             >
               <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" />
@@ -862,7 +870,7 @@ function HostControlBar({ session, closing, reopening, deleting, onGoLive, onClo
           {/* Share */}
           {session.status !== 'closed' && (
             <button onClick={share} title="Share session link"
-              className={`p-1.5 rounded-lg border transition-colors ${shared ? 'border-emerald-500/50 text-emerald-400' : 'border-brand-border text-purple-200/40 hover:text-white hover:border-brand-border'}`}>
+              className={`p-2.5 rounded-lg border transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center ${shared ? 'border-emerald-500/50 text-emerald-400' : 'border-brand-border text-purple-200/40 hover:text-white hover:border-brand-border'}`}>
               {shared ? <CheckIcon /> : <ShareIcon />}
             </button>
           )}
@@ -944,7 +952,7 @@ function SortTabs({ sort, onChange }: { sort: SortOption; onChange: (s: SortOpti
         <button
           key={tab.value}
           onClick={() => onChange(tab.value)}
-          className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+          className={`flex-1 py-2.5 rounded-lg text-xs font-semibold transition-colors min-h-[44px] ${
             sort === tab.value ? 'bg-brand-purple text-white' : 'text-purple-200/50 hover:text-white'
           }`}
         >
@@ -1003,7 +1011,7 @@ function QuestionCard({ question, isEchoed, isMine, creditsLeft, onEcho,
             onClick={onEcho}
             disabled={!canEcho}
             title={isMine ? "Can't Echo your own question" : isEchoed ? 'Already Echoed' : 'Add Echo'}
-            className={`w-10 h-10 rounded-xl border-2 flex items-center justify-center transition-all ${
+            className={`w-11 h-11 rounded-xl border-2 flex items-center justify-center transition-all ${
               isEchoed        ? 'bg-brand-orange/20 border-brand-orange text-brand-orange' :
               canEcho         ? 'bg-transparent border-white/40 text-white hover:border-brand-orange hover:text-brand-orange hover:bg-brand-orange/10' :
                                 'bg-transparent border-brand-border/30 text-purple-200/20 cursor-not-allowed'
@@ -1018,7 +1026,7 @@ function QuestionCard({ question, isEchoed, isMine, creditsLeft, onEcho,
 
         {/* Body + meta */}
         <div className="flex-1 min-w-0">
-          <p className="text-white text-sm leading-relaxed">{question.body}</p>
+          <p className="text-white text-sm leading-relaxed break-words">{question.body}</p>
 
           <div className="flex items-center gap-2 mt-2 flex-wrap">
             {isPinned && <span className="text-xs text-brand-orange font-semibold">📌 Pinned</span>}
@@ -1049,7 +1057,7 @@ function QuestionCard({ question, isEchoed, isMine, creditsLeft, onEcho,
                 <button
                   onClick={onSpotlight}
                   title={isSpotlighted ? 'Remove from spotlight' : 'Spotlight — mark as Now Answering'}
-                  className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border transition-colors ${
+                  className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-2.5 rounded-lg border transition-colors min-h-[44px] ${
                     isSpotlighted
                       ? 'bg-amber-500/20 border-amber-400/50 text-amber-300'
                       : 'border-brand-border/60 text-purple-200/50 hover:border-amber-400/40 hover:text-amber-300 hover:bg-amber-500/10'
@@ -1062,33 +1070,33 @@ function QuestionCard({ question, isEchoed, isMine, creditsLeft, onEcho,
                 <button
                   onClick={onStar}
                   title={question.status === 'starred' ? 'Remove star' : 'Star this question'}
-                  className={`text-xs font-bold px-2.5 py-1.5 rounded-lg border transition-colors ${
+                  className={`text-xs font-bold px-3 py-2.5 rounded-lg border transition-colors min-h-[44px] ${
                     question.status === 'starred'
                       ? 'bg-yellow-500/15 border-yellow-500/40 text-yellow-400'
                       : 'border-brand-border/60 text-purple-200/40 hover:text-yellow-400 hover:border-yellow-500/30'
                   }`}
                 >
-                  ★
+                  ★ Star
                 </button>
 
                 {/* Answered */}
                 <button
                   onClick={onAnswered}
                   title={question.status === 'answered' ? 'Mark unanswered' : 'Mark answered'}
-                  className={`text-xs font-semibold px-2.5 py-1.5 rounded-lg border transition-colors ${
+                  className={`text-xs font-semibold px-3 py-2.5 rounded-lg border transition-colors min-h-[44px] ${
                     question.status === 'answered'
                       ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-400'
                       : 'border-brand-border/60 text-purple-200/40 hover:text-emerald-400 hover:border-emerald-500/30'
                   }`}
                 >
-                  ✓
+                  {question.status === 'answered' ? 'Answered' : '✓'}
                 </button>
               </div>
 
               {/* Secondary actions row */}
               <div className="flex items-center gap-1.5 flex-wrap">
                 <ModButton onClick={onPin} title={isPinned ? 'Unpin' : 'Pin to top'} active={isPinned}>
-                  {isPinned ? 'Unpin' : '📌'}
+                  {isPinned ? 'Unpin' : 'Pin'}
                 </ModButton>
                 <ModButton onClick={onHide} title={question.status === 'hidden' ? 'Unhide' : 'Hide'} danger={question.status !== 'hidden'} active={question.status === 'hidden'}>
                   {question.status === 'hidden' ? 'Unhide' : 'Hide'}
@@ -1096,11 +1104,11 @@ function QuestionCard({ question, isEchoed, isMine, creditsLeft, onEcho,
                 <ModButton onClick={onReply} title="Add host reply">Reply</ModButton>
                 {onMute && (
                   <ModButton onClick={onMute} title={question.author_is_muted ? 'Unmute' : 'Mute'} active={!!question.author_is_muted} danger={!question.author_is_muted}>
-                    {question.author_is_muted ? 'Unmute' : '🔇'}
+                    {question.author_is_muted ? 'Unmute' : 'Mute'}
                   </ModButton>
                 )}
                 {onRemove && (
-                  <ModButton onClick={onRemove} title="Remove from session" danger>✕</ModButton>
+                  <ModButton onClick={() => { if (confirm('Remove this person from the session?')) onRemove!(); }} title="Remove from session" danger>Remove</ModButton>
                 )}
               </div>
             </div>
@@ -1122,7 +1130,7 @@ function ModButton({ children, active, danger, onClick, title }: {
     <button
       onClick={onClick}
       title={title}
-      className={`text-xs px-2.5 py-1 rounded-lg border transition-colors font-semibold ${
+      className={`text-xs px-3 py-2.5 rounded-lg border transition-colors font-semibold min-h-[44px] ${
         active  ? 'border-emerald-500/50 bg-emerald-500/10 text-emerald-400' :
         danger  ? 'border-red-700/40 text-red-400 hover:bg-red-900/20' :
                   'border-brand-border/60 text-purple-200/50 hover:border-brand-purple hover:text-white'
@@ -1144,25 +1152,32 @@ function ReplyModal({ question, reply, loading, onChange, onSubmit, onClose }: {
   onClose: () => void;
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm px-4">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm px-4 pb-6 sm:pb-0">
       <div className="card p-6 w-full max-w-lg">
-        <h2 className="font-bold text-white mb-2">Host reply</h2>
-        <p className="text-purple-200/50 text-sm mb-4 line-clamp-2">{question.body}</p>
-        <textarea
-          value={reply}
-          onChange={e => onChange(e.target.value)}
-          placeholder="Write your reply…"
-          rows={4}
-          maxLength={2000}
-          className="w-full bg-brand-bg border border-brand-border rounded-xl px-4 py-3 text-white text-sm
-                     placeholder-brand-border resize-none focus:outline-none focus:border-brand-purple transition-colors mb-4"
-        />
-        <div className="flex gap-3 justify-end">
-          <button onClick={onClose} className="btn-ghost text-sm py-2 px-4">Cancel</button>
-          <button onClick={onSubmit} disabled={loading || !reply.trim()} className="btn-primary text-sm py-2 px-5 disabled:opacity-40">
-            {loading ? 'Saving…' : 'Save reply'}
+        <div className="flex items-center justify-between mb-2">
+          <h2 className="font-bold text-white">Host reply</h2>
+          <button onClick={onClose} className="text-purple-200/40 hover:text-white transition-colors p-1" aria-label="Close">
+            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
           </button>
         </div>
+        <p className="text-purple-200/50 text-sm mb-4 line-clamp-2">{question.body}</p>
+        <form onSubmit={e => { e.preventDefault(); onSubmit(); }}>
+          <textarea
+            value={reply}
+            onChange={e => onChange(e.target.value)}
+            placeholder="Write your reply…"
+            rows={3}
+            maxLength={2000}
+            className="w-full bg-brand-bg border border-brand-border rounded-xl px-4 py-3 text-base
+                       placeholder-purple-200/40 resize-none focus:outline-none focus:border-brand-purple transition-colors mb-4"
+          />
+          <div className="flex gap-3 justify-end">
+            <button type="button" onClick={onClose} className="btn-ghost text-sm py-2.5 px-4">Cancel</button>
+            <button type="submit" disabled={loading || !reply.trim()} className="btn-primary text-sm py-2.5 px-5 disabled:opacity-40">
+              {loading ? 'Saving…' : 'Save reply'}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );
@@ -1185,7 +1200,7 @@ function SubmitBar({ body, setBody, credits, submitting, similarQuestions, onSub
   const canSubmit = body.trim().length > 0 && credits > 0 && !submitting && sessionStatus !== 'closed';
 
   return (
-    <div className="fixed bottom-0 inset-x-0 z-40 bg-brand-card border-t border-brand-border shadow-2xl">
+    <div className="fixed bottom-0 inset-x-0 z-40 bg-brand-card border-t border-brand-border shadow-2xl pb-[env(safe-area-inset-bottom)]">
       {similarQuestions.length > 0 && (
         <div className="max-w-2xl mx-auto px-4 pt-3">
           <p className="text-xs text-brand-orange font-semibold mb-2">Similar questions already asked:</p>
@@ -1219,7 +1234,7 @@ function SubmitBar({ body, setBody, credits, submitting, similarQuestions, onSub
             maxLength={300}
             rows={2}
             className="w-full bg-brand-bg border border-brand-border rounded-xl px-4 py-3 pr-12
-                       text-white text-sm placeholder-purple-200/40 resize-none
+                       text-white text-base placeholder-purple-200/40 resize-none
                        focus:outline-none focus:border-brand-purple transition-colors disabled:opacity-40"
           />
           <span className={`absolute right-3 bottom-3 text-xs ${remaining < 50 ? 'text-red-400' : 'text-purple-200/40'}`}>
@@ -1246,7 +1261,7 @@ function SubmitBar({ body, setBody, credits, submitting, similarQuestions, onSub
                 <line x1="9" y1="9" x2="9.01" y2="9" strokeWidth="3" />
                 <line x1="15" y1="9" x2="15.01" y2="9" strokeWidth="3" />
               </svg>
-              {postAnonymously ? 'Anon' : 'Anon'}
+              {postAnonymously ? 'Anon on' : 'Anon off'}
             </button>
           )}
           <button onClick={onSubmit} disabled={!canSubmit} className="btn-primary px-4 py-3 disabled:opacity-40 disabled:cursor-not-allowed">
@@ -1291,8 +1306,8 @@ function WelcomeScreen({ session, onEnter }: {
   onEnter: () => void;
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-brand-bg px-4">
-      <div className="card p-8 w-full max-w-sm text-center">
+    <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center bg-brand-bg px-4 py-8 overflow-y-auto">
+      <div className="card p-8 w-full max-w-sm text-center my-auto">
         {/* Channel avatar */}
         {(session as any).org_avatar_url ? (
           <img
