@@ -407,7 +407,7 @@ const FEATURES = [
   {
     icon: <CreditIcon />,
     title: 'Credit system',
-    desc: 'Each guest gets a limited number of questions and Echoes to spend — so people think before they post, and the best questions win.',
+    desc: 'Each guest gets a limited number of questions and Echoes to spend — so people think before they post, and the most resonant questions rise to the top.',
   },
   {
     icon: <MobileIcon />,
