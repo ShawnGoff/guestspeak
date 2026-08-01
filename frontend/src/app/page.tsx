@@ -361,7 +361,7 @@ function HowItWorks() {
           Simple for everyone
         </h2>
         <p className="text-purple-200/55 text-center text-lg mb-16 max-w-xl mx-auto">
-          Hosts get signal. Audiences get a voice. Three steps, that's it.
+          Hosts see what the room actually wants to talk about. Three steps, that's it.
         </p>
 
         <div className="grid md:grid-cols-3 gap-6">
