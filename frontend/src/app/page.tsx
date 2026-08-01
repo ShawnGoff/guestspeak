@@ -246,7 +246,7 @@ function Hero() {
             </h1>
 
             <p className="text-lg sm:text-xl text-purple-200/70 mb-10 max-w-xl lg:max-w-none">
-              Real-time Q&amp;A where the crowd surfaces the best questions — no apps, no accounts, no friction.
+              Real-time Q&amp;A where the crowd surfaces the best questions — no account needed to join, no friction.
             </p>
 
             {/* CTAs */}
