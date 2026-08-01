@@ -271,7 +271,8 @@ export default function SessionPageClient({ params }: SessionPageProps) {
   // ── Submit question ───────────────────────────────────────────────────────
 
   async function submitQuestion() {
-    if (!session || !body.trim() || credits < 1) return;
+    if (!session || !body.trim()) return;
+    if (!isMod && credits < 1) return;
     setSubmitting(true); setError(null);
     try {
       const q = await api.post<Question>('/questions', {
@@ -760,6 +761,7 @@ export default function SessionPageClient({ params }: SessionPageProps) {
           isRegistered={isRegistered}
           postAnonymously={postAnonymously}
           onToggleAnon={() => setPostAnonymously(p => !p)}
+          isMod={isMod}
         />
       )}
 
@@ -878,7 +880,7 @@ function SessionHeader({ session, isLiveSoon, credits, isMod, hostView, particip
         </div>
 
         <div className="flex-shrink-0 flex flex-col items-end gap-2">
-          <CreditDisplay credits={credits} max={session.credits_per_user} nextCreditSecs={nextCreditSecs} creditCap={creditCap} />
+          {!isMod && <CreditDisplay credits={credits} max={session.credits_per_user} nextCreditSecs={nextCreditSecs} creditCap={creditCap} />}
           {isMod && (
             <button
               onClick={onToggleHostView}
@@ -1433,7 +1435,7 @@ function ReplyModal({ question, reply, loading, onChange, onSubmit, onClose }: {
 
 // ─── Submit bar ───────────────────────────────────────────────────────────────
 
-function SubmitBar({ body, setBody, credits, submitting, similarQuestions, onSubmit, onEchoSimilar, sessionStatus, isRegistered, postAnonymously, onToggleAnon }: {
+function SubmitBar({ body, setBody, credits, submitting, similarQuestions, onSubmit, onEchoSimilar, sessionStatus, isRegistered, postAnonymously, onToggleAnon, isMod }: {
   body: string; setBody: (v: string) => void;
   credits: number; submitting: boolean;
   similarQuestions: Question[];
@@ -1442,10 +1444,11 @@ function SubmitBar({ body, setBody, credits, submitting, similarQuestions, onSub
   isRegistered: boolean;
   postAnonymously: boolean;
   onToggleAnon: () => void;
+  isMod?: boolean;
 }) {
   const MAX = 300;
   const remaining = MAX - body.length;
-  const canSubmit = body.trim().length > 0 && credits > 0 && !submitting && sessionStatus !== 'closed';
+  const canSubmit = body.trim().length > 0 && (isMod || credits > 0) && !submitting && sessionStatus !== 'closed';
 
   return (
     <div className="fixed bottom-0 inset-x-0 z-40 bg-brand-card border-t border-brand-border shadow-2xl pb-[env(safe-area-inset-bottom)]">
@@ -1477,8 +1480,8 @@ function SubmitBar({ body, setBody, credits, submitting, similarQuestions, onSub
             value={body}
             onChange={e => setBody(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); onSubmit(); } }}
-            placeholder={credits > 0 ? 'Ask a question…' : 'No credits remaining'}
-            disabled={credits < 1}
+            placeholder={isMod || credits > 0 ? 'Ask a question…' : 'No credits remaining'}
+            disabled={!isMod && credits < 1}
             maxLength={300}
             rows={2}
             className="w-full bg-brand-bg border border-brand-border rounded-xl px-4 py-3 pr-12
