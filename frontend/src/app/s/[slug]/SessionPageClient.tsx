@@ -478,6 +478,12 @@ export default function SessionPageClient({ params }: SessionPageProps) {
   if (error && !session) return <ErrorScreen message={error} />;
   if (!session) return null;
 
+  // Separate featured (top) question from the rest
+  const featuredQuestion = sort === 'echoes' && displayedQuestions.length > 0 && !searchQuery
+    ? displayedQuestions[0]
+    : null;
+  const listQuestions = featuredQuestion ? displayedQuestions.slice(1) : displayedQuestions;
+
   return (
     <div className="min-h-[100dvh] bg-brand-bg flex flex-col">
       <SessionHeader
@@ -509,138 +515,236 @@ export default function SessionPageClient({ params }: SessionPageProps) {
         />
       )}
 
-      <main className="flex-1 max-w-2xl w-full mx-auto px-3 sm:px-4 pb-[calc(8rem+env(safe-area-inset-bottom))] pt-4">
+      {/* 3-pane layout: left sidebar + center feed + right sidebar */}
+      <div className="flex flex-1 max-w-7xl mx-auto w-full">
 
-        {/* Stream embed — only shown when session has a stream URL */}
-        {session.stream_url && (
-          <StreamEmbed url={session.stream_url} sessionSlug={session.slug} />
-        )}
+        {/* ── Left sidebar (desktop only) ─────────────────────────────────── */}
+        <aside className="hidden lg:flex flex-col w-56 xl:w-64 border-r border-brand-border shrink-0 sticky top-[57px] h-[calc(100vh-57px)] overflow-y-auto">
+          <div className="p-5 flex flex-col gap-5">
+            <div>
+              <p className="text-[10px] font-bold text-purple-200/25 uppercase tracking-widest mb-3">Session</p>
+              <h2 className="font-bold text-white text-sm leading-snug mb-1">{session.title}</h2>
+              {session.host_username && (
+                <p className="text-xs text-purple-200/40">Hosted by <span className="text-brand-amber font-semibold">{session.host_username}</span></p>
+              )}
+              {session.org_name && (
+                <Link href={`/org/${session.org_slug}`} className="text-xs text-brand-orange/70 hover:text-brand-orange mt-0.5 flex items-center gap-1">
+                  {session.org_name}
+                  {session.org_is_verified && (
+                    <span className="inline-flex items-center justify-center w-3 h-3 rounded-full bg-brand-orange text-white flex-shrink-0">
+                      <svg viewBox="0 0 24 24" className="w-1.5 h-1.5" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 13l4 4L19 7" /></svg>
+                    </span>
+                  )}
+                </Link>
+              )}
+            </div>
 
-        {/* Closed session stats banner */}
-        {session.status === 'closed' && (
-          <div className="card p-4 mb-6 flex flex-wrap gap-6 items-center">
-            <div className="text-center">
-              <p className="text-2xl font-extrabold text-white">{(session as any).question_count ?? questions.length}</p>
-              <p className="text-xs text-purple-200/40 mt-0.5">Questions</p>
+            {/* Stats */}
+            <div className="border-t border-brand-border/40 pt-4 flex flex-col gap-3">
+              {[
+                { label: 'Questions', value: questions.length },
+                { label: 'Unanswered', value: questions.filter(q => q.status !== 'answered').length },
+                { label: 'Answered', value: questions.filter(q => q.status === 'answered').length },
+              ].map(s => (
+                <div key={s.label} className="flex items-center justify-between">
+                  <span className="text-xs text-purple-200/35">{s.label}</span>
+                  <span className="text-lg font-bold text-white">{s.value}</span>
+                </div>
+              ))}
+              {participantCount !== null && (
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-purple-200/35">Attending</span>
+                  <span className="text-lg font-bold text-white flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400/60" />
+                    {participantCount}
+                  </span>
+                </div>
+              )}
             </div>
-            <div className="text-center">
-              <p className="text-2xl font-extrabold text-white">{(session as any).participant_count ?? '—'}</p>
-              <p className="text-xs text-purple-200/40 mt-0.5">Participants</p>
-            </div>
-            <div className="text-center">
-              <p className="text-2xl font-extrabold text-brand-amber">{(session as any).total_echoes ?? '—'}</p>
-              <p className="text-xs text-purple-200/40 mt-0.5">Total Echoes</p>
-            </div>
-            {session.ends_at && (
-              <div className="text-center">
-                <p className="text-sm font-semibold text-white">{new Date(session.ends_at).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}</p>
-                <p className="text-xs text-purple-200/40 mt-0.5">Session date</p>
+
+            {/* Join code card */}
+            {session.join_code && session.status !== 'closed' && (
+              <div className="mt-auto border-t border-brand-border/40 pt-4">
+                <div className="rounded-xl bg-brand-purple/15 border border-brand-purple/25 p-3.5 text-center">
+                  <p className="text-xs font-bold text-purple-200/50 mb-1">Join code</p>
+                  <p className="text-xl font-bold text-brand-amber tracking-[0.2em] mb-2">{session.join_code}</p>
+                  <p className="text-xs text-brand-orange font-semibold">guestspeak.app</p>
+                </div>
               </div>
             )}
           </div>
-        )}
+        </aside>
 
-        {/* Search */}
-        <div className="relative mb-4">
-          <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-brand-border w-4 h-4" />
-          <input
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-            placeholder="Search questions…"
-            className="w-full bg-brand-card border border-brand-border rounded-xl pl-9 pr-4 py-3
-                       text-white text-base placeholder-purple-200/40 focus:outline-none focus:border-brand-purple transition-colors"
-          />
-        </div>
+        {/* ── Center feed ─────────────────────────────────────────────────── */}
+        <main className="flex-1 min-w-0 pb-[calc(8rem+env(safe-area-inset-bottom))] pt-4 px-3 sm:px-5 lg:px-6 overflow-y-auto">
 
-        {/* Pending approval queue — visible to host/mod when requires_approval is on */}
-        {isMod && hostView && session.requires_approval && (
-          <div className="mb-4">
-            <button
-              onClick={() => setShowPending(v => !v)}
-              className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border transition-colors ${
-                pendingQuestions.length > 0
-                  ? 'bg-amber-500/10 border-amber-500/30 text-amber-300'
-                  : 'bg-brand-card border-brand-border/50 text-purple-200/40'
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-semibold">Pending approval</span>
-                {pendingQuestions.length > 0 && (
-                  <span className="text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 px-2 py-0.5 rounded-full">
-                    {pendingQuestions.length}
-                  </span>
-                )}
+          {/* Stream embed */}
+          {session.stream_url && (
+            <StreamEmbed url={session.stream_url} sessionSlug={session.slug} />
+          )}
+
+          {/* Closed session stats banner */}
+          {session.status === 'closed' && (
+            <div className="card p-4 mb-6 flex flex-wrap gap-6 items-center">
+              <div className="text-center">
+                <p className="text-2xl font-extrabold text-white">{(session as any).question_count ?? questions.length}</p>
+                <p className="text-xs text-purple-200/40 mt-0.5">Questions</p>
               </div>
-              <svg className={`w-4 h-4 transition-transform ${showPending ? 'rotate-180' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M6 9l6 6 6-6" />
-              </svg>
-            </button>
+              <div className="text-center">
+                <p className="text-2xl font-extrabold text-white">{(session as any).participant_count ?? '—'}</p>
+                <p className="text-xs text-purple-200/40 mt-0.5">Participants</p>
+              </div>
+              <div className="text-center">
+                <p className="text-2xl font-extrabold text-brand-amber">{(session as any).total_echoes ?? '—'}</p>
+                <p className="text-xs text-purple-200/40 mt-0.5">Total Echoes</p>
+              </div>
+              {session.ends_at && (
+                <div className="text-center">
+                  <p className="text-sm font-semibold text-white">{new Date(session.ends_at).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}</p>
+                  <p className="text-xs text-purple-200/40 mt-0.5">Session date</p>
+                </div>
+              )}
+            </div>
+          )}
 
-            {showPending && (
-              <div className="mt-2 space-y-2">
-                {pendingQuestions.length === 0 && (
-                  <p className="text-center text-xs text-purple-200/30 py-4">No questions waiting for approval.</p>
-                )}
-                {pendingQuestions.map(q => (
-                  <div key={q.id} className="card p-4 border-amber-500/20">
-                    <p className="text-white text-sm leading-relaxed mb-1">{q.body}</p>
-                    {q.author_username && (
-                      <p className="text-xs text-purple-200/30 mb-3">{q.author_username}</p>
-                    )}
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => approveQuestion(q.id)}
-                        className="flex-1 text-sm py-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-semibold hover:bg-emerald-500/20 transition-colors min-h-[44px]"
-                      >
-                        ✓ Approve
-                      </button>
-                      <button
-                        onClick={() => { if (confirm('Reject this question?')) rejectQuestion(q.id); }}
-                        className="flex-1 text-sm py-2.5 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 font-semibold hover:bg-red-500/20 transition-colors min-h-[44px]"
-                      >
-                        ✕ Reject
-                      </button>
+          {/* Search */}
+          <div className="relative mb-4">
+            <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-brand-border w-4 h-4" />
+            <input
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              placeholder="Search questions…"
+              className="w-full bg-brand-card border border-brand-border rounded-xl pl-9 pr-4 py-3
+                         text-white text-base placeholder-purple-200/40 focus:outline-none focus:border-brand-purple transition-colors"
+            />
+          </div>
+
+          {/* Pending approval queue */}
+          {isMod && hostView && session.requires_approval && (
+            <div className="mb-4">
+              <button
+                onClick={() => setShowPending(v => !v)}
+                className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border transition-colors ${
+                  pendingQuestions.length > 0
+                    ? 'bg-amber-500/10 border-amber-500/30 text-amber-300'
+                    : 'bg-brand-card border-brand-border/50 text-purple-200/40'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-semibold">Pending approval</span>
+                  {pendingQuestions.length > 0 && (
+                    <span className="text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 px-2 py-0.5 rounded-full">
+                      {pendingQuestions.length}
+                    </span>
+                  )}
+                </div>
+                <svg className={`w-4 h-4 transition-transform ${showPending ? 'rotate-180' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M6 9l6 6 6-6" />
+                </svg>
+              </button>
+              {showPending && (
+                <div className="mt-2 space-y-2">
+                  {pendingQuestions.length === 0 && (
+                    <p className="text-center text-xs text-purple-200/30 py-4">No questions waiting for approval.</p>
+                  )}
+                  {pendingQuestions.map(q => (
+                    <div key={q.id} className="card p-4 border-amber-500/20">
+                      <p className="text-white text-sm leading-relaxed mb-1">{q.body}</p>
+                      {q.author_username && <p className="text-xs text-purple-200/30 mb-3">{q.author_username}</p>}
+                      <div className="flex gap-2">
+                        <button onClick={() => approveQuestion(q.id)} className="flex-1 text-sm py-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-semibold hover:bg-emerald-500/20 transition-colors min-h-[44px]">✓ Approve</button>
+                        <button onClick={() => { if (confirm('Reject this question?')) rejectQuestion(q.id); }} className="flex-1 text-sm py-2.5 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 font-semibold hover:bg-red-500/20 transition-colors min-h-[44px]">✕ Reject</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Sort tabs */}
+          <SortTabs sort={sort} onChange={setSort} />
+
+          <div className="space-y-3 mt-4">
+            {/* Featured top question */}
+            {featuredQuestion && (
+              <FeaturedQuestionCard
+                question={featuredQuestion}
+                isEchoed={echoedIds.has(featuredQuestion.id)}
+                isMine={myQuestionIds.has(featuredQuestion.id)}
+                creditsLeft={credits}
+                onEcho={() => addEcho(featuredQuestion.id)}
+                hostView={isMod && hostView}
+                onStar={() => setQuestionStatus(featuredQuestion.id, featuredQuestion.status === 'starred' ? 'new' : 'starred')}
+                onAnswered={() => setQuestionStatus(featuredQuestion.id, featuredQuestion.status === 'answered' ? 'new' : 'answered')}
+                onHide={() => setQuestionStatus(featuredQuestion.id, featuredQuestion.status === 'hidden' ? 'new' : 'hidden')}
+                onPin={() => togglePin(featuredQuestion.id)}
+                onSpotlight={() => toggleSpotlight(featuredQuestion.id)}
+                onReply={() => { setReplyTarget(featuredQuestion); setReplyText(featuredQuestion.host_reply ?? ''); }}
+                onMute={featuredQuestion.participant_id && !myQuestionIds.has(featuredQuestion.id) ? () => muteAuthor(featuredQuestion.participant_id!, !!featuredQuestion.author_is_muted) : undefined}
+                onRemove={featuredQuestion.participant_id && !myQuestionIds.has(featuredQuestion.id) ? () => removeAuthor(featuredQuestion.participant_id!) : undefined}
+                sessionClosed={session.status === 'closed'}
+              />
+            )}
+
+            {/* Remaining questions */}
+            {listQuestions.length === 0 && !featuredQuestion && (
+              <div className="text-center py-16 text-purple-200/40">
+                <p className="text-4xl mb-3">❓</p>
+                <p className="font-medium">No questions yet.</p>
+                <p className="text-sm mt-1">Be the first to ask something.</p>
+              </div>
+            )}
+            {listQuestions.map(q => (
+              <QuestionCard
+                key={q.id}
+                question={q}
+                isEchoed={echoedIds.has(q.id)}
+                isMine={myQuestionIds.has(q.id)}
+                creditsLeft={credits}
+                onEcho={() => addEcho(q.id)}
+                hostView={isMod && hostView}
+                onStar={() => setQuestionStatus(q.id, q.status === 'starred' ? 'new' : 'starred')}
+                onAnswered={() => setQuestionStatus(q.id, q.status === 'answered' ? 'new' : 'answered')}
+                onHide={() => setQuestionStatus(q.id, q.status === 'hidden' ? 'new' : 'hidden')}
+                onPin={() => togglePin(q.id)}
+                onSpotlight={() => toggleSpotlight(q.id)}
+                onReply={() => { setReplyTarget(q); setReplyText(q.host_reply ?? ''); }}
+                onMute={q.participant_id && !myQuestionIds.has(q.id) ? () => muteAuthor(q.participant_id!, !!q.author_is_muted) : undefined}
+                onRemove={q.participant_id && !myQuestionIds.has(q.id) ? () => removeAuthor(q.participant_id!) : undefined}
+                sessionClosed={session.status === 'closed'}
+              />
+            ))}
+          </div>
+        </main>
+
+        {/* ── Right sidebar (desktop only) ────────────────────────────────── */}
+        <aside className="hidden xl:flex flex-col w-64 border-l border-brand-border shrink-0 sticky top-[57px] h-[calc(100vh-57px)] overflow-y-auto">
+          <div className="p-5">
+            <p className="text-[10px] font-bold text-purple-200/25 uppercase tracking-widest mb-4">Top Questions</p>
+            <div className="flex flex-col gap-3">
+              {questions
+                .filter(q => q.status !== 'hidden' && q.status !== 'answered')
+                .sort((a, b) => b.vote_count - a.vote_count)
+                .slice(0, 5)
+                .map((q, i) => (
+                  <div key={q.id} className="flex items-start gap-2.5">
+                    <span className={`text-xs font-bold w-4 shrink-0 mt-0.5 ${i === 0 ? 'text-brand-amber' : 'text-purple-200/25'}`}>
+                      {i + 1}
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs text-purple-200/70 leading-relaxed line-clamp-2">{q.body}</p>
+                      <p className="text-[11px] text-brand-orange/70 mt-0.5">{q.vote_count} echoes</p>
                     </div>
                   </div>
                 ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        <SortTabs sort={sort} onChange={setSort} />
-
-        <div className="space-y-3 mt-4">
-          {displayedQuestions.length === 0 && (
-            <div className="text-center py-16 text-purple-200/40">
-              <p className="text-4xl mb-3">❓</p>
-              <p className="font-medium">No questions yet.</p>
-              <p className="text-sm mt-1">Be the first to ask something.</p>
+              {questions.filter(q => q.status !== 'hidden').length === 0 && (
+                <p className="text-xs text-purple-200/25 text-center py-4">No questions yet</p>
+              )}
             </div>
-          )}
-          {displayedQuestions.map(q => (
-            <QuestionCard
-              key={q.id}
-              question={q}
-              isEchoed={echoedIds.has(q.id)}
-              isMine={myQuestionIds.has(q.id)}
-              creditsLeft={credits}
-              onEcho={() => addEcho(q.id)}
-              // Mod props
-              hostView={isMod && hostView}
-              onStar={() => setQuestionStatus(q.id, q.status === 'starred' ? 'new' : 'starred')}
-              onAnswered={() => setQuestionStatus(q.id, q.status === 'answered' ? 'new' : 'answered')}
-              onHide={() => setQuestionStatus(q.id, q.status === 'hidden' ? 'new' : 'hidden')}
-              onPin={() => togglePin(q.id)}
-              onSpotlight={() => toggleSpotlight(q.id)}
-              onReply={() => { setReplyTarget(q); setReplyText(q.host_reply ?? ''); }}
-              onMute={q.participant_id && !myQuestionIds.has(q.id) ? () => muteAuthor(q.participant_id!, !!q.author_is_muted) : undefined}
-              onRemove={q.participant_id && !myQuestionIds.has(q.id) ? () => removeAuthor(q.participant_id!) : undefined}
-              sessionClosed={session.status === 'closed'}
-            />
-          ))}
-        </div>
-      </main>
+          </div>
+        </aside>
+      </div>
 
       {/* Submit bar */}
       {!submissionClosed && (
@@ -836,7 +940,7 @@ function HostControlBar({ session, closing, reopening, deleting, onGoLive, onClo
 
   return (
     <div className="bg-brand-card border-b border-brand-purple/25">
-      <div className="max-w-2xl mx-auto px-4 py-3">
+      <div className="max-w-7xl mx-auto px-4 py-3">
 
         {/* Primary row — status action + join code */}
         <div className="flex items-center gap-3 flex-wrap">
@@ -916,7 +1020,7 @@ function HostControlBar({ session, closing, reopening, deleting, onGoLive, onClo
 
         {/* Secondary row — owner-only admin actions */}
         {isOwner && (
-          <div className="flex items-center gap-2 mt-2 pt-2 border-t border-brand-border/30">
+          <div className="flex items-center gap-2 mt-2 pt-2 border-t border-brand-border/30 max-w-7xl">
             <Link href={`/s/${session.slug}/edit`} className="text-xs text-purple-200/40 hover:text-purple-200/70 transition-colors">Edit session</Link>
             <span className="text-brand-border">·</span>
             <button onClick={onManageMods} className="text-xs text-purple-200/40 hover:text-purple-200/70 transition-colors">Manage moderators</button>
@@ -989,28 +1093,121 @@ function StatusBadge({ status, isLiveSoon }: { status: string; isLiveSoon: boole
 
 // ─── Sort tabs ────────────────────────────────────────────────────────────────
 
-const SORT_TABS: { value: SortOption; label: string; short: string }[] = [
-  { value: 'echoes',   label: 'Top Echoes', short: 'Top' },
-  { value: 'recent',   label: 'Recent',     short: 'New' },
-  { value: 'answered', label: 'Answered',   short: 'Done' },
-  { value: 'starred',  label: 'Starred',    short: '★' },
+const SORT_TABS: { value: SortOption; label: string }[] = [
+  { value: 'echoes',   label: '🔥 Top' },
+  { value: 'recent',   label: '🕐 Recent' },
+  { value: 'answered', label: '✓ Answered' },
+  { value: 'starred',  label: '★ Starred' },
 ];
 
 function SortTabs({ sort, onChange }: { sort: SortOption; onChange: (s: SortOption) => void }) {
   return (
-    <div className="flex gap-1 p-1 bg-brand-card rounded-xl border border-brand-border">
+    <div className="flex border-b border-brand-border/60 overflow-x-auto gap-0">
       {SORT_TABS.map(tab => (
         <button
           key={tab.value}
           onClick={() => onChange(tab.value)}
-          className={`flex-1 py-2.5 rounded-lg text-xs font-semibold transition-colors min-h-[44px] ${
-            sort === tab.value ? 'bg-brand-purple text-white' : 'text-purple-200/50 hover:text-white'
+          className={`px-4 py-3 text-sm font-semibold border-b-2 -mb-px whitespace-nowrap transition-all ${
+            sort === tab.value
+              ? 'border-brand-orange text-white'
+              : 'border-transparent text-purple-200/40 hover:text-purple-200/70'
           }`}
         >
-          <span className="hidden sm:inline">{tab.label}</span>
-          <span className="sm:hidden">{tab.short}</span>
+          {tab.label}
         </button>
       ))}
+    </div>
+  );
+}
+
+// ─── Featured top question card ───────────────────────────────────────────────
+
+function FeaturedQuestionCard({ question, isEchoed, isMine, creditsLeft, onEcho,
+  hostView, onStar, onAnswered, onHide, onPin, onSpotlight, onReply,
+  onMute, onRemove, sessionClosed }: {
+  question: Question & { is_pinned?: boolean; is_spotlighted?: boolean };
+  isEchoed: boolean; isMine: boolean; creditsLeft: number;
+  onEcho: () => void; hostView: boolean;
+  onStar: () => void; onAnswered: () => void; onHide: () => void;
+  onPin: () => void; onSpotlight: () => void; onReply: () => void;
+  onMute?: () => void; onRemove?: () => void; sessionClosed: boolean;
+}) {
+  const canEcho = !isEchoed && !isMine && creditsLeft > 0 && question.status !== 'hidden';
+  const isSpotlighted = !!question.is_spotlighted;
+
+  return (
+    <div className={`rounded-2xl border p-5 shadow-[0_0_30px_rgba(245,146,30,0.12)] ${
+      isSpotlighted ? 'border-amber-400/60 bg-amber-500/5' : 'border-brand-orange/50 bg-brand-orange/5'
+    }`}>
+      {isSpotlighted && (
+        <div className="flex items-center gap-2 mb-4">
+          <span className="text-xs font-bold text-amber-300 tracking-wide">🎙 NOW ANSWERING</span>
+        </div>
+      )}
+      {!isSpotlighted && (
+        <div className="flex items-center gap-2 mb-4">
+          <span className="text-xs font-bold text-brand-orange tracking-wide">🔥 TOP QUESTION</span>
+        </div>
+      )}
+
+      <div className="flex gap-4 sm:gap-6">
+        {/* Body */}
+        <div className="flex-1 min-w-0">
+          <p className="text-base sm:text-lg font-bold text-white leading-snug mb-3">{question.body}</p>
+          <div className="flex items-center gap-2 flex-wrap">
+            {question.status === 'answered' && (
+              <span className="text-xs font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/25 px-2 py-0.5 rounded-full">✓ ANSWERED</span>
+            )}
+            {isMine && <span className="text-xs text-brand-orange/60 font-medium">Your question</span>}
+            {question.author_username && (
+              <span className={`text-xs ${question.post_anonymously ? 'text-purple-300/50 italic' : 'text-purple-200/40'}`}>
+                {question.author_username}
+              </span>
+            )}
+          </div>
+          {question.host_reply && (
+            <div className="mt-3 pl-3 border-l-2 border-brand-orange/40">
+              <p className="text-xs text-brand-orange/70 font-semibold mb-1">Host reply</p>
+              <p className="text-sm text-purple-200/80">{question.host_reply}</p>
+            </div>
+          )}
+          {hostView && (
+            <div className="mt-4 pt-3 border-t border-brand-border/30 space-y-2">
+              <div className="flex items-center gap-2">
+                <button onClick={onSpotlight} className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-2.5 rounded-lg border transition-colors min-h-[44px] ${isSpotlighted ? 'bg-amber-500/20 border-amber-400/50 text-amber-300' : 'border-brand-border/60 text-purple-200/50 hover:border-amber-400/40 hover:text-amber-300'}`}>🎙 {isSpotlighted ? 'Now Answering' : 'Spotlight'}</button>
+                <button onClick={onStar} className={`text-xs font-bold px-3 py-2.5 rounded-lg border transition-colors min-h-[44px] ${question.status === 'starred' ? 'bg-yellow-500/15 border-yellow-500/40 text-yellow-400' : 'border-brand-border/60 text-purple-200/40 hover:text-yellow-400'}`}>★ Star</button>
+                <button onClick={onAnswered} className={`text-xs font-semibold px-3 py-2.5 rounded-lg border transition-colors min-h-[44px] ${question.status === 'answered' ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-400' : 'border-brand-border/60 text-purple-200/40 hover:text-emerald-400'}`}>{question.status === 'answered' ? 'Answered' : '✓'}</button>
+              </div>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <ModButton onClick={onPin} title={question.is_pinned ? 'Unpin' : 'Pin'} active={!!question.is_pinned}>{question.is_pinned ? 'Unpin' : 'Pin'}</ModButton>
+                <ModButton onClick={onHide} title="Hide" danger={question.status !== 'hidden'} active={question.status === 'hidden'}>{question.status === 'hidden' ? 'Unhide' : 'Hide'}</ModButton>
+                <ModButton onClick={onReply} title="Reply">Reply</ModButton>
+                {onMute && <ModButton onClick={onMute} title="Mute" active={!!question.author_is_muted} danger={!question.author_is_muted}>{question.author_is_muted ? 'Unmute' : 'Mute'}</ModButton>}
+                {onRemove && <ModButton onClick={() => { if (confirm('Remove?')) onRemove!(); }} title="Remove" danger>Remove</ModButton>}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Echo button */}
+        <div className="shrink-0 flex flex-col items-center gap-2 min-w-[68px]">
+          <button
+            onClick={onEcho}
+            disabled={!canEcho}
+            className={`w-full flex flex-col items-center gap-1 px-3 py-3 rounded-xl border transition-all active:scale-95 ${
+              isEchoed
+                ? 'border-brand-amber/50 bg-brand-amber/10 text-brand-amber'
+                : canEcho
+                ? 'border-brand-border text-purple-200/50 hover:border-brand-orange/60 hover:bg-brand-orange/10 hover:text-brand-orange'
+                : 'border-brand-border/30 text-purple-200/20 cursor-not-allowed'
+            }`}
+          >
+            <span className="text-xl font-black leading-none">↑</span>
+            <span className="text-2xl font-black leading-none">{question.vote_count}</span>
+            <span className="text-[10px] font-semibold tracking-wide opacity-60">echoes</span>
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -1253,7 +1450,7 @@ function SubmitBar({ body, setBody, credits, submitting, similarQuestions, onSub
   return (
     <div className="fixed bottom-0 inset-x-0 z-40 bg-brand-card border-t border-brand-border shadow-2xl pb-[env(safe-area-inset-bottom)]">
       {similarQuestions.length > 0 && (
-        <div className="max-w-2xl mx-auto px-4 pt-3">
+        <div className="max-w-3xl mx-auto px-4 pt-3">
           <p className="text-xs text-brand-orange font-semibold mb-2">Similar questions already asked:</p>
           <div className="space-y-2 mb-3">
             {similarQuestions.slice(0, 3).map(q => (
@@ -1274,7 +1471,7 @@ function SubmitBar({ body, setBody, credits, submitting, similarQuestions, onSub
         </div>
       )}
 
-      <div className="max-w-2xl mx-auto px-3 sm:px-4 py-3 flex gap-2 sm:gap-3 items-end">
+      <div className="max-w-3xl mx-auto px-3 sm:px-4 py-3 flex gap-2 sm:gap-3 items-end">
         <div className="flex-1 relative">
           <textarea
             value={body}
