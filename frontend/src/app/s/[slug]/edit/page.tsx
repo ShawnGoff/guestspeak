@@ -32,6 +32,7 @@ export default function EditSessionPage({ params }: { params: { slug: string } }
   const [startDate, setStartDate]     = useState('');
   const [startTime, setStartTime]     = useState('');
   const [isOnline, setIsOnline]           = useState(false);
+  const [streamUrl, setStreamUrl]         = useState('');
   const [cutoffEnabled, setCutoffEnabled] = useState(false);
   const [cutoffMins, setCutoffMins]   = useState(15);
 
@@ -67,6 +68,7 @@ export default function EditSessionPage({ params }: { params: { slug: string } }
         if (session.lat)  setLat(session.lat);
         if (session.lng)  setLng(session.lng);
         setIsOnline(session.is_online ?? false);
+        setStreamUrl(session.stream_url ?? '');
 
         if (session.starts_at) {
           const d = new Date(session.starts_at);
@@ -132,6 +134,7 @@ export default function EditSessionPage({ params }: { params: { slug: string } }
         lat:     isOnline ? undefined : lat,
         lng:     isOnline ? undefined : lng,
         is_online: isOnline,
+        stream_url: streamUrl.trim() || '',
         starts_at: startsAt,
         submission_cutoff_at,
       });
@@ -270,6 +273,21 @@ export default function EditSessionPage({ params }: { params: { slug: string } }
                 </FormField>
               </div>
             )}
+
+            <div className="mt-4">
+              <FormField
+                label="Live stream URL (optional)"
+                hint="YouTube or Twitch — your audience can watch and ask questions on the same page"
+              >
+                <input
+                  type="url"
+                  value={streamUrl}
+                  onChange={e => setStreamUrl(e.target.value)}
+                  placeholder="https://youtube.com/watch?v=… or https://twitch.tv/…"
+                  className="input"
+                />
+              </FormField>
+            </div>
 
             <div className="mt-4">
               <label className="flex items-center gap-3 cursor-pointer">

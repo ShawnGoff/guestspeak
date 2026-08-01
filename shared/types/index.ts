@@ -109,6 +109,7 @@ export interface Session {
   lng?: number;
   is_featured?: boolean;
   is_online?: boolean;
+  stream_url?: string;
   join_code?: string;
   starts_at?: string;
   ends_at?: string;

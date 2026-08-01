@@ -23,6 +23,7 @@ const CreateSessionSchema = z.object({
   lat: z.number().min(-90).max(90).optional(),
   lng: z.number().min(-180).max(180).optional(),
   is_online: z.boolean().optional(),
+  stream_url: z.string().url().max(1000).optional().or(z.literal('')),
 });
 
 const UpdateSessionSchema = CreateSessionSchema.partial();
@@ -88,8 +89,8 @@ export async function createSession(req: Request, res: Response, next: NextFunct
     const result = await pool.query(
       `INSERT INTO sessions
          (host_id, org_id, title, description, visibility, credits_per_user, slug,
-          join_code, starts_at, submission_cutoff_at, city, region, country, lat, lng, is_online)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
+          join_code, starts_at, submission_cutoff_at, city, region, country, lat, lng, is_online, stream_url)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
        RETURNING *`,
       [
         hostId,
@@ -108,6 +109,7 @@ export async function createSession(req: Request, res: Response, next: NextFunct
         data.lat ?? null,
         data.lng ?? null,
         data.is_online ?? false,
+        data.stream_url || null,
       ],
     );
 
