@@ -40,7 +40,7 @@ export async function getQuestions(req: Request, res: Response, next: NextFuncti
     }
 
     const conditions = ['q.session_id = $1'];
-    if (!includeHidden) conditions.push("q.status != 'hidden'");
+    if (!includeHidden) conditions.push("q.status NOT IN ('hidden', 'pending')");
     const params: unknown[] = [sessionId];
 
     if (status) {
@@ -93,12 +93,12 @@ export async function createQuestion(req: Request, res: Response, next: NextFunc
 
     // Verify session is open and accepting questions
     const sessionResult = await pool.query(
-      'SELECT status, submission_cutoff_at, visibility, host_id FROM sessions WHERE id = $1',
+      'SELECT status, submission_cutoff_at, visibility, host_id, requires_approval FROM sessions WHERE id = $1',
       [session_id],
     );
     if (!sessionResult.rows[0]) throw new AppError(404, 'Session not found');
 
-    const { status, submission_cutoff_at, visibility, host_id } = sessionResult.rows[0];
+    const { status, submission_cutoff_at, visibility, host_id, requires_approval } = sessionResult.rows[0];
 
     // Block non-hosts from submitting to private sessions
     if (visibility === 'private' && userId !== host_id) {
@@ -116,17 +116,24 @@ export async function createQuestion(req: Request, res: Response, next: NextFunc
     // Verify the user has joined (participant row must exist)
     await verifyParticipant(session_id, userId, guestToken);
 
+    // Reject if the participant is muted or session-banned
+    await rejectIfMutedOrBanned(session_id, userId, guestToken);
+
     // Deduct 1 credit (atomic — prevents double-spend)
     await spendCredit(session_id, userId, guestToken);
 
     // Apply word filter — stored body is always clean
     const cleanBody = await filterText(body);
 
+    // If the session requires host approval, questions start as 'pending'
+    // and are invisible to the audience until approved.
+    const initialStatus = requires_approval ? 'pending' : 'new';
+
     const result = await pool.query(
-      `INSERT INTO questions (session_id, author_id, author_guest_token, body)
-       VALUES ($1, $2, $3, $4)
+      `INSERT INTO questions (session_id, author_id, author_guest_token, body, status)
+       VALUES ($1, $2, $3, $4, $5)
        RETURNING *`,
-      [session_id, userId, guestToken, cleanBody],
+      [session_id, userId, guestToken, cleanBody, initialStatus],
     );
 
     const question = result.rows[0];
@@ -318,6 +325,36 @@ export async function searchSimilar(req: Request, res: Response, next: NextFunct
   }
 }
 
+/** PATCH /api/questions/:id/approve — host/mod approves a pending question */
+export async function approveQuestion(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { id } = req.params;
+    const callerId = req.user!.userId;
+
+    const qResult = await pool.query(
+      `SELECT q.session_id, q.status FROM questions q WHERE q.id = $1`,
+      [id],
+    );
+    if (!qResult.rows[0]) throw new AppError(404, 'Question not found');
+    const { session_id, status: qStatus } = qResult.rows[0];
+    if (qStatus !== 'pending') throw new AppError(400, 'Question is not pending approval');
+
+    const { role, permissions } = await resolveCallerRole(session_id, callerId);
+    if (role === 'participant' || role === 'none') throw new AppError(403, 'Insufficient permissions');
+    if (role === 'moderator' && !permissions.can_approve) throw new AppError(403, 'Insufficient permissions');
+
+    const result = await pool.query(
+      `UPDATE questions SET status = 'new', updated_at = NOW() WHERE id = $1 RETURNING *`,
+      [id],
+    );
+    const approved = result.rows[0];
+    broadcast(session_id, { type: 'question:new', data: approved });
+    res.json(approved);
+  } catch (err) {
+    next(err);
+  }
+}
+
 /** PATCH /api/questions/:id/pin — host/org_admin toggles pin */
 export async function pinQuestion(req: Request, res: Response, next: NextFunction) {
   try {
@@ -443,6 +480,36 @@ async function verifyParticipant(
 
   if (result.rowCount === 0) {
     throw new AppError(403, 'You must join the session before participating');
+  }
+}
+
+/**
+ * Throws 403 if the participant is muted or session-banned.
+ */
+async function rejectIfMutedOrBanned(
+  sessionId: string,
+  userId: string | null,
+  guestToken: string | null,
+) {
+  const col = userId ? 'user_id' : 'guest_token';
+  const val = userId ?? guestToken;
+
+  // Check mute
+  const muteResult = await pool.query(
+    `SELECT is_muted FROM session_participants WHERE session_id = $1 AND ${col} = $2`,
+    [sessionId, val],
+  );
+  if (muteResult.rows[0]?.is_muted) {
+    throw new AppError(403, 'You have been muted in this session');
+  }
+
+  // Check session ban
+  const banResult = await pool.query(
+    `SELECT id FROM session_bans WHERE session_id = $1 AND ${col} = $2`,
+    [sessionId, val],
+  );
+  if (banResult.rows[0]) {
+    throw new AppError(403, 'You have been removed from this session');
   }
 }
 

@@ -9,6 +9,7 @@ import {
   pinQuestion,
   spotlightQuestion,
   addHostReply,
+  approveQuestion,
 } from '../controllers/questionController';
 import { requireAuth, optionalAuth } from '../middleware/auth';
 import { questionLimiter } from '../middleware/rateLimit';
@@ -41,5 +42,8 @@ router.patch('/:id/spotlight', requireAuth, spotlightQuestion);
 
 // PATCH /api/questions/:id/reply — host-only post-session reply
 router.patch('/:id/reply', requireAuth, addHostReply);
+
+// PATCH /api/questions/:id/approve — host/mod approves a pending question
+router.patch('/:id/approve', requireAuth, approveQuestion);
 
 export default router;

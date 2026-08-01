@@ -4,6 +4,8 @@ import {
   addModerator,
   updateModeratorPermissions,
   removeModerator,
+  muteParticipant,
+  removeParticipant,
 } from '../controllers/moderatorController';
 import { requireAuth } from '../middleware/auth';
 
@@ -23,5 +25,11 @@ router.patch('/:userId', updateModeratorPermissions);
 
 // DELETE /api/sessions/:id/moderators/:userId
 router.delete('/:userId', removeModerator);
+
+// PATCH /api/sessions/:id/participants/:participantId/mute
+router.patch('/participants/:participantId/mute', muteParticipant);
+
+// DELETE /api/sessions/:id/participants/:participantId
+router.delete('/participants/:participantId', removeParticipant);
 
 export default router;
