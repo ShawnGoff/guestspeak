@@ -7,6 +7,7 @@ import discoverRoutes from './discover';
 import userRoutes from './users';
 import uploadRoutes from './upload';
 import notificationRoutes from './notifications';
+import adminRoutes from './admin';
 
 const router = Router();
 
@@ -18,5 +19,6 @@ router.use('/discover', discoverRoutes);
 router.use('/users', userRoutes);
 router.use('/upload', uploadRoutes);
 router.use('/notifications', notificationRoutes);
+router.use('/admin', adminRoutes);
 
 export default router;

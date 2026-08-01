@@ -379,6 +379,25 @@ export async function joinSession(req: Request, res: Response, next: NextFunctio
 
     if (status === 'closed') throw new AppError(410, 'This session is closed');
 
+    // Block platform-banned users/guests from joining any session
+    if (userId) {
+      const ban = await pool.query(
+        `SELECT id FROM platform_bans
+         WHERE user_id = $1 AND (expires_at IS NULL OR expires_at > NOW())
+         LIMIT 1`,
+        [userId],
+      );
+      if (ban.rows[0]) throw new AppError(403, 'Your account has been suspended from GuestSpeak');
+    } else if (guestToken) {
+      const ban = await pool.query(
+        `SELECT id FROM platform_bans
+         WHERE guest_token = $1 AND (expires_at IS NULL OR expires_at > NOW())
+         LIMIT 1`,
+        [guestToken],
+      );
+      if (ban.rows[0]) throw new AppError(403, 'This device has been suspended from GuestSpeak');
+    }
+
     // Block non-hosts from joining private sessions
     if (visibility === 'private' && userId !== host_id) {
       throw new AppError(403, 'This session is private');
