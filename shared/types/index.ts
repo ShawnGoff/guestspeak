@@ -130,6 +130,10 @@ export interface Question {
   participant_id?: string;
   /** True if the question author is currently muted in this session */
   author_is_muted?: boolean;
+  /** True when a registered user posted anonymously — shown as "Anon{n}" to everyone */
+  post_anonymously?: boolean;
+  /** Assigned anon number within the session (e.g. 3 → "Anon3") */
+  anon_number?: number;
   body: string;
   status: QuestionStatus;
   /** Internal field — displayed publicly as "Echoes" */

@@ -47,6 +47,8 @@ export default function SessionPage({ params }: SessionPageProps) {
   const [deletingSession, setDeletingSession] = useState(false);
 
   const [showUsernamePicker, setShowUsernamePicker] = useState(false);
+  const [isRegistered, setIsRegistered]             = useState(false);
+  const [postAnonymously, setPostAnonymously]       = useState(false);
 
   // Live UX
   const [showWelcome, setShowWelcome]             = useState(false);
@@ -75,7 +77,8 @@ export default function SessionPage({ params }: SessionPageProps) {
         }
 
         // Determine how to join based on who's viewing
-        const isRegistered   = !!localStorage.getItem('aa_user');
+        const isRegistered = !!localStorage.getItem('aa_user');
+        setIsRegistered(isRegistered);
         const savedGuestName = localStorage.getItem('aa_guest_username');
 
         if (isRegistered) {
@@ -218,7 +221,11 @@ export default function SessionPage({ params }: SessionPageProps) {
     if (!session || !body.trim() || credits < 1) return;
     setSubmitting(true); setError(null);
     try {
-      const q = await api.post<Question>('/questions', { session_id: session.id, body: body.trim() });
+      const q = await api.post<Question>('/questions', {
+        session_id: session.id,
+        body: body.trim(),
+        ...(postAnonymously && { post_anonymously: true }),
+      });
       setBody(''); setSimilarQuestions([]);
       setCredits(c => c - 1);
       setMyQuestionIds(prev => new Set([...prev, q.id]));
@@ -515,6 +522,9 @@ export default function SessionPage({ params }: SessionPageProps) {
           onSubmit={submitQuestion}
           onEchoSimilar={addEcho}
           sessionStatus={session.status}
+          isRegistered={isRegistered}
+          postAnonymously={postAnonymously}
+          onToggleAnon={() => setPostAnonymously(p => !p)}
         />
       )}
 
@@ -954,7 +964,9 @@ function QuestionCard({ question, isEchoed, isMine, creditsLeft, onEcho,
             {question.status === 'starred'  && <span className="text-xs text-yellow-400 font-semibold">★ Starred</span>}
             {question.status === 'answered' && <span className="text-xs text-emerald-400 font-semibold">✓ Answered</span>}
             {question.author_username && (
-              <span className="text-xs text-purple-200/30">{question.author_username}</span>
+              <span className={`text-xs ${question.post_anonymously ? 'text-purple-300/50 italic' : 'text-purple-200/30'}`}>
+                {question.author_username}
+              </span>
             )}
           </div>
 
@@ -1077,12 +1089,15 @@ function ReplyModal({ question, reply, loading, onChange, onSubmit, onClose }: {
 
 // ─── Submit bar ───────────────────────────────────────────────────────────────
 
-function SubmitBar({ body, setBody, credits, submitting, similarQuestions, onSubmit, onEchoSimilar, sessionStatus }: {
+function SubmitBar({ body, setBody, credits, submitting, similarQuestions, onSubmit, onEchoSimilar, sessionStatus, isRegistered, postAnonymously, onToggleAnon }: {
   body: string; setBody: (v: string) => void;
   credits: number; submitting: boolean;
   similarQuestions: Question[];
   onSubmit: () => void; onEchoSimilar: (id: string) => void;
   sessionStatus: string;
+  isRegistered: boolean;
+  postAnonymously: boolean;
+  onToggleAnon: () => void;
 }) {
   const MAX = 300;
   const remaining = MAX - body.length;
@@ -1130,9 +1145,33 @@ function SubmitBar({ body, setBody, credits, submitting, similarQuestions, onSub
             {remaining} left
           </span>
         </div>
-        <button onClick={onSubmit} disabled={!canSubmit} className="btn-primary px-4 py-3 self-end disabled:opacity-40 disabled:cursor-not-allowed">
-          {submitting ? '…' : 'Ask'}
-        </button>
+        <div className="flex flex-col items-end gap-2 self-end">
+          {/* Anonymous toggle — registered users only */}
+          {isRegistered && (
+            <button
+              type="button"
+              onClick={onToggleAnon}
+              title={postAnonymously ? 'Posting anonymously — tap to post as yourself' : 'Post anonymously'}
+              className={`flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg border transition-colors ${
+                postAnonymously
+                  ? 'bg-purple-500/15 border-purple-500/30 text-purple-300'
+                  : 'bg-white/5 border-white/10 text-purple-200/40 hover:text-purple-200/70'
+              }`}
+            >
+              {/* Mask icon */}
+              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2z" />
+                <path d="M8 14s1.5 2 4 2 4-2 4-2" />
+                <line x1="9" y1="9" x2="9.01" y2="9" strokeWidth="3" />
+                <line x1="15" y1="9" x2="15.01" y2="9" strokeWidth="3" />
+              </svg>
+              {postAnonymously ? 'Anon' : 'Anon'}
+            </button>
+          )}
+          <button onClick={onSubmit} disabled={!canSubmit} className="btn-primary px-4 py-3 disabled:opacity-40 disabled:cursor-not-allowed">
+            {submitting ? '…' : 'Ask'}
+          </button>
+        </div>
       </div>
     </div>
   );

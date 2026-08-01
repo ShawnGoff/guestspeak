@@ -10,6 +10,7 @@ import type { SortOption } from '@ask-away/shared/types';
 const CreateQuestionSchema = z.object({
   session_id: z.string().uuid(),
   body: z.string().min(1).max(300),
+  post_anonymously: z.boolean().optional(),
 });
 
 const StatusSchema = z.object({
@@ -64,13 +65,20 @@ export async function getQuestions(req: Request, res: Response, next: NextFuncti
     const result = await pool.query(
       `SELECT q.id, q.body, q.status, q.is_pinned, q.is_spotlighted, q.vote_count,
               q.host_reply, q.host_replied_at, q.created_at,
-              COALESCE(u.username, sp.guest_username) AS author_username,
-              sp.id   AS participant_id,
-              sp.is_muted AS author_is_muted
+              q.post_anonymously, q.anon_number,
+              -- For anon posts: return "Anon{n}" as the display name; hide real identity from everyone
+              CASE
+                WHEN q.post_anonymously THEN 'Anon' || q.anon_number
+                ELSE COALESCE(u.username, sp.guest_username)
+              END AS author_username,
+              -- participant_id and is_muted only for non-anon posts (avoids identity-via-mod-action)
+              CASE WHEN q.post_anonymously THEN NULL ELSE sp.id END AS participant_id,
+              CASE WHEN q.post_anonymously THEN NULL ELSE sp.is_muted END AS author_is_muted
        FROM questions q
-       LEFT JOIN users u ON u.id = q.author_id
+       LEFT JOIN users u ON u.id = q.author_id AND NOT q.post_anonymously
        LEFT JOIN session_participants sp
          ON sp.session_id = q.session_id
+         AND NOT q.post_anonymously
          AND (
            (q.author_guest_token IS NOT NULL AND sp.guest_token = q.author_guest_token)
            OR
@@ -90,9 +98,11 @@ export async function getQuestions(req: Request, res: Response, next: NextFuncti
 
 export async function createQuestion(req: Request, res: Response, next: NextFunction) {
   try {
-    const { session_id, body } = CreateQuestionSchema.parse(req.body);
+    const { session_id, body, post_anonymously: wantsAnon } = CreateQuestionSchema.parse(req.body);
     const userId = req.user?.isGuest === false ? req.user.userId : null;
     const guestToken = req.user?.guestToken ?? null;
+    // Only registered users can post anonymously — guests are already pseudonymous
+    const postAnonymously = !!(wantsAnon && userId);
 
     if (!userId && !guestToken) throw new AppError(401, 'Authentication required');
 
@@ -134,11 +144,21 @@ export async function createQuestion(req: Request, res: Response, next: NextFunc
     // and are invisible to the audience until approved.
     const initialStatus = requires_approval ? 'pending' : 'new';
 
+    // For anon posts, atomically claim the next anon number for this session
+    let anonNumber: number | null = null;
+    if (postAnonymously) {
+      const counterResult = await pool.query(
+        `UPDATE sessions SET anon_counter = anon_counter + 1 WHERE id = $1 RETURNING anon_counter`,
+        [session_id],
+      );
+      anonNumber = counterResult.rows[0].anon_counter;
+    }
+
     const result = await pool.query(
-      `INSERT INTO questions (session_id, author_id, author_guest_token, body, status)
-       VALUES ($1, $2, $3, $4, $5)
+      `INSERT INTO questions (session_id, author_id, author_guest_token, body, status, post_anonymously, anon_number)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
        RETURNING *`,
-      [session_id, userId, guestToken, cleanBody, initialStatus],
+      [session_id, userId, guestToken, cleanBody, initialStatus, postAnonymously, anonNumber],
     );
 
     const question = result.rows[0];
