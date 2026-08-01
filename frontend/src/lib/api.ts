@@ -1,6 +1,18 @@
 // NEXT_PUBLIC_API_URL should be the base domain only, e.g. https://api.guestspeak.app
 // The /api prefix is appended here so all callers stay consistent.
-const API = (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001') + '/api';
+const BACKEND = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
+const API = BACKEND + '/api';
+
+/**
+ * Resolves a backend asset path to a full URL.
+ * Handles both legacy absolute URLs (http://localhost:3001/uploads/…)
+ * and new relative paths (/uploads/…) stored after the URL-bug fix.
+ */
+export function resolveAsset(url: string | null | undefined): string | undefined {
+  if (!url) return undefined;
+  if (url.startsWith('http')) return url; // already absolute (legacy rows)
+  return `${BACKEND}${url}`;             // relative path → prepend backend base
+}
 
 function getToken(): string | null {
   if (typeof window === 'undefined') return null;

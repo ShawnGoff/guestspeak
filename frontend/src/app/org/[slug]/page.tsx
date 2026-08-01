@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { api } from '@/lib/api';
+import { api, resolveAsset } from '@/lib/api';
 import type { Organization, Session } from '@ask-away/shared/types';
 import AppNav from '@/components/AppNav';
 
@@ -82,7 +82,7 @@ export default function OrgPage({ params }: OrgPageProps) {
           {/* Avatar */}
           <div className="w-16 h-16 rounded-2xl bg-brand-card border border-brand-border flex-shrink-0 flex items-center justify-center overflow-hidden">
             {org.avatar_url ? (
-              <img src={org.avatar_url} alt={org.name} className="w-full h-full object-cover" />
+              <img src={resolveAsset(org.avatar_url)} alt={org.name} className="w-full h-full object-cover" />
             ) : (
               <span className="text-2xl font-extrabold text-orange-gradient">
                 {org.name.charAt(0).toUpperCase()}

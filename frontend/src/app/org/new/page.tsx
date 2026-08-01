@@ -68,7 +68,7 @@ export default function NewOrgPage() {
         });
         if (!res.ok) throw new Error('Image upload failed');
         const data = await res.json();
-        avatar_url = `${API_BASE}${data.url}`;
+        avatar_url = data.url; // relative path — resolved at display time using API_BASE
       }
 
       const org = await api.post<{ slug: string }>('/orgs', {

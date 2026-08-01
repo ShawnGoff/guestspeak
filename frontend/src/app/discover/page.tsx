@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import { api } from '@/lib/api';
+import { api, resolveAsset } from '@/lib/api';
 import { isLoggedIn } from '@/lib/auth';
 import type { Session, DiscoverResponse, OrgSearchResult } from '@ask-away/shared/types';
 import { ORG_CATEGORIES } from '@/lib/categories';
@@ -331,7 +331,7 @@ function SessionCard({ session, showDistance }: { session: Session & { distance_
             <div className="flex items-center gap-1.5 mb-1 min-w-0">
               {session.org_avatar_url ? (
                 <img
-                  src={session.org_avatar_url}
+                  src={resolveAsset(session.org_avatar_url)}
                   alt={session.org_name}
                   className="w-4 h-4 rounded-full object-cover flex-shrink-0"
                 />
@@ -411,7 +411,7 @@ function ChannelCard({ org }: { org: OrgSearchResult }) {
     <Link href={`/org/${org.slug}`} className="card p-5 flex gap-4 hover:border-brand-purple/50 transition-colors group">
       <div className="flex-shrink-0 w-12 h-12 rounded-full bg-brand-bg border border-brand-border overflow-hidden flex items-center justify-center">
         {org.avatar_url ? (
-          <img src={org.avatar_url} alt={org.name} className="w-full h-full object-cover" />
+          <img src={resolveAsset(org.avatar_url)} alt={org.name} className="w-full h-full object-cover" />
         ) : (
           <span className="text-lg font-bold text-purple-200/30">
             {org.name.charAt(0).toUpperCase()}

@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { api } from '@/lib/api';
+import { api, resolveAsset } from '@/lib/api';
 import { getUser, clearAuth, isLoggedIn } from '@/lib/auth';
 import type { DiscoverResponse, Session } from '@ask-away/shared/types';
 
@@ -199,7 +199,7 @@ export default function DashboardPage() {
                   >
                     <div className="w-10 h-10 rounded-xl bg-brand-border/40 flex items-center justify-center flex-shrink-0 text-lg font-bold text-white group-hover:bg-brand-purple/20 transition-colors">
                       {org.avatar_url
-                        ? <img src={org.avatar_url} alt={org.name} className="w-full h-full rounded-xl object-cover" />
+                        ? <img src={resolveAsset(org.avatar_url)} alt={org.name} className="w-full h-full rounded-xl object-cover" />
                         : org.name.charAt(0).toUpperCase()}
                     </div>
                     <div className="min-w-0">
@@ -650,7 +650,7 @@ function DiscoverChannelCard({ org }: { org: DiscoverOrg }) {
     >
       <div className="w-10 h-10 rounded-xl bg-brand-border/40 flex items-center justify-center flex-shrink-0 text-sm font-bold text-white group-hover:bg-brand-purple/20 transition-colors overflow-hidden">
         {org.avatar_url
-          ? <img src={org.avatar_url} alt={org.name} className="w-full h-full object-cover" />
+          ? <img src={resolveAsset(org.avatar_url)} alt={org.name} className="w-full h-full object-cover" />
           : org.name.charAt(0).toUpperCase()}
       </div>
       <div className="min-w-0 flex-1">

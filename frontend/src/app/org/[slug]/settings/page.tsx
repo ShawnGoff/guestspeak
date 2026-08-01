@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { api } from '@/lib/api';
+import { api, resolveAsset } from '@/lib/api';
 import { isLoggedIn, getUser } from '@/lib/auth';
 import LocationAutocomplete, { type LocationResult } from '@/components/LocationAutocomplete';
 import { ORG_CATEGORIES } from '@/lib/categories';
@@ -83,7 +83,7 @@ export default function OrgSettingsPage({ params }: { params: { slug: string } }
       setName(data.org.name);
       setDescription(data.org.description ?? '');
       setWebsite(data.org.website ?? '');
-      setAvatarPreview(data.org.avatar_url ?? null);
+      setAvatarPreview(resolveAsset(data.org.avatar_url) ?? null);
       setCity(data.org.city ?? '');
       setRegion(data.org.region ?? '');
       setCountry(data.org.country ?? '');
@@ -132,7 +132,7 @@ export default function OrgSettingsPage({ params }: { params: { slug: string } }
         });
         if (!res.ok) throw new Error('Image upload failed');
         const data = await res.json();
-        avatar_url = `${API_BASE}${data.url}`;
+        avatar_url = data.url; // relative path — resolved at display time using API_BASE
         setAvatarFile(null);
       }
 
