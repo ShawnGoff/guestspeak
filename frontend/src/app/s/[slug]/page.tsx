@@ -39,6 +39,8 @@ export default function SessionPage({ params }: SessionPageProps) {
   // Host/mod overlay
   const [hostView, setHostView]             = useState(false);
   const [showModPanel, setShowModPanel]     = useState(false);
+  const [pendingQuestions, setPendingQuestions] = useState<Question[]>([]);
+  const [showPending, setShowPending]       = useState(false);
   const [replyTarget, setReplyTarget]       = useState<Question | null>(null);
   const [replyText, setReplyText]           = useState('');
   const [replyLoading, setReplyLoading]     = useState(false);
@@ -75,6 +77,9 @@ export default function SessionPage({ params }: SessionPageProps) {
         if (!hasSeen && s.status !== 'closed' && !isHostOrMod) {
           setShowWelcome(true);
         }
+
+        // Hosts and mods start in host view — they're here to run the session
+        if (isHostOrMod) setHostView(true);
 
         // Determine how to join based on who's viewing
         const isRegistered = !!localStorage.getItem('aa_user');
@@ -116,6 +121,13 @@ export default function SessionPage({ params }: SessionPageProps) {
 
         const result = await api.get<{ data: Question[] }>(`/questions?sessionId=${s.id}&sort=${sort}`);
         setQuestions(result.data);
+
+        // Fetch pending queue for hosts/mods on sessions with approval required
+        if (isHostOrMod && s.requires_approval) {
+          api.get<{ data: Question[] }>(`/questions?sessionId=${s.id}&status=pending`)
+            .then(r => setPendingQuestions(r.data))
+            .catch(() => {});
+        }
       } catch (err: any) {
         setError(err.message);
       } finally {
@@ -146,9 +158,13 @@ export default function SessionPage({ params }: SessionPageProps) {
 
     es.addEventListener('question:new', (e) => {
       const q: Question = JSON.parse(e.data);
-      setQuestions(prev => [q, ...prev]);
-      // Show "↑ N new" badge if user is scrolled down
-      if (!atTopRef.current) setNewQuestionsCount(n => n + 1);
+      if (q.status === 'pending') {
+        // Route pending questions to the approval queue for hosts/mods
+        setPendingQuestions(prev => [q, ...prev]);
+      } else {
+        setQuestions(prev => [q, ...prev]);
+        if (!atTopRef.current) setNewQuestionsCount(n => n + 1);
+      }
     });
     es.addEventListener('echo:added', (e) => {
       const { questionId, vote_count } = JSON.parse(e.data);
@@ -252,6 +268,21 @@ export default function SessionPage({ params }: SessionPageProps) {
   async function setQuestionStatus(questionId: string, status: string) {
     try {
       await api.patch(`/questions/${questionId}/status`, { status });
+    } catch (err: any) { setError(err.message); }
+  }
+
+  async function approveQuestion(questionId: string) {
+    try {
+      const approved = await api.patch<Question>(`/questions/${questionId}/approve`, {});
+      setPendingQuestions(prev => prev.filter(q => q.id !== questionId));
+      setQuestions(prev => [approved, ...prev]);
+    } catch (err: any) { setError(err.message); }
+  }
+
+  async function rejectQuestion(questionId: string) {
+    try {
+      await api.patch(`/questions/${questionId}/status`, { status: 'hidden' });
+      setPendingQuestions(prev => prev.filter(q => q.id !== questionId));
     } catch (err: any) { setError(err.message); }
   }
 
@@ -477,6 +508,62 @@ export default function SessionPage({ params }: SessionPageProps) {
           />
         </div>
 
+        {/* Pending approval queue — visible to host/mod when requires_approval is on */}
+        {isMod && hostView && session.requires_approval && (
+          <div className="mb-4">
+            <button
+              onClick={() => setShowPending(v => !v)}
+              className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border transition-colors ${
+                pendingQuestions.length > 0
+                  ? 'bg-amber-500/10 border-amber-500/30 text-amber-300'
+                  : 'bg-brand-card border-brand-border/50 text-purple-200/40'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-semibold">Pending approval</span>
+                {pendingQuestions.length > 0 && (
+                  <span className="text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 px-2 py-0.5 rounded-full">
+                    {pendingQuestions.length}
+                  </span>
+                )}
+              </div>
+              <svg className={`w-4 h-4 transition-transform ${showPending ? 'rotate-180' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M6 9l6 6 6-6" />
+              </svg>
+            </button>
+
+            {showPending && (
+              <div className="mt-2 space-y-2">
+                {pendingQuestions.length === 0 && (
+                  <p className="text-center text-xs text-purple-200/30 py-4">No questions waiting for approval.</p>
+                )}
+                {pendingQuestions.map(q => (
+                  <div key={q.id} className="card p-4 border-amber-500/20">
+                    <p className="text-white text-sm leading-relaxed mb-1">{q.body}</p>
+                    {q.author_username && (
+                      <p className="text-xs text-purple-200/30 mb-3">{q.author_username}</p>
+                    )}
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => approveQuestion(q.id)}
+                        className="flex-1 text-xs py-2 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-semibold hover:bg-emerald-500/20 transition-colors"
+                      >
+                        ✓ Approve
+                      </button>
+                      <button
+                        onClick={() => rejectQuestion(q.id)}
+                        className="flex-1 text-xs py-2 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 font-semibold hover:bg-red-500/20 transition-colors"
+                      >
+                        Reject
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         <SortTabs sort={sort} onChange={setSort} />
 
         <div className="space-y-3 mt-4">
@@ -675,154 +762,129 @@ function HostControlBar({ session, closing, reopening, deleting, onGoLive, onClo
   onManageMods: () => void;
   callerRole: CallerRole;
 }) {
-  const [copied, setCopied]       = useState(false);
-  const [showQR, setShowQR]       = useState(false);
-  const [shared, setShared]       = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [showQR, setShowQR] = useState(false);
+  const [shared, setShared] = useState(false);
 
   const joinCode = session.join_code;
   const joinUrl  = typeof window !== 'undefined'
     ? `${window.location.origin}/s/${session.slug}`
     : '';
+  const isOwner = ['host', 'org_owner', 'org_admin'].includes(callerRole);
 
   function copyCode() {
     navigator.clipboard.writeText(joinCode ?? '');
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    setCopied(true); setTimeout(() => setCopied(false), 2000);
+  }
+  async function share() {
+    if (navigator.share) {
+      await navigator.share({ title: session.title, text: `Join "${session.title}" on GuestSpeak`, url: joinUrl }).catch(() => {});
+    } else {
+      await navigator.clipboard.writeText(joinUrl);
+      setShared(true); setTimeout(() => setShared(false), 2000);
+    }
   }
 
   return (
-    <div className="bg-brand-purple/10 border-b border-brand-purple/30">
-      <div className="max-w-2xl mx-auto px-3 sm:px-4 py-2 flex items-center gap-2 flex-wrap">
-        <span className="text-xs text-brand-orange font-bold uppercase tracking-widest mr-auto">Host controls</span>
+    <div className="bg-brand-card border-b border-brand-purple/25">
+      <div className="max-w-2xl mx-auto px-4 py-3">
 
-        {/* Edit + Manage mods — only host/org_owner/org_admin */}
-        {['host', 'org_owner', 'org_admin'].includes(callerRole) && (
-          <>
-            <Link
-              href={`/s/${session.slug}/edit`}
-              className="text-xs px-3 py-1.5 rounded-lg border border-brand-border text-purple-200/60 hover:border-brand-purple hover:text-white transition-colors"
-            >
-              Edit
-            </Link>
+        {/* Primary row — status action + join code */}
+        <div className="flex items-center gap-3 flex-wrap">
+
+          {/* Primary session action */}
+          {session.status === 'upcoming' && (
             <button
-              onClick={onManageMods}
-              className="text-xs px-3 py-1.5 rounded-lg border border-brand-border text-purple-200/60 hover:border-brand-purple hover:text-white transition-colors"
+              onClick={() => { if (confirm('Go live now?')) onGoLive(); }}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-500/15 border border-emerald-500/40 text-emerald-400 font-semibold text-sm hover:bg-emerald-500/25 transition-colors"
             >
-              Manage mods
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              Go live
             </button>
-          </>
-        )}
-
-        {/* Share */}
-        {session.status !== 'closed' && (
-          <button
-            onClick={async () => {
-              const url = joinUrl;
-              const text = `Join "${session.title}" on GuestSpeak`;
-              if (navigator.share) {
-                await navigator.share({ title: session.title, text, url }).catch(() => {});
-              } else {
-                await navigator.clipboard.writeText(url);
-                setShared(true);
-                setTimeout(() => setShared(false), 2000);
-              }
-            }}
-            className={`text-xs px-3 py-1.5 rounded-lg border transition-colors flex items-center gap-1.5 ${
-              shared ? 'border-emerald-500/50 text-emerald-400' : 'border-brand-border text-purple-200/60 hover:border-brand-purple hover:text-white'
-            }`}
-          >
-            {shared ? <CheckIcon /> : <ShareIcon />}
-            {shared ? 'Copied!' : 'Share'}
-          </button>
-        )}
-
-        {/* QR code toggle */}
-        {joinCode && session.status !== 'closed' && (
-          <button
-            onClick={() => setShowQR(v => !v)}
-            className={`text-xs px-3 py-1.5 rounded-lg border transition-colors ${
-              showQR ? 'border-brand-purple text-brand-purple bg-brand-purple/10' : 'border-brand-border text-purple-200/60 hover:border-brand-purple hover:text-white'
-            }`}
-          >
-            QR code
-          </button>
-        )}
-
-        {/* Join code copy */}
-        {joinCode && (
-          <button
-            onClick={copyCode}
-            className={`flex items-center gap-1.5 text-xs font-mono px-3 py-1.5 rounded-lg border transition-colors ${
-              copied ? 'border-emerald-500/50 text-emerald-400' : 'border-brand-border text-white hover:border-brand-purple'
-            }`}
-          >
-            <span className="text-purple-200/40">Code:</span>
-            {joinCode}
-            {copied ? <CheckIcon /> : <CopyIcon />}
-          </button>
-        )}
-
-        {/* Go Live */}
-        {session.status === 'upcoming' && (
-          <button
-            onClick={() => {
-              if (confirm('Go live now? Your audience will be notified the session has started.')) onGoLive();
-            }}
-            className="text-xs px-3 py-1.5 rounded-lg border border-emerald-600/60 text-emerald-400 hover:bg-emerald-900/20 transition-colors flex items-center gap-1.5"
-          >
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-            Go live
-          </button>
-        )}
-
-        {/* Close session */}
-        {session.status === 'live' && (
-          <button
-            onClick={() => {
-              if (confirm('Close this session? Submissions will stop and it becomes read-only.')) onClose();
-            }}
-            disabled={closing}
-            className="text-xs px-3 py-1.5 rounded-lg border border-red-700/50 text-red-400 hover:bg-red-900/20 transition-colors disabled:opacity-40"
-          >
-            {closing ? 'Closing…' : 'Close session'}
-          </button>
-        )}
-
-        {session.status === 'closed' && (
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-xs text-purple-200/40 mr-1">Session ended</span>
+          )}
+          {session.status === 'live' && (
             <button
-              onClick={onExport}
-              className="text-xs px-3 py-1.5 rounded-lg border border-brand-border text-purple-200/60 hover:border-brand-purple hover:text-white transition-colors flex items-center gap-1.5"
+              onClick={() => { if (confirm('Close this session? Submissions will stop.')) onClose(); }}
+              disabled={closing}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 font-semibold text-sm hover:bg-red-500/20 transition-colors disabled:opacity-40"
             >
-              <DownloadIcon />
-              Export CSV
+              {closing ? 'Closing…' : 'Close session'}
             </button>
+          )}
+          {session.status === 'closed' && (
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs font-semibold text-purple-200/40 uppercase tracking-wider">Session ended</span>
+              <button onClick={onExport} className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-brand-border text-purple-200/50 hover:text-white transition-colors">
+                <DownloadIcon /> Export CSV
+              </button>
+              <button onClick={onReopen} disabled={reopening} className="text-xs px-3 py-1.5 rounded-lg border border-emerald-600/50 text-emerald-400 hover:bg-emerald-900/20 transition-colors disabled:opacity-40">
+                {reopening ? 'Reopening…' : 'Reopen'}
+              </button>
+              <button onClick={onDelete} disabled={deleting} className="text-xs px-3 py-1.5 rounded-lg border border-red-700/40 text-red-400/70 hover:text-red-400 hover:bg-red-900/20 transition-colors disabled:opacity-40">
+                {deleting ? 'Deleting…' : 'Delete'}
+              </button>
+            </div>
+          )}
+
+          {/* Spacer */}
+          <div className="flex-1" />
+
+          {/* Join code — tappable to copy */}
+          {joinCode && session.status !== 'closed' && (
             <button
-              onClick={onReopen}
-              disabled={reopening}
-              className="text-xs px-3 py-1.5 rounded-lg border border-emerald-600/60 text-emerald-400 hover:bg-emerald-900/20 transition-colors disabled:opacity-40"
+              onClick={copyCode}
+              title="Tap to copy join code"
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border font-mono transition-colors ${
+                copied ? 'border-emerald-500/50 text-emerald-400' : 'border-brand-border text-white hover:border-brand-purple'
+              }`}
             >
-              {reopening ? 'Reopening…' : 'Reopen'}
+              <span className="text-purple-200/40 text-xs font-sans">Code</span>
+              <span className="text-sm font-bold tracking-widest">{joinCode}</span>
+              {copied ? <CheckIcon /> : <CopyIcon />}
             </button>
+          )}
+
+          {/* QR toggle */}
+          {joinCode && session.status !== 'closed' && (
             <button
-              onClick={onDelete}
-              disabled={deleting}
-              className="text-xs px-3 py-1.5 rounded-lg border border-red-700/50 text-red-400 hover:bg-red-900/20 transition-colors disabled:opacity-40"
+              onClick={() => setShowQR(v => !v)}
+              title="Show QR code"
+              className={`p-1.5 rounded-lg border transition-colors ${showQR ? 'border-brand-purple text-brand-purple' : 'border-brand-border text-purple-200/40 hover:text-white hover:border-brand-border'}`}
             >
-              {deleting ? 'Deleting…' : 'Delete'}
+              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" />
+                <rect x="3" y="14" width="7" height="7" />
+                <path d="M14 14h.01M17 14h.01M14 17h.01M17 17h.01M20 14h.01M20 17h.01M20 20h.01" />
+              </svg>
             </button>
+          )}
+
+          {/* Share */}
+          {session.status !== 'closed' && (
+            <button onClick={share} title="Share session link"
+              className={`p-1.5 rounded-lg border transition-colors ${shared ? 'border-emerald-500/50 text-emerald-400' : 'border-brand-border text-purple-200/40 hover:text-white hover:border-brand-border'}`}>
+              {shared ? <CheckIcon /> : <ShareIcon />}
+            </button>
+          )}
+        </div>
+
+        {/* Secondary row — owner-only admin actions */}
+        {isOwner && (
+          <div className="flex items-center gap-2 mt-2 pt-2 border-t border-brand-border/30">
+            <Link href={`/s/${session.slug}/edit`} className="text-xs text-purple-200/40 hover:text-purple-200/70 transition-colors">Edit session</Link>
+            <span className="text-brand-border">·</span>
+            <button onClick={onManageMods} className="text-xs text-purple-200/40 hover:text-purple-200/70 transition-colors">Manage moderators</button>
           </div>
         )}
       </div>
 
       {/* QR panel */}
       {showQR && joinUrl && (
-        <div className="max-w-2xl mx-auto px-4 pb-4 flex flex-col items-center gap-3">
+        <div className="border-t border-brand-border/30 py-4 flex flex-col items-center gap-2">
           <div className="bg-white rounded-2xl p-4 inline-block">
-            <QRCode value={joinUrl} size={180} />
+            <QRCode value={joinUrl} size={160} />
           </div>
-          <p className="text-xs text-purple-200/40">Audience scans to join — no code needed</p>
+          <p className="text-xs text-purple-200/40">Audience scans to join — no app needed</p>
         </div>
       )}
     </div>
@@ -980,48 +1042,67 @@ function QuestionCard({ question, isEchoed, isMine, creditsLeft, onEcho,
 
           {/* Mod action buttons */}
           {hostView && (
-            <div className="flex items-center gap-1.5 mt-3 pt-3 border-t border-brand-border/30 flex-wrap">
-              <ModButton
-                active={question.status === 'starred'}
-                onClick={onStar}
-                title={question.status === 'starred' ? 'Unstar' : 'Star'}
-              >
-                ★
-              </ModButton>
-              <ModButton
-                active={question.status === 'answered'}
-                onClick={onAnswered}
-                title={question.status === 'answered' ? 'Mark unanswered' : 'Mark answered'}
-              >
-                ✓
-              </ModButton>
-              <ModButton onClick={onHide} title={question.status === 'hidden' ? 'Unhide question' : 'Hide question'} danger={question.status !== 'hidden'} active={question.status === 'hidden'}>
-                {question.status === 'hidden' ? 'Unhide' : 'Hide'}
-              </ModButton>
-              <ModButton onClick={onPin} title={isPinned ? 'Unpin question' : 'Pin to top'} active={isPinned}>
-                {isPinned ? 'Unpin' : '📌 Pin'}
-              </ModButton>
-              <ModButton onClick={onSpotlight} title={isSpotlighted ? 'Remove spotlight' : 'Now Answering'} active={isSpotlighted}>
-                {isSpotlighted ? '🎙 Live' : '🎙 Now'}
-              </ModButton>
-              <ModButton onClick={onReply} title="Add host reply">
-                Reply
-              </ModButton>
-              {onMute && (
-                <ModButton
-                  onClick={onMute}
-                  title={question.author_is_muted ? 'Unmute — allow them to ask again' : 'Mute — prevent further questions'}
-                  active={!!question.author_is_muted}
-                  danger={!question.author_is_muted}
+            <div className="mt-3 pt-3 border-t border-brand-border/30 space-y-2">
+              {/* Primary actions row */}
+              <div className="flex items-center gap-2">
+                {/* Spotlight — hero action */}
+                <button
+                  onClick={onSpotlight}
+                  title={isSpotlighted ? 'Remove from spotlight' : 'Spotlight — mark as Now Answering'}
+                  className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border transition-colors ${
+                    isSpotlighted
+                      ? 'bg-amber-500/20 border-amber-400/50 text-amber-300'
+                      : 'border-brand-border/60 text-purple-200/50 hover:border-amber-400/40 hover:text-amber-300 hover:bg-amber-500/10'
+                  }`}
                 >
-                  {question.author_is_muted ? 'Unmute' : '🔇 Mute'}
+                  🎙 {isSpotlighted ? 'Now Answering' : 'Spotlight'}
+                </button>
+
+                {/* Star */}
+                <button
+                  onClick={onStar}
+                  title={question.status === 'starred' ? 'Remove star' : 'Star this question'}
+                  className={`text-xs font-bold px-2.5 py-1.5 rounded-lg border transition-colors ${
+                    question.status === 'starred'
+                      ? 'bg-yellow-500/15 border-yellow-500/40 text-yellow-400'
+                      : 'border-brand-border/60 text-purple-200/40 hover:text-yellow-400 hover:border-yellow-500/30'
+                  }`}
+                >
+                  ★
+                </button>
+
+                {/* Answered */}
+                <button
+                  onClick={onAnswered}
+                  title={question.status === 'answered' ? 'Mark unanswered' : 'Mark answered'}
+                  className={`text-xs font-semibold px-2.5 py-1.5 rounded-lg border transition-colors ${
+                    question.status === 'answered'
+                      ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-400'
+                      : 'border-brand-border/60 text-purple-200/40 hover:text-emerald-400 hover:border-emerald-500/30'
+                  }`}
+                >
+                  ✓
+                </button>
+              </div>
+
+              {/* Secondary actions row */}
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <ModButton onClick={onPin} title={isPinned ? 'Unpin' : 'Pin to top'} active={isPinned}>
+                  {isPinned ? 'Unpin' : '📌'}
                 </ModButton>
-              )}
-              {onRemove && (
-                <ModButton onClick={onRemove} title="Remove from session" danger>
-                  Remove
+                <ModButton onClick={onHide} title={question.status === 'hidden' ? 'Unhide' : 'Hide'} danger={question.status !== 'hidden'} active={question.status === 'hidden'}>
+                  {question.status === 'hidden' ? 'Unhide' : 'Hide'}
                 </ModButton>
-              )}
+                <ModButton onClick={onReply} title="Add host reply">Reply</ModButton>
+                {onMute && (
+                  <ModButton onClick={onMute} title={question.author_is_muted ? 'Unmute' : 'Mute'} active={!!question.author_is_muted} danger={!question.author_is_muted}>
+                    {question.author_is_muted ? 'Unmute' : '🔇'}
+                  </ModButton>
+                )}
+                {onRemove && (
+                  <ModButton onClick={onRemove} title="Remove from session" danger>✕</ModButton>
+                )}
+              </div>
             </div>
           )}
         </div>
