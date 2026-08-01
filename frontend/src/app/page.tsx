@@ -42,9 +42,9 @@ function Logo() {
 // ─── Mock Q&A Widget ─────────────────────────────────────────────────────────
 
 const MOCK_QUESTIONS = [
-  { text: "How do you handle prompt injection and untrusted user input in production?", author: "Jordan M.", ago: "2m", top: true },
-  { text: "What's your strategy for keeping AI inference costs manageable at scale?", author: "Priya K.", ago: "4m", top: false },
-  { text: "How are you versioning and testing prompt changes across releases?", author: "anon", ago: "6m", top: false },
+  { text: "What's one thing you wish you'd known before building your first AI product?", author: "Jordan M.", ago: "2m", top: true },
+  { text: "How do you keep your team focused when the tools are changing this fast?", author: "Priya K.", ago: "4m", top: false },
+  { text: "What does good human-AI collaboration actually look like day to day?", author: "anon", ago: "6m", top: false },
 ];
 
 function MockQAWidget() {
@@ -336,19 +336,19 @@ const HOW_IT_WORKS = [
     step: '01',
     icon: <LinkIcon />,
     title: 'Host shares a link',
-    desc: 'Create a session in seconds. Share the link or join code with your audience — no app install required.',
+    desc: 'Create a session in seconds. Share the link or join code with your audience — no signup required to join.',
   },
   {
     step: '02',
     icon: <QuestionIcon />,
     title: 'Audience asks questions',
-    desc: 'Anyone can submit a question instantly. Guests get up to 5 credits to spend on questions or Echoes.',
+    desc: 'Anyone can submit a question instantly. Each person gets a handful of asks — encouraging quality over quantity.',
   },
   {
     step: '03',
     icon: <EchoIconLg />,
-    title: 'Echoes surface the best',
-    desc: 'Instead of upvotes, the crowd adds Echoes. The most-echoed questions float to the top automatically.',
+    title: 'Best questions rise to the top',
+    desc: 'The audience adds Echoes to questions they want answered. The most-supported questions automatically move to the top.',
   },
 ];
 
@@ -397,17 +397,17 @@ const FEATURES = [
   {
     icon: <ShieldIcon />,
     title: 'Moderation built in',
-    desc: 'Hosts assign moderators with granular permissions: star, hide, flag, or mark answered.',
+    desc: 'Pin important questions, hide off-topic ones, and mark questions answered — all from a simple host dashboard.',
   },
   {
     icon: <SimilarIcon />,
     title: 'Duplicate detection',
-    desc: 'Before submitting, the audience sees similar questions already asked — keeping the feed clean.',
+    desc: 'Before posting, audiences see similar questions already in the feed — so the same question doesn\'t get asked five times.',
   },
   {
     icon: <CreditIcon />,
     title: 'Credit system',
-    desc: 'Hosts can give guests up to 5 credits to spend on questions or Echoes. Quality over volume.',
+    desc: 'Each guest gets a limited number of questions and Echoes to spend — so people think before they post, and the best questions win.',
   },
   {
     icon: <MobileIcon />,
@@ -532,7 +532,7 @@ function EarlyAccess() {
           )}
 
           <div className="flex flex-wrap justify-center gap-2 mt-10">
-            {['Real-time Q&A', 'No app install needed', 'Free to start', 'Built for live events'].map(f => (
+            {['Real-time Q&A', 'Works in any browser', 'Free to start', 'Built for live events'].map(f => (
               <span key={f} className="px-3 py-1.5 rounded-full border border-brand-border text-purple-200/50 text-xs">
                 {f}
               </span>
