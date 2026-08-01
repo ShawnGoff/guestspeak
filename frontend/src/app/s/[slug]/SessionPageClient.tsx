@@ -522,10 +522,10 @@ export default function SessionPageClient({ params }: SessionPageProps) {
         <aside className="hidden lg:flex flex-col w-56 xl:w-64 border-r border-brand-border shrink-0 sticky top-[57px] h-[calc(100vh-57px)] overflow-y-auto">
           <div className="p-5 flex flex-col gap-5">
             <div>
-              <p className="text-[10px] font-bold text-purple-200/25 uppercase tracking-widest mb-3">Session</p>
+              <p className="text-[10px] font-bold text-purple-200/50 uppercase tracking-widest mb-3">Session</p>
               <h2 className="font-bold text-white text-sm leading-snug mb-1">{session.title}</h2>
               {session.host_username && (
-                <p className="text-xs text-purple-200/40">Hosted by <span className="text-brand-amber font-semibold">{session.host_username}</span></p>
+                <p className="text-xs text-purple-200/60">Hosted by <span className="text-brand-amber font-semibold">{session.host_username}</span></p>
               )}
               {session.org_name && (
                 <Link href={`/org/${session.org_slug}`} className="text-xs text-brand-orange/70 hover:text-brand-orange mt-0.5 flex items-center gap-1">
@@ -547,13 +547,13 @@ export default function SessionPageClient({ params }: SessionPageProps) {
                 { label: 'Answered', value: questions.filter(q => q.status === 'answered').length },
               ].map(s => (
                 <div key={s.label} className="flex items-center justify-between">
-                  <span className="text-xs text-purple-200/35">{s.label}</span>
+                  <span className="text-xs text-purple-200/60">{s.label}</span>
                   <span className="text-lg font-bold text-white">{s.value}</span>
                 </div>
               ))}
               {participantCount !== null && (
                 <div className="flex items-center justify-between">
-                  <span className="text-xs text-purple-200/35">Attending</span>
+                  <span className="text-xs text-purple-200/60">Attending</span>
                   <span className="text-lg font-bold text-white flex items-center gap-1">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-400/60" />
                     {participantCount}
@@ -566,7 +566,7 @@ export default function SessionPageClient({ params }: SessionPageProps) {
             {session.join_code && session.status !== 'closed' && (
               <div className="mt-auto border-t border-brand-border/40 pt-4">
                 <div className="rounded-xl bg-brand-purple/15 border border-brand-purple/25 p-3.5 text-center">
-                  <p className="text-xs font-bold text-purple-200/50 mb-1">Join code</p>
+                  <p className="text-xs font-bold text-purple-200/70 mb-1">Join code</p>
                   <p className="text-xl font-bold text-brand-amber tracking-[0.2em] mb-2">{session.join_code}</p>
                   <p className="text-xs text-brand-orange font-semibold">guestspeak.app</p>
                 </div>
@@ -721,7 +721,7 @@ export default function SessionPageClient({ params }: SessionPageProps) {
         {/* ── Right sidebar (desktop only) ────────────────────────────────── */}
         <aside className="hidden xl:flex flex-col w-64 border-l border-brand-border shrink-0 sticky top-[57px] h-[calc(100vh-57px)] overflow-y-auto">
           <div className="p-5">
-            <p className="text-[10px] font-bold text-purple-200/25 uppercase tracking-widest mb-4">Top Questions</p>
+            <p className="text-[10px] font-bold text-purple-200/50 uppercase tracking-widest mb-4">Top Questions</p>
             <div className="flex flex-col gap-3">
               {questions
                 .filter(q => q.status !== 'hidden' && q.status !== 'answered')
@@ -733,13 +733,13 @@ export default function SessionPageClient({ params }: SessionPageProps) {
                       {i + 1}
                     </span>
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs text-purple-200/70 leading-relaxed line-clamp-2">{q.body}</p>
-                      <p className="text-[11px] text-brand-orange/70 mt-0.5">{q.vote_count} echoes</p>
+                      <p className="text-xs text-purple-200/80 leading-relaxed line-clamp-2">{q.body}</p>
+                      <p className="text-[11px] text-brand-orange mt-0.5">{q.vote_count} echoes</p>
                     </div>
                   </div>
                 ))}
               {questions.filter(q => q.status !== 'hidden').length === 0 && (
-                <p className="text-xs text-purple-200/25 text-center py-4">No questions yet</p>
+                <p className="text-xs text-purple-200/40 text-center py-4">No questions yet</p>
               )}
             </div>
           </div>
@@ -1056,15 +1056,15 @@ function CreditDisplay({ credits, max, nextCreditSecs, creditCap }: {
 
   return (
     <div className="flex items-center gap-1.5">
-      <span className="text-xs text-purple-200/50">Credits</span>
+      <span className="text-xs text-purple-200/60">Credits</span>
       <div className="flex gap-1">
-        {Array.from({ length: max }).map((_, i) => (
-          <div key={i} className={`w-2.5 h-2.5 rounded-full transition-colors ${i < credits ? 'bg-brand-orange' : 'bg-brand-border'}`} />
+        {Array.from({ length: cap }).map((_, i) => (
+          <div key={i} className={`w-2.5 h-2.5 rounded-full transition-colors ${i < credits ? 'bg-brand-orange' : 'bg-brand-border/60'}`} />
         ))}
       </div>
-      <span className={`text-xs font-bold ${credits > 0 ? 'text-brand-amber' : 'text-brand-border'}`}>{credits}</span>
+      <span className={`text-xs font-bold ${credits > 0 ? 'text-brand-amber' : 'text-purple-200/40'}`}>{credits}</span>
       {showCountdown && (
-        <span className="text-xs text-purple-200/30 tabular-nums">+1 in {mins}:{secs}</span>
+        <span className="text-xs text-purple-200/50 tabular-nums">+1 in {mins}:{secs}</span>
       )}
     </div>
   );
