@@ -17,6 +17,9 @@ export interface ModeratorPermissions {
   can_star: boolean;
   can_flag: boolean;
   can_hide: boolean;
+  can_mute: boolean;
+  can_remove: boolean;
+  can_approve: boolean;
 }
 
 /**
@@ -32,12 +35,18 @@ export async function resolveCallerRole(
     can_star: true,
     can_flag: true,
     can_hide: true,
+    can_mute: true,
+    can_remove: true,
+    can_approve: true,
   };
   const noPerms: ModeratorPermissions = {
     can_mark_answered: false,
     can_star: false,
     can_flag: false,
     can_hide: false,
+    can_mute: false,
+    can_remove: false,
+    can_approve: false,
   };
 
   // Fetch session + org membership in one query
@@ -49,7 +58,10 @@ export async function resolveCallerRole(
        sm.can_mark_answered,
        sm.can_star,
        sm.can_flag,
-       sm.can_hide
+       sm.can_hide,
+       sm.can_mute,
+       sm.can_remove,
+       sm.can_approve
      FROM sessions s
      LEFT JOIN organization_members om
             ON om.org_id = s.org_id AND om.user_id = $2
@@ -79,6 +91,9 @@ export async function resolveCallerRole(
         can_star: row.can_star,
         can_flag: row.can_flag,
         can_hide: row.can_hide,
+        can_mute: row.can_mute ?? false,
+        can_remove: row.can_remove ?? false,
+        can_approve: row.can_approve ?? false,
       },
     };
   }

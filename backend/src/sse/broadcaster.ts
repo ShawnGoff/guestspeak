@@ -7,7 +7,9 @@ export type SSEEventType =
   | 'session:live'
   | 'session:closed'
   | 'session:spotlight'
-  | 'participant:count';
+  | 'participant:count'
+  | 'participant:muted'
+  | 'participant:removed';
 
 export interface SSEEvent {
   type: SSEEventType;

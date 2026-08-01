@@ -5,7 +5,7 @@ import { AppError } from '../middleware/errorHandler';
 import { broadcast } from '../sse/broadcaster';
 import { resolveCallerRole, requireHostOrOrgAdmin } from '../db/permissions';
 import { filterText } from '../lib/wordFilter';
-import type { SortOption } from '@ask-away/shared/types';
+type SortOption = 'echoes' | 'recent' | 'answered' | 'starred';
 
 const CreateQuestionSchema = z.object({
   session_id: z.string().uuid(),
