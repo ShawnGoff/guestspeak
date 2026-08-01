@@ -52,6 +52,11 @@ export default function SessionPageClient({ params }: SessionPageProps) {
   const [isRegistered, setIsRegistered]             = useState(false);
   const [postAnonymously, setPostAnonymously]       = useState(false);
 
+  // Credit regen countdown (seconds until next credit)
+  const CREDIT_CAP = 6;
+  const REGEN_SECS = 10 * 60; // 10 minutes
+  const [nextCreditSecs, setNextCreditSecs] = useState(REGEN_SECS);
+
   // Live UX
   const [showWelcome, setShowWelcome]             = useState(false);
   const [participantCount, setParticipantCount]   = useState<number | null>(null);
@@ -223,6 +228,30 @@ export default function SessionPageClient({ params }: SessionPageProps) {
     const t = setTimeout(() => setError(null), 5000);
     return () => clearTimeout(t);
   }, [error]);
+
+  // ── Credit regen heartbeat ────────────────────────────────────────────────
+
+  useEffect(() => {
+    if (!session || session.status === 'closed') return;
+    // Hosts/mods skip the regen countdown
+    const callerRole = session.caller_role ?? 'none';
+    if (['host', 'org_owner', 'org_admin', 'moderator'].includes(callerRole)) return;
+
+    const interval = setInterval(() => {
+      setNextCreditSecs(prev => {
+        if (prev <= 1) {
+          // Time's up — send heartbeat
+          api.post<{ credits_remaining: number }>(`/sessions/${session.id}/heartbeat`, {})
+            .then(r => setCredits(r.credits_remaining))
+            .catch(() => {});
+          return REGEN_SECS;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [session?.id, session?.status, session?.caller_role]);
 
   // ── Similar detection ─────────────────────────────────────────────────────
 
@@ -458,6 +487,8 @@ export default function SessionPageClient({ params }: SessionPageProps) {
         isMod={isMod}
         hostView={hostView}
         participantCount={participantCount}
+        nextCreditSecs={!isMod ? nextCreditSecs : undefined}
+        creditCap={CREDIT_CAP}
         onToggleHostView={() => setHostView(v => !v)}
       />
 
@@ -700,13 +731,15 @@ export default function SessionPageClient({ params }: SessionPageProps) {
 
 // ─── Session header ───────────────────────────────────────────────────────────
 
-function SessionHeader({ session, isLiveSoon, credits, isMod, hostView, participantCount, onToggleHostView }: {
+function SessionHeader({ session, isLiveSoon, credits, isMod, hostView, participantCount, nextCreditSecs, creditCap, onToggleHostView }: {
   session: Session;
   isLiveSoon: boolean;
   credits: number;
   isMod: boolean;
   hostView: boolean;
   participantCount: number | null;
+  nextCreditSecs?: number;
+  creditCap?: number;
   onToggleHostView: () => void;
 }) {
   return (
@@ -741,7 +774,7 @@ function SessionHeader({ session, isLiveSoon, credits, isMod, hostView, particip
         </div>
 
         <div className="flex-shrink-0 flex flex-col items-end gap-2">
-          <CreditDisplay credits={credits} max={session.credits_per_user} />
+          <CreditDisplay credits={credits} max={session.credits_per_user} nextCreditSecs={nextCreditSecs} creditCap={creditCap} />
           {isMod && (
             <button
               onClick={onToggleHostView}
@@ -906,7 +939,17 @@ function HostControlBar({ session, closing, reopening, deleting, onGoLive, onClo
 
 // ─── Credit display ───────────────────────────────────────────────────────────
 
-function CreditDisplay({ credits, max }: { credits: number; max: number }) {
+function CreditDisplay({ credits, max, nextCreditSecs, creditCap }: {
+  credits: number;
+  max: number;
+  nextCreditSecs?: number;
+  creditCap?: number;
+}) {
+  const cap = creditCap ?? max;
+  const showCountdown = nextCreditSecs !== undefined && credits < cap;
+  const mins = Math.floor((nextCreditSecs ?? 0) / 60);
+  const secs = String((nextCreditSecs ?? 0) % 60).padStart(2, '0');
+
   return (
     <div className="flex items-center gap-1.5">
       <span className="text-xs text-purple-200/50">Credits</span>
@@ -916,6 +959,9 @@ function CreditDisplay({ credits, max }: { credits: number; max: number }) {
         ))}
       </div>
       <span className={`text-xs font-bold ${credits > 0 ? 'text-brand-amber' : 'text-brand-border'}`}>{credits}</span>
+      {showCountdown && (
+        <span className="text-xs text-purple-200/30 tabular-nums">+1 in {mins}:{secs}</span>
+      )}
     </div>
   );
 }

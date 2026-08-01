@@ -445,6 +445,77 @@ export async function joinSession(req: Request, res: Response, next: NextFunctio
   }
 }
 
+const CREDIT_CAP = 6;
+const CREDIT_REGEN_MINUTES = 10;
+
+/**
+ * POST /api/sessions/:id/heartbeat
+ * Called by the frontend every 10 minutes while a participant is in the session.
+ * Awards 1 credit if the participant is below the cap and at least 10 minutes
+ * have elapsed since the last credit was awarded.
+ * Server-side enforcement prevents spam.
+ */
+export async function heartbeat(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { id } = req.params;
+    const userId    = req.user?.isGuest === false ? req.user.userId : null;
+    const guestToken = req.user?.guestToken ?? null;
+
+    if (!userId && !guestToken) throw new AppError(401, 'Authentication required');
+
+    let credits_remaining: number;
+
+    if (userId) {
+      const result = await pool.query(
+        `UPDATE session_participants
+         SET credits_remaining = LEAST(credits_remaining + 1, $1),
+             last_credit_at    = NOW()
+         WHERE session_id = $2
+           AND user_id    = $3
+           AND credits_remaining < $1
+           AND (last_credit_at IS NULL OR last_credit_at < NOW() - INTERVAL '${CREDIT_REGEN_MINUTES} minutes')
+         RETURNING credits_remaining`,
+        [CREDIT_CAP, id, userId],
+      );
+      // If no row updated (already at cap or too soon), just read current value
+      if (!result.rows[0]) {
+        const cur = await pool.query(
+          `SELECT credits_remaining FROM session_participants WHERE session_id = $1 AND user_id = $2`,
+          [id, userId],
+        );
+        credits_remaining = cur.rows[0]?.credits_remaining ?? 0;
+      } else {
+        credits_remaining = result.rows[0].credits_remaining;
+      }
+    } else {
+      const result = await pool.query(
+        `UPDATE session_participants
+         SET credits_remaining = LEAST(credits_remaining + 1, $1),
+             last_credit_at    = NOW()
+         WHERE session_id  = $2
+           AND guest_token = $3
+           AND credits_remaining < $1
+           AND (last_credit_at IS NULL OR last_credit_at < NOW() - INTERVAL '${CREDIT_REGEN_MINUTES} minutes')
+         RETURNING credits_remaining`,
+        [CREDIT_CAP, id, guestToken],
+      );
+      if (!result.rows[0]) {
+        const cur = await pool.query(
+          `SELECT credits_remaining FROM session_participants WHERE session_id = $1 AND guest_token = $2`,
+          [id, guestToken],
+        );
+        credits_remaining = cur.rows[0]?.credits_remaining ?? 0;
+      } else {
+        credits_remaining = result.rows[0].credits_remaining;
+      }
+    }
+
+    res.json({ credits_remaining });
+  } catch (err) {
+    next(err);
+  }
+}
+
 /**
  * GET /api/sessions/code/:code
  * Look up a session by its short join code (case-insensitive).

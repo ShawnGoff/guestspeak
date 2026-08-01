@@ -37,6 +37,8 @@ export default function CreateSessionPage() {
   const [loading, setLoading]   = useState(false);
   const [error, setError]       = useState<string | null>(null);
   const [joinCode, setJoinCode] = useState<{ code: string; slug: string; title: string } | null>(null);
+  const [copiedCode, setCopiedCode] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -95,8 +97,18 @@ export default function CreateSessionPage() {
     const origin  = typeof window !== 'undefined' ? window.location.origin : 'https://guestspeak.app';
     const joinUrl = `${origin}/s/${joinCode.slug}`;
 
-    function copyCode() { navigator.clipboard.writeText(joinCode!.code); }
-    function copyLink() { navigator.clipboard.writeText(joinUrl); }
+    function copyCode() {
+      navigator.clipboard.writeText(joinCode!.code).then(() => {
+        setCopiedCode(true);
+        setTimeout(() => setCopiedCode(false), 2000);
+      });
+    }
+    function copyLink() {
+      navigator.clipboard.writeText(joinUrl).then(() => {
+        setCopiedLink(true);
+        setTimeout(() => setCopiedLink(false), 2000);
+      });
+    }
 
     return (
       <div className="min-h-screen bg-brand-bg flex flex-col items-center justify-center px-4 py-12">
@@ -135,16 +147,29 @@ export default function CreateSessionPage() {
             >
               {joinCode.code}
             </button>
-            <p className="text-xs text-purple-200/30 mb-6">Tap code to copy</p>
+            <p className={`text-xs mb-6 transition-colors ${copiedCode ? 'text-emerald-400' : 'text-purple-200/30'}`}>
+              {copiedCode ? 'Code copied!' : 'Tap code to copy'}
+            </p>
 
             {/* Actions */}
             <div className="flex flex-col gap-2.5">
               <button onClick={copyLink} className="btn-ghost py-2.5 text-sm flex items-center justify-center gap-2">
-                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71" />
-                  <path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" />
-                </svg>
-                Copy link
+                {copiedLink ? (
+                  <>
+                    <svg className="w-4 h-4 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M20 6L9 17l-5-5" />
+                    </svg>
+                    <span className="text-emerald-400">Copied!</span>
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71" />
+                      <path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" />
+                    </svg>
+                    Copy link
+                  </>
+                )}
               </button>
               <button
                 onClick={() => router.push(`/s/${joinCode.slug}`)}
@@ -247,13 +272,13 @@ export default function CreateSessionPage() {
                 <input
                   type="range"
                   min={1}
-                  max={5}
+                  max={6}
                   value={credits}
                   onChange={e => setCredits(Number(e.target.value))}
                   className="flex-1 accent-brand-orange"
                 />
                 <div className="flex gap-1.5">
-                  {Array.from({ length: 5 }).map((_, i) => (
+                  {Array.from({ length: 6 }).map((_, i) => (
                     <div
                       key={i}
                       className={`w-3 h-3 rounded-full transition-colors ${

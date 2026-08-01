@@ -8,6 +8,7 @@ import {
   closeSession,
   reopenSession,
   joinSession,
+  heartbeat,
   deleteSession,
   listSessions,
   listMySessions,
@@ -52,8 +53,11 @@ router.delete('/:id', requireRegistered, deleteSession);
 // GET  /api/sessions/:id/export   — download Q&A as CSV (host only)
 router.get('/:id/export', requireRegistered, exportSession);
 
-// POST /api/sessions/:id/join     — join (guest or registered)
+// POST /api/sessions/:id/join      — join (guest or registered)
 router.post('/:id/join', optionalAuth, joinSession);
+
+// POST /api/sessions/:id/heartbeat — credit regen tick (guest or registered)
+router.post('/:id/heartbeat', optionalAuth, heartbeat);
 
 // /api/sessions/:id/moderators    — moderator management (host only)
 router.use('/:id/moderators', moderatorRoutes);

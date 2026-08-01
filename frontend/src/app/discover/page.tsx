@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { api, resolveAsset } from '@/lib/api';
 import { isLoggedIn } from '@/lib/auth';
 import type { Session, DiscoverResponse, OrgSearchResult } from '@ask-away/shared/types';
@@ -11,9 +12,29 @@ import AppNav from '@/components/AppNav';
 // ─── Page ────────────────────────────────────────────────────────────────────
 
 export default function DiscoverPage() {
+  const router = useRouter();
   const [data, setData] = useState<DiscoverResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [mounted, setMounted] = useState(false);
+
+  // Join by code
+  const [joinCode, setJoinCode]             = useState('');
+  const [joining, setJoining]               = useState(false);
+  const [joinError, setJoinError]           = useState<string | null>(null);
+
+  async function handleJoin(e: React.FormEvent) {
+    e.preventDefault();
+    if (!joinCode.trim()) return;
+    setJoining(true);
+    setJoinError(null);
+    try {
+      const session = await api.get<{ slug: string }>(`/sessions/code/${joinCode.trim().toUpperCase()}`);
+      router.push(`/s/${session.slug}`);
+    } catch {
+      setJoinError('No session found with that code.');
+      setJoining(false);
+    }
+  }
 
   // Unified search state
   const [nameQuery, setNameQuery]           = useState('');
@@ -151,6 +172,33 @@ export default function DiscoverPage() {
         <div className="mb-6">
           <h1 className="text-3xl font-extrabold text-white mb-1">Discover</h1>
           <p className="text-purple-200/50 text-sm">Find live Q&amp;As and channels near you.</p>
+        </div>
+
+        {/* Join by code */}
+        <div className="card p-4 mb-4">
+          <form onSubmit={handleJoin} className="flex gap-2">
+            <div className="flex-1 relative">
+              <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-purple-200/30 pointer-events-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+              </svg>
+              <input
+                type="text"
+                value={joinCode}
+                onChange={e => { setJoinCode(e.target.value.toUpperCase()); setJoinError(null); }}
+                placeholder="Have a join code? Enter it here…"
+                maxLength={12}
+                className="w-full bg-brand-bg border border-brand-border rounded-xl pl-9 pr-4 py-2.5 text-sm text-white placeholder-purple-200/30 focus:outline-none focus:border-brand-purple transition-colors font-mono tracking-widest"
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={joining || !joinCode.trim()}
+              className="btn-primary text-sm px-5 py-2.5 disabled:opacity-40 shrink-0"
+            >
+              {joining ? '…' : 'Join'}
+            </button>
+          </form>
+          {joinError && <p className="text-red-400 text-xs mt-2 ml-1">{joinError}</p>}
         </div>
 
         {/* Unified search card */}
