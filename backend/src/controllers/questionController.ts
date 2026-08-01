@@ -4,6 +4,7 @@ import { pool } from '../db/pool';
 import { AppError } from '../middleware/errorHandler';
 import { broadcast } from '../sse/broadcaster';
 import { resolveCallerRole, requireHostOrOrgAdmin } from '../db/permissions';
+import { filterText } from '../lib/wordFilter';
 import type { SortOption } from '@ask-away/shared/types';
 
 const CreateQuestionSchema = z.object({
@@ -118,11 +119,14 @@ export async function createQuestion(req: Request, res: Response, next: NextFunc
     // Deduct 1 credit (atomic — prevents double-spend)
     await spendCredit(session_id, userId, guestToken);
 
+    // Apply word filter — stored body is always clean
+    const cleanBody = await filterText(body);
+
     const result = await pool.query(
       `INSERT INTO questions (session_id, author_id, author_guest_token, body)
        VALUES ($1, $2, $3, $4)
        RETURNING *`,
-      [session_id, userId, guestToken, body],
+      [session_id, userId, guestToken, cleanBody],
     );
 
     const question = result.rows[0];
