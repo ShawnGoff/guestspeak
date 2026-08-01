@@ -35,7 +35,7 @@ export default function CreateSessionPage() {
 
   const [loading, setLoading]   = useState(false);
   const [error, setError]       = useState<string | null>(null);
-  const [joinCode, setJoinCode] = useState<{ code: string; slug: string } | null>(null);
+  const [joinCode, setJoinCode] = useState<{ code: string; slug: string; title: string } | null>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -80,7 +80,7 @@ export default function CreateSessionPage() {
         submission_cutoff_at,
       });
 
-      setJoinCode({ code: session.join_code, slug: session.slug });
+      setJoinCode({ code: session.join_code, slug: session.slug, title: session.title });
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -88,40 +88,75 @@ export default function CreateSessionPage() {
     }
   }
 
-  // ── Join code reveal screen ───────────────────────────────────────────────
+  // ── Session created screen ────────────────────────────────────────────────
   if (joinCode) {
-    const joinUrl = `${typeof window !== 'undefined' ? window.location.origin : ''}/s/${joinCode.slug}`;
+    const origin  = typeof window !== 'undefined' ? window.location.origin : 'https://guestspeak.app';
+    const joinUrl = `${origin}/s/${joinCode.slug}`;
+
+    function copyCode() { navigator.clipboard.writeText(joinCode!.code); }
+    function copyLink() { navigator.clipboard.writeText(joinUrl); }
+
     return (
-      <div className="min-h-screen bg-brand-bg flex items-center justify-center px-4">
-        <div className="card p-10 max-w-sm w-full text-center">
-          <p className="text-brand-orange text-sm font-semibold uppercase tracking-widest mb-4">Session ready</p>
+      <div className="min-h-screen bg-brand-bg flex flex-col items-center justify-center px-4 py-12">
+        {/* Success glow */}
+        <div className="absolute inset-0 pointer-events-none overflow-hidden">
+          <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[480px] h-[480px] rounded-full bg-brand-orange/5 blur-3xl" />
+        </div>
 
-          {/* QR Code */}
-          <div className="bg-white rounded-2xl p-4 inline-block mb-6">
-            <QRCode value={joinUrl} size={160} />
+        <div className="relative w-full max-w-md text-center">
+
+          {/* Heading */}
+          <div className="mb-8">
+            <div className="inline-flex items-center gap-2 text-xs font-bold text-emerald-400 uppercase tracking-widest mb-4">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              Session created
+            </div>
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-white leading-tight mb-2">
+              {joinCode.title}
+            </h1>
+            <p className="text-purple-200/50 text-sm">Your audience can join right now.</p>
           </div>
 
-          <p className="text-purple-200/50 text-sm mb-2">Or share the join code</p>
-          <div className="text-4xl font-extrabold text-orange-gradient tracking-widest mb-6">{joinCode.code}</div>
+          {/* QR + code card */}
+          <div className="card p-6 sm:p-8 mb-4">
+            {/* QR code */}
+            <div className="bg-white rounded-2xl p-4 inline-block mb-6">
+              <QRCode value={joinUrl} size={168} />
+            </div>
 
-          <p className="text-purple-200/40 text-xs mb-6">
-            Audience scans the QR code or visits <span className="text-white">guestspeak.app</span> and types the code.
+            {/* Big join code */}
+            <p className="text-xs text-purple-200/40 uppercase tracking-widest mb-2">Join code</p>
+            <button
+              onClick={copyCode}
+              className="text-5xl font-extrabold text-orange-gradient tracking-[0.15em] mb-1 hover:opacity-80 transition-opacity cursor-copy"
+              title="Tap to copy code"
+            >
+              {joinCode.code}
+            </button>
+            <p className="text-xs text-purple-200/30 mb-6">Tap code to copy</p>
+
+            {/* Actions */}
+            <div className="flex flex-col gap-2.5">
+              <button onClick={copyLink} className="btn-ghost py-2.5 text-sm flex items-center justify-center gap-2">
+                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71" />
+                  <path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" />
+                </svg>
+                Copy link
+              </button>
+              <button
+                onClick={() => router.push(`/s/${joinCode.slug}`)}
+                className="btn-primary py-3 text-sm font-semibold"
+              >
+                Open session →
+              </button>
+            </div>
+          </div>
+
+          {/* Helper note */}
+          <p className="text-xs text-purple-200/30 leading-relaxed">
+            Audience scans the QR or goes to <span className="text-white/50">guestspeak.app</span> and types the code — no app or account needed.
           </p>
-
-          <div className="flex flex-col gap-3">
-            <button
-              onClick={() => navigator.clipboard.writeText(joinCode.code)}
-              className="btn-ghost py-3 text-sm"
-            >
-              Copy code
-            </button>
-            <button
-              onClick={() => router.push(`/s/${joinCode.slug}`)}
-              className="btn-primary py-3 text-sm"
-            >
-              Go to session →
-            </button>
-          </div>
         </div>
       </div>
     );
