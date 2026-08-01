@@ -240,9 +240,9 @@ function Hero() {
 
             {/* Headline */}
             <h1 className="text-5xl sm:text-6xl xl:text-7xl font-extrabold leading-[1.05] mb-6">
-              <span className="text-white">Give your audience</span>
+              <span className="text-white">Bring your whole audience</span>
               <br />
-              <span className="text-orange-gradient">a voice.</span>
+              <span className="text-orange-gradient">into the conversation.</span>
             </h1>
 
             <p className="text-lg sm:text-xl text-purple-200/70 mb-10 max-w-xl lg:max-w-none">
