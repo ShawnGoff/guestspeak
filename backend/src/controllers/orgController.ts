@@ -212,6 +212,16 @@ export async function addMember(req: Request, res: Response, next: NextFunction)
       await requireOrgOwner(id, req.user!.userId);
     }
 
+    // Block any operation targeting the current owner unless caller is also an owner.
+    // Prevents admins from demoting/removing the owner (irreversible channel takeover).
+    const targetMembership = await pool.query(
+      `SELECT role FROM organization_members WHERE org_id = $1 AND user_id = $2`,
+      [id, user_id],
+    );
+    if (targetMembership.rows[0]?.role === 'owner') {
+      await requireOrgOwner(id, req.user!.userId);
+    }
+
     const userCheck = await pool.query('SELECT id FROM users WHERE id = $1 AND is_guest = false', [user_id]);
     if (!userCheck.rows[0]) throw new AppError(404, 'User not found');
 

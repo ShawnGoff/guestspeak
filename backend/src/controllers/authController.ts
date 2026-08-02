@@ -61,7 +61,7 @@ export async function login(req: Request, res: Response, next: NextFunction) {
 
     const result = await pool.query(
       `SELECT id, email, username, is_guest, password_hash FROM users
-       WHERE (email = $1 OR username ILIKE $1) AND is_guest = false`,
+       WHERE (email = $1 OR LOWER(username) = LOWER($1)) AND is_guest = false`,
       [email],
     );
 

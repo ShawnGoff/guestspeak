@@ -23,7 +23,9 @@ const CreateSessionSchema = z.object({
   lat: z.number().min(-90).max(90).optional(),
   lng: z.number().min(-180).max(180).optional(),
   is_online: z.boolean().optional(),
-  stream_url: z.string().url().max(1000).optional().or(z.literal('')),
+  stream_url: z.string().url().max(1000)
+    .refine(u => new URL(u).protocol === 'https:', { message: 'stream_url must use https' })
+    .optional().or(z.literal('')),
 });
 
 const UpdateSessionSchema = CreateSessionSchema.partial();

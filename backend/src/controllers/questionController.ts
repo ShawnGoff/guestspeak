@@ -243,22 +243,42 @@ export async function addEcho(req: Request, res: Response, next: NextFunction) {
     // Verify participant membership
     await verifyParticipant(session_id, userId, guestToken);
 
-    // Insert vote first — if it fails with a unique violation the user already
-    // Echoed, so we 409 without touching credits. Spend credit only on success.
+    // Wrap credit spend + vote insert in a transaction.
+    // Spend credit FIRST so a failed spend never lets the vote land.
+    const col = userId ? 'user_id' : 'guest_token';
+    const val = userId ?? guestToken;
+
+    const client = await pool.connect();
     try {
-      await pool.query(
+      await client.query('BEGIN');
+
+      // Deduct credit — rolls back everything if user is out
+      const spendResult = await client.query(
+        `UPDATE session_participants
+         SET credits_remaining = credits_remaining - 1, actions_used = actions_used + 1
+         WHERE session_id = $1 AND ${col} = $2 AND credits_remaining > 0
+         RETURNING credits_remaining`,
+        [session_id, val],
+      );
+      if (spendResult.rowCount === 0) {
+        await client.query('ROLLBACK');
+        throw new AppError(402, 'No credits remaining');
+      }
+
+      // Insert vote — unique constraint catches duplicate echoes
+      await client.query(
         `INSERT INTO votes (question_id, user_id, guest_token) VALUES ($1, $2, $3)`,
         [questionId, userId, guestToken],
       );
-    } catch (err: any) {
-      if (err?.code === '23505') {
-        throw new AppError(409, 'You have already Echoed this question');
-      }
-      throw err;
-    }
 
-    // Vote recorded — now deduct credit
-    await spendCredit(session_id, userId, guestToken);
+      await client.query('COMMIT');
+    } catch (err: any) {
+      await client.query('ROLLBACK').catch(() => {});
+      if (err?.code === '23505') throw new AppError(409, 'You have already Echoed this question');
+      throw err;
+    } finally {
+      client.release();
+    }
 
     // vote_count updated by DB trigger; fetch fresh value
     const updated = await pool.query(
