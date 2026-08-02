@@ -587,14 +587,18 @@ export async function exportSession(req: Request, res: Response, next: NextFunct
     const questionsResult = await pool.query(
       `SELECT q.body, q.vote_count, q.status, q.is_pinned, q.host_reply,
               q.host_replied_at, q.created_at,
-              COALESCE(u.username, sp.guest_username) AS author
+              CASE
+                WHEN q.post_anonymously THEN 'Anon' || q.anon_number
+                ELSE COALESCE(u.username, sp.guest_username)
+              END AS author
        FROM questions q
-       LEFT JOIN users u ON u.id = q.author_id
+       LEFT JOIN users u ON u.id = q.author_id AND NOT q.post_anonymously
        LEFT JOIN session_participants sp
          ON sp.session_id = q.session_id
+         AND NOT q.post_anonymously
          AND sp.guest_token = q.author_guest_token
          AND q.author_guest_token IS NOT NULL
-       WHERE q.session_id = $1 AND q.status != 'hidden'
+       WHERE q.session_id = $1 AND q.status NOT IN ('hidden', 'pending')
        ORDER BY q.is_pinned DESC, q.vote_count DESC, q.created_at ASC`,
       [id],
     );

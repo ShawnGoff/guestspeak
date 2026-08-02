@@ -5,6 +5,7 @@ import { AppError } from '../middleware/errorHandler';
 import { broadcast } from '../sse/broadcaster';
 import { resolveCallerRole, requireHostOrOrgAdmin } from '../db/permissions';
 import { filterText } from '../lib/wordFilter';
+import { fetchPublicQuestion, toPublicQuestion } from '../lib/questionHelpers';
 type SortOption = 'echoes' | 'recent' | 'answered' | 'starred';
 
 const CreateQuestionSchema = z.object({
@@ -157,16 +158,19 @@ export async function createQuestion(req: Request, res: Response, next: NextFunc
     const result = await pool.query(
       `INSERT INTO questions (session_id, author_id, author_guest_token, body, status, post_anonymously, anon_number)
        VALUES ($1, $2, $3, $4, $5, $6, $7)
-       RETURNING *`,
+       RETURNING id`,
       [session_id, userId, guestToken, cleanBody, initialStatus, postAnonymously, anonNumber],
     );
 
-    const question = result.rows[0];
+    const newId = result.rows[0].id;
+    const publicQuestion = await fetchPublicQuestion(newId, session_id);
 
-    // Notify all listeners in this session
-    broadcast(session_id, { type: 'question:new', data: question });
+    // C4: only broadcast approved questions — pending ones wait for host approval
+    if (initialStatus !== 'pending') {
+      broadcast(session_id, { type: 'question:new', data: publicQuestion });
+    }
 
-    res.status(201).json(question);
+    res.status(201).json(publicQuestion);
   } catch (err) {
     next(err);
   }
@@ -202,15 +206,15 @@ export async function updateQuestionStatus(req: Request, res: Response, next: Ne
       }
     }
 
-    const result = await pool.query(
-      `UPDATE questions SET status = $1, updated_at = NOW() WHERE id = $2 RETURNING *`,
+    await pool.query(
+      `UPDATE questions SET status = $1, updated_at = NOW() WHERE id = $2`,
       [status, id],
     );
 
-    const updated = result.rows[0];
-    broadcast(session_id, { type: 'question:updated', data: updated });
+    const publicQuestion = await fetchPublicQuestion(id, session_id);
+    broadcast(session_id, { type: 'question:updated', data: publicQuestion });
 
-    res.json(updated);
+    res.json(publicQuestion);
   } catch (err) {
     next(err);
   }
@@ -368,13 +372,13 @@ export async function approveQuestion(req: Request, res: Response, next: NextFun
     if (role === 'participant' || role === 'none') throw new AppError(403, 'Insufficient permissions');
     if (role === 'moderator' && !permissions.can_approve) throw new AppError(403, 'Insufficient permissions');
 
-    const result = await pool.query(
-      `UPDATE questions SET status = 'new', updated_at = NOW() WHERE id = $1 RETURNING *`,
+    await pool.query(
+      `UPDATE questions SET status = 'new', updated_at = NOW() WHERE id = $1`,
       [id],
     );
-    const approved = result.rows[0];
-    broadcast(session_id, { type: 'question:new', data: approved });
-    res.json(approved);
+    const publicQuestion = await fetchPublicQuestion(id, session_id);
+    broadcast(session_id, { type: 'question:new', data: publicQuestion });
+    res.json(publicQuestion);
   } catch (err) {
     next(err);
   }
@@ -395,14 +399,14 @@ export async function pinQuestion(req: Request, res: Response, next: NextFunctio
 
     await requireHostOrOrgAdmin(session_id, callerId);
 
-    const result = await pool.query(
-      `UPDATE questions SET is_pinned = $1, updated_at = NOW() WHERE id = $2 RETURNING *`,
+    await pool.query(
+      `UPDATE questions SET is_pinned = $1, updated_at = NOW() WHERE id = $2`,
       [!is_pinned, id],
     );
 
-    const updated = result.rows[0];
-    broadcast(session_id, { type: 'question:updated', data: updated });
-    res.json(updated);
+    const publicQuestion = await fetchPublicQuestion(id, session_id);
+    broadcast(session_id, { type: 'question:updated', data: publicQuestion });
+    res.json(publicQuestion);
   } catch (err) {
     next(err);
   }
@@ -447,7 +451,7 @@ export async function spotlightQuestion(req: Request, res: Response, next: NextF
       data: { question_id: nowSpotlighted ? id : null },
     });
 
-    res.json(updated);
+    res.json(toPublicQuestion(updated));
   } catch (err) {
     next(err);
   }
@@ -469,16 +473,16 @@ export async function addHostReply(req: Request, res: Response, next: NextFuncti
 
     await requireHostOrOrgAdmin(session_id, callerId);
 
-    const result = await pool.query(
+    await pool.query(
       `UPDATE questions
        SET host_reply = $1, host_replied_at = NOW(), updated_at = NOW()
-       WHERE id = $2
-       RETURNING *`,
+       WHERE id = $2`,
       [reply, id],
     );
 
-    broadcast(session_id, { type: 'question:updated', data: result.rows[0] });
-    res.json(result.rows[0]);
+    const publicQuestion = await fetchPublicQuestion(id, session_id);
+    broadcast(session_id, { type: 'question:updated', data: publicQuestion });
+    res.json(publicQuestion);
   } catch (err) {
     next(err);
   }
