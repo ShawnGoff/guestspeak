@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
+import Footer from '@/components/Footer';
 
 // ─── Nav ────────────────────────────────────────────────────────────────────
 
@@ -579,21 +580,6 @@ function CTA() {
   );
 }
 
-// ─── Footer ──────────────────────────────────────────────────────────────────
-
-function Footer() {
-  return (
-    <footer className="border-t border-brand-border/40 py-8 px-4">
-      <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
-        <span className="font-display font-bold tracking-tight text-lg">Guest<span className="text-brand-orange">Speak</span></span>
-        <p className="text-purple-200/40 text-sm">© {new Date().getFullYear()} GuestSpeak. Built for live events.</p>
-        <div className="flex gap-6 text-purple-200/50 text-sm">
-          <span>Privacy &amp; Terms coming soon</span>
-        </div>
-      </div>
-    </footer>
-  );
-}
 
 // ─── Shared ──────────────────────────────────────────────────────────────────
 
