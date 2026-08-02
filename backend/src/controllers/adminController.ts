@@ -57,12 +57,20 @@ export async function listFlags(req: Request, res: Response, next: NextFunction)
 
 // ─── Platform bans ────────────────────────────────────────────────────────────
 
+// duration_hours: 24 = 1 day, 72 = 3 days, 168 = 1 week, null/omitted = permanent.
+// Mutually exclusive with expires_at — prefer duration_hours in the admin UI.
+const DURATION_LABEL: Record<number, string> = { 24: '1 day', 72: '3 days', 168: '1 week' };
+const ALLOWED_DURATIONS = [24, 72, 168] as const;
+
 const CreateBanSchema = z.object({
-  user_id:     z.string().uuid().optional(),
-  guest_token: z.string().optional(),
-  ip_address:  z.string().optional(),
-  reason:      z.string().min(1).max(500),
-  expires_at:  z.string().datetime().optional(),
+  user_id:        z.string().uuid().optional(),
+  guest_token:    z.string().optional(),
+  ip_address:     z.string().optional(),
+  reason:         z.string().min(1).max(500),
+  duration_hours: z.union([z.literal(24), z.literal(72), z.literal(168)]).optional(),
+  // Escape hatch — raw ISO datetime (admin can still pass a custom date).
+  // If both duration_hours and expires_at are provided, duration_hours wins.
+  expires_at:     z.string().datetime().optional(),
 }).refine(d => d.user_id || d.guest_token || d.ip_address, {
   message: 'At least one of user_id, guest_token, or ip_address is required',
 });
@@ -96,6 +104,17 @@ export async function createBan(req: Request, res: Response, next: NextFunction)
     const data = CreateBanSchema.parse(req.body);
     const adminId = req.user!.userId;
 
+    // Resolve expires_at: duration_hours takes precedence over raw expires_at.
+    // null = permanent.
+    let expiresAt: string | null = null;
+    if (data.duration_hours != null) {
+      const exp = new Date();
+      exp.setHours(exp.getHours() + data.duration_hours);
+      expiresAt = exp.toISOString();
+    } else if (data.expires_at) {
+      expiresAt = data.expires_at;
+    }
+
     // Log the action
     await pool.query(
       `INSERT INTO admin_action_log (admin_id, action, target_type, target_id, notes)
@@ -108,7 +127,7 @@ export async function createBan(req: Request, res: Response, next: NextFunction)
        VALUES ($1, $2, $3, $4, $5, $6)
        RETURNING *`,
       [data.user_id ?? null, data.guest_token ?? null, data.ip_address ?? null,
-       data.reason, data.expires_at ?? null, adminId],
+       data.reason, expiresAt, adminId],
     );
 
     res.status(201).json(result.rows[0]);

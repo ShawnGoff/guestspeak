@@ -132,8 +132,8 @@ export async function createQuestion(req: Request, res: Response, next: NextFunc
     // Verify the user has joined (participant row must exist)
     await verifyParticipant(session_id, userId, guestToken);
 
-    // Reject if the participant is muted or session-banned
-    await rejectIfMutedOrBanned(session_id, userId, guestToken);
+    // Reject if the participant is muted or session-banned (pass IP for platform ban check)
+    await rejectIfMutedOrBanned(session_id, userId, guestToken, req.ip ?? null);
 
     // Deduct 1 credit (atomic — prevents double-spend)
     await spendCredit(session_id, userId, guestToken);
@@ -242,6 +242,9 @@ export async function addEcho(req: Request, res: Response, next: NextFunction) {
 
     // Verify participant membership
     await verifyParticipant(session_id, userId, guestToken);
+
+    // Reject muted, session-banned, or platform-banned users (pass IP for platform ban check)
+    await rejectIfMutedOrBanned(session_id, userId, guestToken, req.ip ?? null);
 
     // Wrap credit spend + vote insert in a transaction.
     // Spend credit FIRST so a failed spend never lets the vote land.
@@ -533,12 +536,15 @@ async function verifyParticipant(
 }
 
 /**
- * Throws 403 if the participant is muted or session-banned.
+ * Throws 403 if the participant is muted, session-banned, or platform-banned.
+ * Checks platform_bans so bans take effect immediately — not just at join time.
+ * ipAddress is optional: pass req.ip when available to enforce IP-level bans.
  */
 async function rejectIfMutedOrBanned(
   sessionId: string,
   userId: string | null,
   guestToken: string | null,
+  ipAddress: string | null = null,
 ) {
   const col = userId ? 'user_id' : 'guest_token';
   const val = userId ?? guestToken;
@@ -559,6 +565,36 @@ async function rejectIfMutedOrBanned(
   );
   if (banResult.rows[0]) {
     throw new AppError(403, 'You have been removed from this session');
+  }
+
+  // Check platform ban — enforced on every action, not just at join.
+  // Checks user_id, guest_token, AND IP so all three ban vectors are enforced.
+  if (userId || guestToken || ipAddress) {
+    const conditions: string[] = [];
+    const params: unknown[] = [];
+
+    if (userId) {
+      params.push(userId);
+      conditions.push(`user_id = $${params.length}`);
+    }
+    if (guestToken) {
+      params.push(guestToken);
+      conditions.push(`guest_token = $${params.length}`);
+    }
+    if (ipAddress) {
+      params.push(ipAddress);
+      conditions.push(`ip_address = $${params.length}`);
+    }
+    params.push(new Date().toISOString());
+    const expiryCheck = `(expires_at IS NULL OR expires_at > $${params.length})`;
+
+    const platformBan = await pool.query(
+      `SELECT id FROM platform_bans WHERE (${conditions.join(' OR ')}) AND ${expiryCheck} LIMIT 1`,
+      params,
+    );
+    if (platformBan.rows[0]) {
+      throw new AppError(403, 'Your account has been suspended');
+    }
   }
 }
 

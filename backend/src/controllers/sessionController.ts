@@ -358,6 +358,7 @@ export async function joinSession(req: Request, res: Response, next: NextFunctio
     }
 
     const { guest_username } = JoinSchema.parse(req.body);
+    const ipAddress = req.ip ?? null;
 
     // Guests must supply a display name
     if (!userId) {
@@ -383,23 +384,36 @@ export async function joinSession(req: Request, res: Response, next: NextFunctio
 
     if (status === 'closed') throw new AppError(410, 'This session is closed');
 
-    // Block platform-banned users/guests from joining any session
-    if (userId) {
-      const ban = await pool.query(
-        `SELECT id FROM platform_bans
-         WHERE user_id = $1 AND (expires_at IS NULL OR expires_at > NOW())
-         LIMIT 1`,
-        [userId],
-      );
-      if (ban.rows[0]) throw new AppError(403, 'Your account has been suspended from GuestSpeak');
-    } else if (guestToken) {
-      const ban = await pool.query(
-        `SELECT id FROM platform_bans
-         WHERE guest_token = $1 AND (expires_at IS NULL OR expires_at > NOW())
-         LIMIT 1`,
-        [guestToken],
-      );
-      if (ban.rows[0]) throw new AppError(403, 'This device has been suspended from GuestSpeak');
+    // Block platform-banned users/guests from joining any session.
+    // Checks user_id, guest_token, AND IP so all three ban vectors are enforced.
+    {
+      const conditions: string[] = [];
+      const params: unknown[] = [];
+
+      if (userId) {
+        params.push(userId);
+        conditions.push(`user_id = $${params.length}`);
+      }
+      if (guestToken) {
+        params.push(guestToken);
+        conditions.push(`guest_token = $${params.length}`);
+      }
+      if (ipAddress) {
+        params.push(ipAddress);
+        conditions.push(`ip_address = $${params.length}`);
+      }
+
+      if (conditions.length > 0) {
+        const ban = await pool.query(
+          `SELECT id FROM platform_bans
+           WHERE (${conditions.join(' OR ')}) AND (expires_at IS NULL OR expires_at > NOW())
+           LIMIT 1`,
+          params,
+        );
+        if (ban.rows[0]) {
+          throw new AppError(403, 'This account or device has been suspended from GuestSpeak');
+        }
+      }
     }
 
     // Block non-hosts from joining private sessions
@@ -407,29 +421,49 @@ export async function joinSession(req: Request, res: Response, next: NextFunctio
       throw new AppError(403, 'This session is private');
     }
 
+    // Per-session IP cap for guests: max 5 distinct guest tokens from the same IP.
+    // Prevents the H2 farming loop (create guest → join → use credits → repeat).
+    // Registered users and conference-NAT scenarios are unaffected:
+    //   - Registered users join with user_id, not counted here.
+    //   - Legitimate conference attendees join once and stay joined (idempotent upsert).
+    const IP_TOKEN_CAP = 5;
+    if (!userId && guestToken && ipAddress) {
+      const existing = await pool.query(
+        `SELECT COUNT(DISTINCT guest_token)::int AS cnt
+         FROM session_participants
+         WHERE session_id = $1 AND ip_address = $2 AND guest_token != $3`,
+        [id, ipAddress, guestToken],
+      );
+      if ((existing.rows[0]?.cnt ?? 0) >= IP_TOKEN_CAP) {
+        throw new AppError(429, 'Too many guest accounts joined from this network — sign in to continue');
+      }
+    }
+
     const credits = credits_per_user;
 
     // Upsert participant (idempotent).
     // NULL values don't match unique constraints, so we branch on identity type.
+    // ip_address is recorded on first join and not overwritten on reconnect
+    // (DO UPDATE leaves ip_address unchanged).
     let credits_remaining: number;
 
     if (userId) {
       const result = await pool.query(
-        `INSERT INTO session_participants (session_id, user_id, credits_remaining)
-         VALUES ($1, $2, $3)
+        `INSERT INTO session_participants (session_id, user_id, credits_remaining, ip_address)
+         VALUES ($1, $2, $3, $4)
          ON CONFLICT (session_id, user_id) DO UPDATE SET session_id = EXCLUDED.session_id
          RETURNING credits_remaining`,
-        [id, userId, credits],
+        [id, userId, credits, ipAddress],
       );
       credits_remaining = result.rows[0].credits_remaining;
     } else {
       const result = await pool.query(
-        `INSERT INTO session_participants (session_id, guest_token, credits_remaining, guest_username)
-         VALUES ($1, $2, $3, $4)
+        `INSERT INTO session_participants (session_id, guest_token, credits_remaining, guest_username, ip_address)
+         VALUES ($1, $2, $3, $4, $5)
          ON CONFLICT (session_id, guest_token) DO UPDATE
            SET guest_username = EXCLUDED.guest_username
          RETURNING credits_remaining`,
-        [id, guestToken, credits, guest_username],
+        [id, guestToken, credits, guest_username, ipAddress],
       );
       credits_remaining = result.rows[0].credits_remaining;
     }

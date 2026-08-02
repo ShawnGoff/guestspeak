@@ -1,0 +1,10 @@
+<svg width="64" height="64" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="64" height="64" rx="14" fill="#1A0A2E"/>
+  <!-- Speech bubble -->
+  <path d="M12 18C12 14.686 14.686 12 18 12H46C49.314 12 52 14.686 52 18V38C52 41.314 49.314 44 46 44H34L24 52V44H18C14.686 44 12 41.314 12 38V18Z" fill="#F5921E"/>
+  <!-- Three dots -->
+  <circle cx="22" cy="28" r="3.5" fill="#1A0A2E"/>
+  <circle cx="32" cy="28" r="3.5" fill="#1A0A2E"/>
+  <circle cx="42" cy="28" r="3.5" fill="#1A0A2E"/>
+</svg>

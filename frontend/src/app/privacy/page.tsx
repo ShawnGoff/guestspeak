@@ -26,7 +26,7 @@ export default function PrivacyPage() {
             <p className="mb-3"><span className="text-white font-medium">Account information.</span> When you register, we collect your email address, username, and a hashed version of your password. We never store your password in plain text.</p>
             <p className="mb-3"><span className="text-white font-medium">Guest sessions.</span> If you join without an account, we assign a temporary guest token stored in your browser. This token identifies your participation within a session but is not linked to your identity.</p>
             <p className="mb-3"><span className="text-white font-medium">Content you submit.</span> Questions and echoes you add are stored and associated with your account or guest token.</p>
-            <p><span className="text-white font-medium">Usage data.</span> We collect basic server logs (IP address, timestamp, HTTP method) for security and debugging. We do not use third-party analytics services.</p>
+            <p><span className="text-white font-medium">Usage data and IP addresses.</span> We record your IP address when you create a guest session or join a Q&amp;A session. Your IP address is stored in our database linked to your account or guest token and is used to enforce platform bans, detect abuse, and prevent credit farming. We also collect standard server logs (timestamp, HTTP method) for security and debugging. We do not use third-party analytics services.</p>
           </section>
 
           <section>
@@ -37,6 +37,7 @@ export default function PrivacyPage() {
               <li>To display your questions and echoes in sessions you participate in</li>
               <li>To enforce session credit limits and regeneration</li>
               <li>To investigate abuse reports or violations of our Terms of Service</li>
+              <li>To enforce platform bans across accounts and devices using your IP address</li>
             </ul>
             <p className="mt-3">We do not sell your data. We do not share it with advertisers or data brokers.</p>
           </section>

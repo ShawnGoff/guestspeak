@@ -55,7 +55,7 @@ export function requireRegistered(req: Request, res: Response, next: NextFunctio
 }
 
 export function optionalAuth(req: Request, res: Response, next: NextFunction) {
-  const token = extractToken(req);
+  const token = extractToken(req, false);
   if (token) {
     try {
       req.user = jwt.verify(token, JWT_SECRET) as JwtPayload;
@@ -66,12 +66,32 @@ export function optionalAuth(req: Request, res: Response, next: NextFunction) {
   next();
 }
 
-function extractToken(req: Request): string | null {
+/**
+ * Like optionalAuth but also accepts ?token= in the query string.
+ * Only use this on the SSE endpoint — EventSource cannot set headers,
+ * so the query string is the only way to pass a token there.
+ * Do NOT use on regular REST routes: query-string tokens leak into logs
+ * and browser history.
+ */
+export function optionalAuthSSE(req: Request, res: Response, next: NextFunction) {
+  const token = extractToken(req, true);
+  if (token) {
+    try {
+      req.user = jwt.verify(token, JWT_SECRET) as JwtPayload;
+    } catch {
+      // ignore — guest continues unauthenticated
+    }
+  }
+  next();
+}
+
+function extractToken(req: Request, allowQuery: boolean): string | null {
   const header = req.headers.authorization;
   if (header?.startsWith('Bearer ')) return header.slice(7);
-  // SSE connections can't set headers, so also accept token in query string
-  const query = req.query.token;
-  if (typeof query === 'string' && query) return query;
+  if (allowQuery) {
+    const query = req.query.token;
+    if (typeof query === 'string' && query) return query;
+  }
   return null;
 }
 

@@ -103,7 +103,7 @@ export function AuthShell({ title, subtitle, children, footer }: {
         {/* Logo */}
         <div className="text-center mb-8">
           <Link href="/" className="inline-block">
-            <span className="text-3xl font-bold tracking-tight text-orange-gradient">GuestSpeak</span>
+            <span className="text-3xl font-bold tracking-tight text-white">Guest<span className="text-brand-orange">Speak</span></span>
           </Link>
         </div>
 

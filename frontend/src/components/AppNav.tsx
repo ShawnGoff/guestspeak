@@ -93,8 +93,8 @@ export default function AppNav({
       <div className={`${mw} mx-auto px-4 h-14 flex items-center justify-between gap-3`}>
         {/* Left — logo + persistent nav links */}
         <div className="flex items-center gap-5 flex-shrink-0">
-          <Link href="/" className="text-xl font-bold tracking-tight text-orange-gradient">
-            GuestSpeak
+          <Link href="/" className="text-xl font-bold tracking-tight text-white">
+            Guest<span className="text-brand-orange">Speak</span>
           </Link>
           <Link
             href="/discover"

@@ -263,10 +263,13 @@ export async function checkUsername(req: Request, res: Response, next: NextFunct
 export async function guestToken(req: Request, res: Response, next: NextFunction) {
   try {
     const guestToken = `guest_${randomUUID()}`;
+    const ipAddress = req.ip ?? null;
 
-    // Create a guest user row so foreign keys resolve
+    // Create a guest user row so foreign keys resolve.
+    // Record IP so platform IP-bans can be checked on every action.
     const result = await pool.query(
-      `INSERT INTO users (is_guest) VALUES (true) RETURNING id`,
+      `INSERT INTO users (is_guest, ip_address) VALUES (true, $1) RETURNING id`,
+      [ipAddress],
     );
     const userId = result.rows[0].id;
 

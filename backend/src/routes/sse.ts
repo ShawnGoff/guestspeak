@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { addClient, removeClient } from '../sse/broadcaster';
-import { optionalAuth } from '../middleware/auth';
+import { optionalAuthSSE } from '../middleware/auth';
 import { pool } from '../db/pool';
 
 const router = Router();
@@ -21,7 +21,7 @@ const router = Router();
  * Auth: token accepted in query string (?token=...) because EventSource
  * does not support custom request headers.
  */
-router.get('/:id/stream', optionalAuth, async (req: Request, res: Response) => {
+router.get('/:id/stream', optionalAuthSSE, async (req: Request, res: Response) => {
   const { id } = req.params;
 
   // Verify session exists

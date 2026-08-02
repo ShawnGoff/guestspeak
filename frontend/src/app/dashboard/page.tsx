@@ -130,7 +130,7 @@ export default function DashboardPage() {
       <nav className="sticky top-0 z-40 bg-brand-bg/90 backdrop-blur border-b border-brand-border/50">
         <div className="max-w-5xl mx-auto px-4 h-14 flex items-center justify-between gap-3">
           <div className="flex items-center gap-5 flex-shrink-0">
-            <Link href="/" className="text-xl font-bold tracking-tight text-orange-gradient">GuestSpeak</Link>
+            <Link href="/" className="text-xl font-bold tracking-tight text-white">Guest<span className="text-brand-orange">Speak</span></Link>
             <Link href="/discover" className="text-sm font-medium text-purple-200/50 hover:text-white transition-colors hidden sm:block">Discover</Link>
           </div>
 
