@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { pool } from '../db/pool';
 import { AppError } from '../middleware/errorHandler';
 import { requireHostOrOrgAdmin, resolveCallerRole } from '../db/permissions';
-import { broadcast } from '../sse/broadcaster';
+import { broadcastTo } from '../sse/broadcaster';
 
 const AddModeratorSchema = z.object({
   user_id: z.string().uuid(),
@@ -177,12 +177,13 @@ export async function muteParticipant(req: Request, res: Response, next: NextFun
       `UPDATE session_participants
        SET is_muted = $1, muted_at = $2, muted_by = $3
        WHERE id = $4 AND session_id = $5
-       RETURNING id, is_muted`,
+       RETURNING id, is_muted, user_id, guest_token`,
       [mute, mute ? new Date() : null, mute ? callerId : null, participantId, sessionId],
     );
     if (!result.rows[0]) throw new AppError(404, 'Participant not found');
 
-    broadcast(sessionId, { type: 'participant:muted', data: { participantId, muted: mute } });
+    const { user_id, guest_token } = result.rows[0];
+    broadcastTo(sessionId, user_id ?? null, guest_token ?? null, { type: 'participant:muted', data: { participantId, muted: mute } });
     res.json(result.rows[0]);
   } catch (err) {
     next(err);
@@ -226,7 +227,7 @@ export async function removeParticipant(req: Request, res: Response, next: NextF
       [participantId],
     );
 
-    broadcast(sessionId, { type: 'participant:removed', data: { participantId } });
+    broadcastTo(sessionId, user_id ?? null, guest_token ?? null, { type: 'participant:removed', data: { participantId } });
     res.json({ removed: true });
   } catch (err) {
     next(err);

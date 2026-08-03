@@ -6,6 +6,7 @@ import { pool } from '../db/pool';
 import { signToken } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
 import { sendPasswordReset } from '../lib/mailer';
+import { containsBannedWord } from '../lib/wordFilter';
 
 const RegisterSchema = z.object({
   email: z.string().email(),
@@ -32,17 +33,18 @@ const LoginSchema = z.object({
 export async function register(req: Request, res: Response, next: NextFunction) {
   try {
     const { email, username, password } = RegisterSchema.parse(req.body);
+    if (containsBannedWord(username)) throw new AppError(400, 'Inappropriate language detected');
     const passwordHash = await bcrypt.hash(password, 12);
 
     const result = await pool.query(
       `INSERT INTO users (email, username, password_hash, is_guest)
        VALUES ($1, $2, $3, false)
-       RETURNING id, email, username, is_guest, created_at`,
+       RETURNING id, email, username, is_guest, created_at, token_version`,
       [email, username, passwordHash],
     );
 
     const user = result.rows[0];
-    const token = signToken({ userId: user.id, isGuest: false });
+    const token = signToken({ userId: user.id, isGuest: false, v: user.token_version });
 
     res.status(201).json({ token, user });
   } catch (err: any) {
@@ -60,7 +62,7 @@ export async function login(req: Request, res: Response, next: NextFunction) {
     const { email, password } = LoginSchema.parse(req.body);
 
     const result = await pool.query(
-      `SELECT id, email, username, is_guest, password_hash FROM users
+      `SELECT id, email, username, is_guest, password_hash, token_version FROM users
        WHERE (email = $1 OR LOWER(username) = LOWER($1)) AND is_guest = false`,
       [email],
     );
@@ -71,7 +73,7 @@ export async function login(req: Request, res: Response, next: NextFunction) {
     const valid = await bcrypt.compare(password, user.password_hash);
     if (!valid) throw new AppError(401, 'Invalid credentials');
 
-    const token = signToken({ userId: user.id, isGuest: false });
+    const token = signToken({ userId: user.id, isGuest: false, v: user.token_version });
     const { password_hash: _, ...safeUser } = user;
 
     res.json({ token, user: safeUser });
@@ -126,7 +128,10 @@ export async function updateMe(req: Request, res: Response, next: NextFunction) 
       if (!valid) throw new AppError(400, 'Current password is incorrect');
 
       const newHash = await bcrypt.hash(data.new_password, 10);
-      await client.query(`UPDATE users SET password_hash = $1 WHERE id = $2`, [newHash, userId]);
+      await client.query(
+        `UPDATE users SET password_hash = $1, token_version = token_version + 1 WHERE id = $2`,
+        [newHash, userId],
+      );
     }
 
     // Code prefix update
@@ -226,7 +231,10 @@ export async function resetPassword(req: Request, res: Response, next: NextFunct
 
     const passwordHash = await bcrypt.hash(password, 12);
 
-    await pool.query(`UPDATE users SET password_hash = $1 WHERE id = $2`, [passwordHash, row.user_id]);
+    await pool.query(
+      `UPDATE users SET password_hash = $1, token_version = token_version + 1 WHERE id = $2`,
+      [passwordHash, row.user_id],
+    );
     await pool.query(`UPDATE password_reset_tokens SET used_at = NOW() WHERE id = $1`, [row.id]);
 
     res.json({ message: 'Password updated. You can now sign in.' });

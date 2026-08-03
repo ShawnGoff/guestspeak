@@ -2,7 +2,7 @@
 -- Records the client IP on guest user creation and session join.
 -- Used for:
 --   1. Platform ban enforcement (IP-level blocks)
---   2. Per-session guest-token cap (max 5 tokens per IP per session)
+--   2. Detecting duplicate guest accounts per session from the same IP
 --
 -- Note: platform_bans.ip_address already exists (migration 015).
 

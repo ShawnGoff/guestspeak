@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { addClient, removeClient } from '../sse/broadcaster';
+import { addClient, removeClient, clientCount } from '../sse/broadcaster';
 import { optionalAuthSSE } from '../middleware/auth';
 import { pool } from '../db/pool';
 
@@ -50,6 +50,13 @@ router.get('/:id/stream', optionalAuthSSE, async (req: Request, res: Response) =
     return;
   }
 
+  // Enforce per-session connection cap to prevent DoS
+  const SSE_CAP = parseInt(process.env.SSE_MAX_CLIENTS_PER_SESSION ?? '500', 10);
+  if (clientCount(id) >= SSE_CAP) {
+    res.status(503).json({ error: 'Session is at capacity. Please try again shortly.' });
+    return;
+  }
+
   // SSE headers
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
@@ -62,7 +69,9 @@ router.get('/:id/stream', optionalAuthSSE, async (req: Request, res: Response) =
     res.write(': heartbeat\n\n');
   }, 30_000);
 
-  addClient(id, res);
+  const userId = req.user?.isGuest === false ? req.user.userId : undefined;
+  const guestToken = req.user?.guestToken;
+  addClient(id, res, userId, guestToken);
 
   req.on('close', () => {
     clearInterval(heartbeat);

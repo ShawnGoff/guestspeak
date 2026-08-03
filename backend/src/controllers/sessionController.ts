@@ -7,13 +7,14 @@ import { AppError } from '../middleware/errorHandler';
 import { requireHostOrOrgAdmin, resolveCallerRole } from '../db/permissions';
 import { broadcast } from '../sse/broadcaster';
 import { createNotificationsForUsers } from './notificationController';
+import { containsBannedWord } from '../lib/wordFilter';
 import { sendSessionLive } from '../lib/mailer';
 
 const CreateSessionSchema = z.object({
   title: z.string().min(1).max(255),
   description: z.string().optional(),
   visibility: z.enum(['public', 'unlisted', 'private']).default('public'),
-  credits_per_user: z.number().int().min(1).max(5).default(3),
+  credits_per_user: z.number().int().min(1).max(6).default(3),
   starts_at: z.string().optional(),
   org_id: z.string().uuid().optional(),
   submission_cutoff_at: z.string().optional(),
@@ -53,6 +54,8 @@ function makeJoinCode(prefix?: string | null): string {
 export async function createSession(req: Request, res: Response, next: NextFunction) {
   try {
     const data = CreateSessionSchema.parse(req.body);
+    if (containsBannedWord(data.title)) throw new AppError(400, 'Inappropriate language detected');
+    if (data.description && containsBannedWord(data.description)) throw new AppError(400, 'Inappropriate language detected');
     const hostId = req.user!.userId;
     const slug = makeSlug(data.title);
 
@@ -168,6 +171,8 @@ export async function updateSession(req: Request, res: Response, next: NextFunct
   try {
     const { id } = req.params;
     const data = UpdateSessionSchema.parse(req.body);
+    if (data.title && containsBannedWord(data.title)) throw new AppError(400, 'Inappropriate language detected');
+    if (data.description && containsBannedWord(data.description)) throw new AppError(400, 'Inappropriate language detected');
 
     const sessionResult = await pool.query('SELECT id FROM sessions WHERE id = $1', [id]);
     if (!sessionResult.rows[0]) throw new AppError(404, 'Session not found');
@@ -363,6 +368,7 @@ export async function joinSession(req: Request, res: Response, next: NextFunctio
     // Guests must supply a display name
     if (!userId) {
       if (!guest_username) throw new AppError(400, 'A display name is required to join');
+      if (containsBannedWord(guest_username)) throw new AppError(400, 'Inappropriate language detected');
 
       // Block names already claimed by registered users
       const taken = await pool.query(
@@ -371,6 +377,18 @@ export async function joinSession(req: Request, res: Response, next: NextFunctio
       );
       if ((taken.rowCount ?? 0) > 0) {
         throw new AppError(409, 'That name is taken by a registered user — pick another or sign in');
+      }
+    }
+    // If a guest is choosing a username, check it isn't already claimed by another
+    // guest in this same session. Reconnects (same guest_token) are allowed through.
+    if (!userId && guest_username && guestToken) {
+      const sessionResult2 = await pool.query(
+        `SELECT id FROM session_participants
+         WHERE session_id = $1 AND LOWER(guest_username) = LOWER($2) AND guest_token != $3`,
+        [id, guest_username, guestToken],
+      );
+      if ((sessionResult2.rowCount ?? 0) > 0) {
+        throw new AppError(409, 'That display name is already taken in this session — please choose another');
       }
     }
 
@@ -439,6 +457,8 @@ export async function joinSession(req: Request, res: Response, next: NextFunctio
       }
     }
 
+    // Everyone starts with the full host-set credits.
+    // The regen heartbeat later caps guests at 2 and signed-in users at 6.
     const credits = credits_per_user;
 
     // Upsert participant (idempotent).
@@ -481,7 +501,8 @@ export async function joinSession(req: Request, res: Response, next: NextFunctio
   }
 }
 
-const CREDIT_CAP = 6;
+const GUEST_CREDIT_CAP   = 2;   // Guests cap out here — sign up to get more
+const USER_CREDIT_CAP    = 6;   // Signed-in users can accumulate up to 6
 const CREDIT_REGEN_MINUTES = 10;
 
 /**
@@ -511,7 +532,7 @@ export async function heartbeat(req: Request, res: Response, next: NextFunction)
            AND credits_remaining < $1
            AND (last_credit_at IS NULL OR last_credit_at < NOW() - INTERVAL '${CREDIT_REGEN_MINUTES} minutes')
          RETURNING credits_remaining`,
-        [CREDIT_CAP, id, userId],
+        [USER_CREDIT_CAP, id, userId],
       );
       // If no row updated (already at cap or too soon), just read current value
       if (!result.rows[0]) {
@@ -533,7 +554,7 @@ export async function heartbeat(req: Request, res: Response, next: NextFunction)
            AND credits_remaining < $1
            AND (last_credit_at IS NULL OR last_credit_at < NOW() - INTERVAL '${CREDIT_REGEN_MINUTES} minutes')
          RETURNING credits_remaining`,
-        [CREDIT_CAP, id, guestToken],
+        [GUEST_CREDIT_CAP, id, guestToken],
       );
       if (!result.rows[0]) {
         const cur = await pool.query(
