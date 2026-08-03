@@ -11,6 +11,9 @@ interface Mod {
   can_star: boolean;
   can_flag: boolean;
   can_hide: boolean;
+  can_mute: boolean;
+  can_remove: boolean;
+  can_approve: boolean;
   assigned_at: string;
 }
 
@@ -24,6 +27,9 @@ const DEFAULT_PERMS = {
   can_star: true,
   can_flag: true,
   can_hide: false,
+  can_mute: true,
+  can_remove: false,
+  can_approve: false,
 };
 
 const PERM_LABELS: { key: keyof typeof DEFAULT_PERMS; label: string }[] = [
@@ -31,6 +37,9 @@ const PERM_LABELS: { key: keyof typeof DEFAULT_PERMS; label: string }[] = [
   { key: 'can_mark_answered', label: 'Mark answered' },
   { key: 'can_flag',          label: 'Flag questions' },
   { key: 'can_hide',          label: 'Hide questions' },
+  { key: 'can_mute',          label: 'Mute participants' },
+  { key: 'can_remove',        label: 'Remove participants' },
+  { key: 'can_approve',       label: 'Approve questions' },
 ];
 
 export default function ModeratorPanel({ sessionId, onClose }: {
@@ -227,7 +236,7 @@ export default function ModeratorPanel({ sessionId, onClose }: {
                         Remove
                       </button>
                     </div>
-                    <div className="grid grid-cols-2 gap-1">
+                    <div className="grid grid-cols-1 gap-1">
                       {PERM_LABELS.map(({ key, label }) => (
                         <PermToggle
                           key={key}

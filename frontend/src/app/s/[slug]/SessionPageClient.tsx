@@ -23,7 +23,7 @@ type SortOption = 'echoes' | 'recent' | 'answered' | 'starred';
 
 export default function SessionPageClient({ params }: SessionPageProps) {
   const router = useRouter();
-  const [session, setSession]               = useState<Session & { caller_role?: CallerRole } | null>(null);
+  const [session, setSession]               = useState<Session & { caller_role?: CallerRole; mod_permissions?: Record<string, boolean> } | null>(null);
   const [questions, setQuestions]           = useState<Question[]>([]);
   const [credits, setCredits]               = useState<number>(3);
   const [sort, setSort]                     = useState<SortOption>('echoes');
@@ -53,9 +53,15 @@ export default function SessionPageClient({ params }: SessionPageProps) {
   const [postAnonymously, setPostAnonymously]       = useState(false);
 
   // Credit regen countdown (seconds until next credit)
-  const CREDIT_CAP = 6;
-  const REGEN_SECS = 10 * 60; // 10 minutes
+  // CREDIT_CAP: dot display — always the host's setting.
+  // REGEN_CAP:  the ceiling the heartbeat will regen to.
+  //             Guests cap at 2 (sign-up incentive); registered users cap at 6.
+  const CREDIT_CAP  = session?.credits_per_user ?? 3;
+  const REGEN_CAP   = isRegistered ? 6 : 2;
+  const REGEN_SECS  = 10 * 60; // 10 minutes
   const [nextCreditSecs, setNextCreditSecs] = useState(REGEN_SECS);
+
+  const [showSignupPrompt, setShowSignupPrompt]   = useState(false);
 
   // Live UX
   const [showWelcome, setShowWelcome]             = useState(false);
@@ -228,6 +234,14 @@ export default function SessionPageClient({ params }: SessionPageProps) {
     const t = setTimeout(() => setError(null), 5000);
     return () => clearTimeout(t);
   }, [error]);
+
+  // ── Guest sign-up prompt ──────────────────────────────────────────────────
+  // Show the conversion prompt whenever a guest hits 0 credits.
+  useEffect(() => {
+    if (!loading && !isRegistered && credits === 0 && session?.status !== 'closed') {
+      setShowSignupPrompt(true);
+    }
+  }, [credits, isRegistered, loading, session?.status]);
 
   // ── Credit regen heartbeat ────────────────────────────────────────────────
 
@@ -451,6 +465,10 @@ export default function SessionPageClient({ params }: SessionPageProps) {
 
   const callerRole = session?.caller_role ?? 'none';
   const isMod = ['host', 'org_owner', 'org_admin', 'moderator'].includes(callerRole);
+  // Hosts/org owners have all permissions; mods only have what their permission record grants.
+  const isOwnerLevel = ['host', 'org_owner', 'org_admin'].includes(callerRole);
+  const canMute   = isOwnerLevel || !!(session?.mod_permissions?.can_mute);
+  const canRemove = isOwnerLevel || !!(session?.mod_permissions?.can_remove);
 
   const displayedQuestions = [...questions].filter(q => {
     if (q.status === 'hidden' && !(isMod && hostView)) return false;
@@ -499,6 +517,7 @@ export default function SessionPageClient({ params }: SessionPageProps) {
         participantCount={participantCount}
         nextCreditSecs={!isMod ? nextCreditSecs : undefined}
         creditCap={CREDIT_CAP}
+        regenCap={REGEN_CAP}
         onToggleHostView={() => setHostView(v => !v)}
       />
 
@@ -685,9 +704,8 @@ export default function SessionPageClient({ params }: SessionPageProps) {
                 onPin={() => togglePin(featuredQuestion.id)}
                 onSpotlight={() => toggleSpotlight(featuredQuestion.id)}
                 onReply={() => { setReplyTarget(featuredQuestion); setReplyText(featuredQuestion.host_reply ?? ''); }}
-                onMute={featuredQuestion.participant_id && !myQuestionIds.has(featuredQuestion.id) ? () => muteAuthor(featuredQuestion.participant_id!, !!featuredQuestion.author_is_muted) : undefined}
-                onRemove={featuredQuestion.participant_id && !myQuestionIds.has(featuredQuestion.id) ? () => removeAuthor(featuredQuestion.participant_id!) : undefined}
-                sessionClosed={session.status === 'closed'}
+                onMute={canMute && featuredQuestion.participant_id && !myQuestionIds.has(featuredQuestion.id) ? () => muteAuthor(featuredQuestion.participant_id!, !!featuredQuestion.author_is_muted) : undefined}
+                onRemove={canRemove && featuredQuestion.participant_id && !myQuestionIds.has(featuredQuestion.id) ? () => removeAuthor(featuredQuestion.participant_id!) : undefined}
               />
             )}
 
@@ -724,9 +742,8 @@ export default function SessionPageClient({ params }: SessionPageProps) {
                 onPin={() => togglePin(q.id)}
                 onSpotlight={() => toggleSpotlight(q.id)}
                 onReply={() => { setReplyTarget(q); setReplyText(q.host_reply ?? ''); }}
-                onMute={q.participant_id && !myQuestionIds.has(q.id) ? () => muteAuthor(q.participant_id!, !!q.author_is_muted) : undefined}
-                onRemove={q.participant_id && !myQuestionIds.has(q.id) ? () => removeAuthor(q.participant_id!) : undefined}
-                sessionClosed={session.status === 'closed'}
+                onMute={canMute && q.participant_id && !myQuestionIds.has(q.id) ? () => muteAuthor(q.participant_id!, !!q.author_is_muted) : undefined}
+                onRemove={canRemove && q.participant_id && !myQuestionIds.has(q.id) ? () => removeAuthor(q.participant_id!) : undefined}
               />
             ))}
           </div>
@@ -828,6 +845,11 @@ export default function SessionPageClient({ params }: SessionPageProps) {
         />
       )}
 
+      {/* Guest sign-up prompt — shown when guest credits hit 0 */}
+      {showSignupPrompt && !isRegistered && session && (
+        <GuestSignupPrompt slug={params.slug} onDismiss={() => setShowSignupPrompt(false)} />
+      )}
+
       {/* Moderator panel */}
       {showModPanel && session && (
         <ModeratorPanel sessionId={session.id} onClose={() => setShowModPanel(false)} />
@@ -850,7 +872,7 @@ export default function SessionPageClient({ params }: SessionPageProps) {
 
 // ─── Session header ───────────────────────────────────────────────────────────
 
-function SessionHeader({ session, isLiveSoon, credits, isMod, hostView, participantCount, nextCreditSecs, creditCap, onToggleHostView }: {
+function SessionHeader({ session, isLiveSoon, credits, isMod, hostView, participantCount, nextCreditSecs, creditCap, regenCap, onToggleHostView }: {
   session: Session;
   isLiveSoon: boolean;
   credits: number;
@@ -859,6 +881,7 @@ function SessionHeader({ session, isLiveSoon, credits, isMod, hostView, particip
   participantCount: number | null;
   nextCreditSecs?: number;
   creditCap?: number;
+  regenCap?: number;
   onToggleHostView: () => void;
 }) {
   return (
@@ -893,7 +916,7 @@ function SessionHeader({ session, isLiveSoon, credits, isMod, hostView, particip
         </div>
 
         <div className="flex-shrink-0 flex flex-col items-end gap-2">
-          {!isMod && <CreditDisplay credits={credits} max={session.credits_per_user} nextCreditSecs={nextCreditSecs} creditCap={creditCap} />}
+          {!isMod && <CreditDisplay credits={credits} max={session.credits_per_user} nextCreditSecs={nextCreditSecs} creditCap={creditCap} regenCap={regenCap} />}
           {isMod && (
             <button
               onClick={onToggleHostView}
@@ -907,7 +930,7 @@ function SessionHeader({ session, isLiveSoon, credits, isMod, hostView, particip
             </button>
           )}
           {!isMod && (
-            <Link href="/" className="text-xs text-purple-200/30 hover:text-purple-200/60">GuestSpeak</Link>
+            <Link href="/" className="text-xs text-purple-200/30 hover:text-purple-200/60">Guest<span className="text-brand-orange/40">Speak</span></Link>
           )}
         </div>
       </div>
@@ -999,7 +1022,7 @@ function HostControlBar({ session, closing, reopening, deleting, onGoLive, onClo
             <button
               onClick={copyCode}
               title="Tap to copy join code"
-              className={`flex items-center gap-2 px-3 py-2.5 rounded-lg border font-mono transition-colors ml-auto min-h-[44px] ${
+              className={`flex items-center gap-2 px-3 py-2.5 rounded-lg border font-mono transition-colors sm:ml-auto min-h-[44px] ${
                 copied ? 'border-emerald-500/50 text-emerald-400' : 'border-brand-border text-white hover:border-brand-purple'
               }`}
             >
@@ -1058,20 +1081,24 @@ function HostControlBar({ session, closing, reopening, deleting, onGoLive, onClo
 
 // ─── Credit display ───────────────────────────────────────────────────────────
 
-function CreditDisplay({ credits, max, nextCreditSecs, creditCap }: {
+function CreditDisplay({ credits, max, nextCreditSecs, creditCap, regenCap }: {
   credits: number;
   max: number;
   nextCreditSecs?: number;
   creditCap?: number;
+  regenCap?: number;
 }) {
   const cap = creditCap ?? max;
-  const showCountdown = nextCreditSecs !== undefined && credits < cap;
+  // Countdown shows when credits are below the regen ceiling (regenCap), not the display cap.
+  // For guests regenCap=2 so the countdown only appears when regen is actually relevant.
+  const countdownThreshold = regenCap ?? cap;
+  const showCountdown = nextCreditSecs !== undefined && credits < countdownThreshold;
   const mins = Math.floor((nextCreditSecs ?? 0) / 60);
   const secs = String((nextCreditSecs ?? 0) % 60).padStart(2, '0');
 
   return (
     <div className="flex items-center gap-1.5">
-      <span className="text-xs text-purple-200/60">Credits</span>
+      <span className="text-xs text-purple-200/60 hidden sm:inline">Credits</span>
       <div className="flex gap-1">
         {Array.from({ length: cap }).map((_, i) => (
           <div key={i} className={`w-2.5 h-2.5 rounded-full transition-colors ${i < credits ? 'bg-brand-orange' : 'bg-brand-border/60'}`} />
@@ -1139,13 +1166,13 @@ function SortTabs({ sort, onChange }: { sort: SortOption; onChange: (s: SortOpti
 
 function FeaturedQuestionCard({ question, isEchoed, isMine, creditsLeft, onEcho,
   hostView, onStar, onAnswered, onHide, onPin, onSpotlight, onReply,
-  onMute, onRemove, sessionClosed }: {
+  onMute, onRemove }: {
   question: Question & { is_pinned?: boolean; is_spotlighted?: boolean };
   isEchoed: boolean; isMine: boolean; creditsLeft: number;
   onEcho: () => void; hostView: boolean;
   onStar: () => void; onAnswered: () => void; onHide: () => void;
   onPin: () => void; onSpotlight: () => void; onReply: () => void;
-  onMute?: () => void; onRemove?: () => void; sessionClosed: boolean;
+  onMute?: () => void; onRemove?: () => void;
 }) {
   const canEcho = !isEchoed && !isMine && creditsLeft > 0 && question.status !== 'hidden';
   const isSpotlighted = !!question.is_spotlighted;
@@ -1231,7 +1258,7 @@ function FeaturedQuestionCard({ question, isEchoed, isMine, creditsLeft, onEcho,
 
 function QuestionCard({ question, isEchoed, isMine, creditsLeft, onEcho,
   hostView, onStar, onAnswered, onHide, onPin, onSpotlight, onReply,
-  onMute, onRemove, sessionClosed }: {
+  onMute, onRemove }: {
   question: Question & { is_pinned?: boolean; is_spotlighted?: boolean };
   isEchoed: boolean;
   isMine: boolean;
@@ -1246,7 +1273,6 @@ function QuestionCard({ question, isEchoed, isMine, creditsLeft, onEcho,
   onReply: () => void;
   onMute?: () => void;
   onRemove?: () => void;
-  sessionClosed: boolean;
 }) {
   const canEcho = !isEchoed && !isMine && creditsLeft > 0 && question.status !== 'hidden';
   const isSpotlighted = !!question.is_spotlighted;
@@ -1469,7 +1495,7 @@ function SubmitBar({ body, setBody, credits, submitting, similarQuestions, onSub
       {similarQuestions.length > 0 && (
         <div className="max-w-3xl mx-auto px-4 pt-3">
           <p className="text-xs text-brand-orange font-semibold mb-2">Similar questions already asked:</p>
-          <div className="space-y-2 mb-3">
+          <div className="space-y-2 mb-3 max-h-[100px] sm:max-h-none overflow-y-auto">
             {similarQuestions.slice(0, 3).map(q => (
               <div key={q.id} className="flex items-center gap-3 bg-brand-card rounded-xl px-3 py-2 border border-brand-border/50">
                 <p className="flex-1 text-xs text-purple-200/70 leading-snug">{q.body}</p>
@@ -1559,6 +1585,49 @@ function ErrorScreen({ message }: { message: string }) {
         <h2 className="text-white font-bold text-lg mb-2">Session not found</h2>
         <p className="text-purple-200/50 text-sm mb-6">{message}</p>
         <Link href="/" className="btn-primary">Back to GuestSpeak</Link>
+      </div>
+    </div>
+  );
+}
+
+// ─── Guest sign-up prompt ────────────────────────────────────────────────────
+
+function GuestSignupPrompt({ slug, onDismiss }: { slug: string; onDismiss: () => void }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-brand-bg/70 backdrop-blur-sm px-4 pb-[env(safe-area-inset-bottom)]">
+      <div className="card p-7 w-full max-w-sm text-center mb-4 sm:mb-0">
+        {/* Icon */}
+        <div className="w-14 h-14 rounded-2xl bg-brand-orange/15 border border-brand-orange/30 flex items-center justify-center mx-auto mb-5">
+          <svg className="w-7 h-7 text-brand-orange" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M4.5 6.375a4.125 4.125 0 118.25 0 4.125 4.125 0 01-8.25 0zM14.25 8.625a3.375 3.375 0 116.75 0 3.375 3.375 0 01-6.75 0zM1.5 19.125a7.125 7.125 0 0114.25 0v.003l-.001.119a.75.75 0 01-.363.63 13.067 13.067 0 01-6.761 1.873c-2.472 0-4.786-.684-6.76-1.873a.75.75 0 01-.364-.63l-.001-.122zM17.25 19.128l-.001.144a2.25 2.25 0 01-.233.96 10.088 10.088 0 005.06-1.01.75.75 0 00.42-.643 4.875 4.875 0 00-6.957-4.611 8.586 8.586 0 011.71 5.157v.003z" />
+          </svg>
+        </div>
+
+        <h2 className="text-white font-bold text-xl mb-2">Keep contributing!</h2>
+        <p className="text-purple-200/55 text-sm leading-relaxed mb-6">
+          You&apos;ve used your credits for now. Sign up free and there&apos;s{' '}
+          <span className="text-brand-amber font-semibold">no cap on additional earned credits</span>{' '}
+          — keep earning as long as the event goes on.
+        </p>
+
+        <Link
+          href={`/register?next=${encodeURIComponent('/s/' + slug)}`}
+          className="btn-primary w-full py-3 text-sm block mb-3"
+        >
+          Sign up free — it&apos;s quick
+        </Link>
+        <Link
+          href={`/login?next=${encodeURIComponent('/s/' + slug)}`}
+          className="block text-sm text-purple-200/50 hover:text-white transition-colors mb-4"
+        >
+          Already have an account? Sign in
+        </Link>
+        <button
+          onClick={onDismiss}
+          className="text-xs text-purple-200/30 hover:text-purple-200/50 transition-colors"
+        >
+          Maybe later — continue watching
+        </button>
       </div>
     </div>
   );

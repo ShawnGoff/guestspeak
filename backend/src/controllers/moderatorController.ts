@@ -46,6 +46,7 @@ export async function listModerators(req: Request, res: Response, next: NextFunc
     const result = await pool.query(
       `SELECT sm.id, sm.user_id, u.username, u.email,
               sm.can_mark_answered, sm.can_star, sm.can_flag, sm.can_hide,
+              sm.can_mute, sm.can_remove, sm.can_approve,
               sm.assigned_at
        FROM session_moderators sm
        JOIN users u ON u.id = sm.user_id

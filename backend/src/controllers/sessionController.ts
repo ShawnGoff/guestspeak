@@ -155,14 +155,20 @@ export async function getSession(req: Request, res: Response, next: NextFunction
       throw new AppError(403, 'This session is private');
     }
 
-    // Attach caller's role so the frontend can render host/mod controls
+    // Attach caller's role so the frontend can render host/mod controls.
+    // For moderator callers, also include their specific permission set so the
+    // frontend can gate mute/remove/approve buttons without an extra round-trip.
     let caller_role = 'none';
+    let mod_permissions: Record<string, boolean> | null = null;
     if (req.user && !req.user.isGuest) {
       const resolved = await resolveCallerRole(session.id, req.user.userId);
       caller_role = resolved.role;
+      if (resolved.role === 'moderator') {
+        mod_permissions = resolved.permissions as unknown as Record<string, boolean>;
+      }
     }
 
-    res.json({ ...session, caller_role });
+    res.json({ ...session, caller_role, ...(mod_permissions ? { mod_permissions } : {}) });
   } catch (err) {
     next(err);
   }
