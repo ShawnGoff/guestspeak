@@ -454,6 +454,9 @@ export default function SessionPageClient({ params }: SessionPageProps) {
 
   const displayedQuestions = [...questions].filter(q => {
     if (q.status === 'hidden' && !(isMod && hostView)) return false;
+    // Starred/Answered tabs are filters, not just sort orders
+    if (sort === 'starred'  && !searchQuery && q.status !== 'starred')  return false;
+    if (sort === 'answered' && !searchQuery && q.status !== 'answered') return false;
     if (!searchQuery) return true;
     return q.body.toLowerCase().includes(searchQuery.toLowerCase());
   }).sort((a, b) => {
@@ -691,9 +694,19 @@ export default function SessionPageClient({ params }: SessionPageProps) {
             {/* Remaining questions */}
             {listQuestions.length === 0 && !featuredQuestion && (
               <div className="text-center py-16 text-purple-200/40">
-                <p className="text-4xl mb-3">❓</p>
-                <p className="font-medium">No questions yet.</p>
-                <p className="text-sm mt-1">Be the first to ask something.</p>
+                <p className="text-4xl mb-3">
+                  {sort === 'starred' ? '★' : sort === 'answered' ? '✓' : '❓'}
+                </p>
+                <p className="font-medium">
+                  {sort === 'starred'  ? 'No starred questions yet.'   :
+                   sort === 'answered' ? 'No answered questions yet.'  :
+                   'No questions yet.'}
+                </p>
+                <p className="text-sm mt-1">
+                  {sort === 'starred'  ? 'Star a question to save it here.' :
+                   sort === 'answered' ? 'Questions appear here once marked answered.' :
+                   'Be the first to ask something.'}
+                </p>
               </div>
             )}
             {listQuestions.map(q => (
@@ -1254,26 +1267,7 @@ function QuestionCard({ question, isEchoed, isMine, creditsLeft, onEcho,
         </div>
       )}
 
-      <div className="p-4 flex gap-3">
-        {/* Echo button + count */}
-        <div className="flex flex-col items-center gap-1 min-w-[44px]">
-          <button
-            onClick={onEcho}
-            disabled={!canEcho}
-            title={isMine ? "Can't Echo your own question" : isEchoed ? 'Already Echoed' : 'Add Echo'}
-            className={`w-11 h-11 rounded-xl border-2 flex items-center justify-center transition-all ${
-              isEchoed        ? 'bg-brand-orange/20 border-brand-orange text-brand-orange' :
-              canEcho         ? 'bg-transparent border-white/40 text-white hover:border-brand-orange hover:text-brand-orange hover:bg-brand-orange/10' :
-                                'bg-transparent border-brand-border/30 text-purple-200/20 cursor-not-allowed'
-            }`}
-          >
-            <EchoArrow />
-          </button>
-          <span className={`text-sm font-bold ${question.vote_count > 0 ? 'text-brand-amber' : 'text-purple-200/40'}`}>
-            {question.vote_count}
-          </span>
-        </div>
-
+      <div className="p-4 flex gap-3 items-start">
         {/* Body + meta */}
         <div className="flex-1 min-w-0">
           <p className="text-white text-sm leading-relaxed break-words">{question.body}</p>
@@ -1363,6 +1357,26 @@ function QuestionCard({ question, isEchoed, isMine, creditsLeft, onEcho,
               </div>
             </div>
           )}
+        </div>
+
+        {/* Echo button — right side, matches FeaturedQuestionCard */}
+        <div className="shrink-0 flex flex-col items-center min-w-[56px]">
+          <button
+            onClick={onEcho}
+            disabled={!canEcho}
+            title={isMine ? "Can't Echo your own question" : isEchoed ? 'Already Echoed' : 'Add Echo'}
+            className={`w-full flex flex-col items-center gap-1 px-2 py-3 rounded-xl border transition-all active:scale-95 ${
+              isEchoed
+                ? 'border-brand-amber/50 bg-brand-amber/10 text-brand-amber'
+                : canEcho
+                ? 'border-brand-border text-purple-200/50 hover:border-brand-orange/60 hover:bg-brand-orange/10 hover:text-brand-orange'
+                : 'border-brand-border/30 text-purple-200/20 cursor-not-allowed'
+            }`}
+          >
+            <span className="text-base font-black leading-none">↑</span>
+            <span className="text-xl font-black leading-none">{question.vote_count}</span>
+            <span className="text-[10px] font-semibold tracking-wide opacity-60">echoes</span>
+          </button>
         </div>
       </div>
     </div>
