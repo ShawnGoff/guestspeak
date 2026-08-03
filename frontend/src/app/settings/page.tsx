@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
-import { getUser, saveAuth, isLoggedIn } from '@/lib/auth';
+import { isLoggedIn } from '@/lib/auth';
 import AppNav from '@/components/AppNav';
 
 interface MeResponse {
@@ -161,7 +161,21 @@ export default function SettingsPage() {
               {me?.code_prefix && (
                 <div className="pt-3 border-t border-brand-border/30">
                   <button
-                    onClick={() => { setPrefix(''); }}
+                    type="button"
+                    onClick={async () => {
+                      setPrefix('');
+                      setPrefixSaving(true); setPrefixMsg(null);
+                      try {
+                        const updated = await api.patch<MeResponse>('/auth/me', { code_prefix: null });
+                        setMe(updated);
+                        setPrefixMsg({ ok: true, text: 'Prefix removed.' });
+                      } catch (err: any) {
+                        setPrefixMsg({ ok: false, text: err.message });
+                      } finally {
+                        setPrefixSaving(false);
+                        setTimeout(() => setPrefixMsg(null), 3000);
+                      }
+                    }}
                     className="text-xs text-purple-200/30 hover:text-red-400 transition-colors"
                   >
                     Remove prefix (use random codes)
