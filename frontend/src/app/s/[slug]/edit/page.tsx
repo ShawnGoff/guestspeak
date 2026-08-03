@@ -35,6 +35,7 @@ export default function EditSessionPage({ params }: { params: { slug: string } }
   const [streamUrl, setStreamUrl]         = useState('');
   const [cutoffEnabled, setCutoffEnabled] = useState(false);
   const [cutoffMins, setCutoffMins]   = useState(15);
+  const [requiresApproval, setRequiresApproval] = useState(false);
 
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState<string | null>(null);
@@ -84,6 +85,7 @@ export default function EditSessionPage({ params }: { params: { slug: string } }
           setCutoffMins([5, 10, 15, 30, 60].includes(diffMins) ? diffMins : 15);
         }
 
+        setRequiresApproval(session.requires_approval ?? false);
         setOrgs(orgData.orgs);
       })
       .catch(err => {
@@ -137,6 +139,7 @@ export default function EditSessionPage({ params }: { params: { slug: string } }
         stream_url: streamUrl.trim() || '',
         starts_at: startsAt,
         submission_cutoff_at,
+        requires_approval: requiresApproval,
       });
 
       setSaved(true);
@@ -311,6 +314,21 @@ export default function EditSessionPage({ params }: { params: { slug: string } }
                   </select>
                 </div>
               )}
+            </div>
+
+            <div className="mt-4">
+              <label className="flex items-center gap-3 cursor-pointer">
+                <div
+                  onClick={() => setRequiresApproval(v => !v)}
+                  className={`w-10 h-6 rounded-full transition-colors relative flex-shrink-0 ${requiresApproval ? 'bg-brand-orange' : 'bg-brand-purple/40'}`}
+                >
+                  <div className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform ${requiresApproval ? 'translate-x-5' : 'translate-x-1'}`} />
+                </div>
+                <div>
+                  <span className="text-sm text-white">Require approval for questions</span>
+                  <p className="text-xs text-purple-200/40 mt-0.5">Questions are hidden until you approve them</p>
+                </div>
+              </label>
             </div>
           </Section>
 

@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { register, login, guestToken, getMe, updateMe, searchUsers, checkUsername, forgotPassword, resetPassword } from '../controllers/authController';
 import { loginLimiter, registerLimiter, guestLimiter, checkUsernameLimiter } from '../middleware/rateLimit';
-import { requireAuth } from '../middleware/auth';
+import { requireAuth, requireRegistered } from '../middleware/auth';
 
 const router = Router();
 
@@ -16,10 +16,10 @@ router.post('/login', loginLimiter, login);
 router.post('/guest', guestLimiter, guestToken);
 
 // GET  /api/auth/me
-router.get('/me', requireAuth, getMe);
+router.get('/me', requireRegistered, getMe);
 
 // PATCH /api/auth/me
-router.patch('/me', requireAuth, updateMe);
+router.patch('/me', requireRegistered, updateMe);
 
 // POST /api/auth/forgot-password
 router.post('/forgot-password', loginLimiter, forgotPassword);

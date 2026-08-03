@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
-import { isLoggedIn } from '@/lib/auth';
+import { isLoggedIn, isGuest } from '@/lib/auth';
 import AppNav from '@/components/AppNav';
 
 interface MySession {
@@ -32,7 +32,7 @@ export default function MySessionsPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!isLoggedIn()) { router.push('/login'); return; }
+    if (!isLoggedIn() || isGuest()) { router.push('/login'); return; }
     api.get<{ sessions: MySession[] }>('/sessions/mine')
       .then(r => setSessions(r.sessions))
       .catch(() => {})

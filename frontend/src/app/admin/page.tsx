@@ -146,7 +146,7 @@ function FlagsTab() {
 function BansTab() {
   const [bans, setBans]     = useState<BanRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [form, setForm]     = useState({ user_id: '', guest_token: '', reason: '', expires_at: '' });
+  const [form, setForm]     = useState({ user_id: '', guest_token: '', ip_address: '', reason: '', expires_at: '' });
   const [adding, setAdding] = useState(false);
 
   const load = useCallback(async () => {
@@ -161,16 +161,17 @@ function BansTab() {
 
   async function submitBan(e: React.FormEvent) {
     e.preventDefault();
-    if (!form.reason.trim() || (!form.user_id.trim() && !form.guest_token.trim())) return;
+    if (!form.reason.trim() || (!form.user_id.trim() && !form.guest_token.trim() && !form.ip_address.trim())) return;
     setAdding(true);
     try {
       await api.post('/admin/bans', {
         ...(form.user_id.trim()     && { user_id: form.user_id.trim() }),
         ...(form.guest_token.trim() && { guest_token: form.guest_token.trim() }),
+        ...(form.ip_address.trim()  && { ip_address: form.ip_address.trim() }),
         reason: form.reason.trim(),
         ...(form.expires_at && { expires_at: new Date(form.expires_at).toISOString() }),
       });
-      setForm({ user_id: '', guest_token: '', reason: '', expires_at: '' });
+      setForm({ user_id: '', guest_token: '', ip_address: '', reason: '', expires_at: '' });
       load();
     } finally { setAdding(false); }
   }
@@ -187,7 +188,7 @@ function BansTab() {
       <div className="card p-5">
         <h3 className="font-bold text-white mb-4">Issue platform ban</h3>
         <form onSubmit={submitBan} className="space-y-3">
-          <div className="grid sm:grid-cols-2 gap-3">
+          <div className="grid sm:grid-cols-3 gap-3">
             <div>
               <label className="block text-xs text-purple-200/50 mb-1">User ID (UUID)</label>
               <input value={form.user_id} onChange={e => setForm(f => ({ ...f, user_id: e.target.value }))}
@@ -197,6 +198,11 @@ function BansTab() {
               <label className="block text-xs text-purple-200/50 mb-1">Guest token</label>
               <input value={form.guest_token} onChange={e => setForm(f => ({ ...f, guest_token: e.target.value }))}
                 placeholder="token" className="input w-full text-sm py-2" />
+            </div>
+            <div>
+              <label className="block text-xs text-purple-200/50 mb-1">IP address</label>
+              <input value={form.ip_address} onChange={e => setForm(f => ({ ...f, ip_address: e.target.value }))}
+                placeholder="1.2.3.4" className="input w-full text-sm py-2 font-mono" />
             </div>
           </div>
           <div>
@@ -321,7 +327,87 @@ function WordsTab() {
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
-type Tab = 'flags' | 'bans' | 'words';
+interface SessionRow {
+  id: string;
+  title: string;
+  slug: string;
+  status: string;
+  is_featured: boolean;
+  created_at: string;
+  host_username: string;
+}
+
+// ─── Featured tab ─────────────────────────────────────────────────────────────
+
+function FeaturedTab() {
+  const [sessions, setSessions] = useState<SessionRow[]>([]);
+  const [loading, setLoading]   = useState(true);
+  const [q, setQ]               = useState('');
+  const [toggling, setToggling] = useState<string | null>(null);
+
+  const load = useCallback(async (query = '') => {
+    setLoading(true);
+    try { setSessions(await api.get<SessionRow[]>(`/admin/sessions?limit=50${query ? `&q=${encodeURIComponent(query)}` : ''}`)); }
+    finally { setLoading(false); }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  async function toggle(session: SessionRow) {
+    setToggling(session.id);
+    try {
+      const updated = await api.patch<SessionRow>(`/admin/sessions/${session.id}/feature`, { featured: !session.is_featured });
+      setSessions(prev => prev.map(s => s.id === updated.id ? { ...s, is_featured: updated.is_featured } : s));
+    } finally { setToggling(null); }
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex gap-3">
+        <input
+          value={q}
+          onChange={e => setQ(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && load(q)}
+          placeholder="Search by title…"
+          className="input flex-1 text-sm py-2"
+        />
+        <button onClick={() => load(q)} className="btn-primary text-sm px-4 py-2">Search</button>
+      </div>
+      {loading ? <p className="text-purple-200/40 py-8 text-center">Loading…</p> : (
+        <div className="space-y-2">
+          {sessions.length === 0 && <p className="text-purple-200/40 py-8 text-center">No sessions found.</p>}
+          {sessions.map(s => (
+            <div key={s.id} className="card p-4 flex items-center justify-between gap-3">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-0.5">
+                  <Link href={`/s/${s.slug}`} className="text-sm font-semibold text-white hover:text-brand-orange transition-colors truncate">
+                    {s.title}
+                  </Link>
+                  {s.is_featured && <Badge color="amber">featured</Badge>}
+                  <Badge color={s.status === 'live' ? 'green' : 'purple'}>{s.status}</Badge>
+                </div>
+                <p className="text-xs text-purple-200/40">@{s.host_username} · {fmt(s.created_at)}</p>
+              </div>
+              <button
+                onClick={() => toggle(s)}
+                disabled={toggling === s.id}
+                className={`shrink-0 text-xs px-3 py-1.5 rounded-lg border transition-colors disabled:opacity-40 ${
+                  s.is_featured
+                    ? 'bg-amber-500/10 border-amber-500/30 text-amber-400 hover:bg-amber-500/20'
+                    : 'bg-white/5 border-white/10 text-purple-200/50 hover:text-white'
+                }`}
+              >
+                {toggling === s.id ? '…' : s.is_featured ? 'Unfeature' : 'Feature'}
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+type Tab = 'flags' | 'bans' | 'words' | 'featured';
 
 export default function AdminPage() {
   const router = useRouter();
@@ -345,9 +431,10 @@ export default function AdminPage() {
   if (!admin) return null;
 
   const tabs: { id: Tab; label: string }[] = [
-    { id: 'flags', label: 'Flagged content' },
-    { id: 'bans',  label: 'Platform bans' },
-    { id: 'words', label: 'Word filter' },
+    { id: 'flags',    label: 'Flagged content' },
+    { id: 'bans',     label: 'Platform bans' },
+    { id: 'words',    label: 'Word filter' },
+    { id: 'featured', label: 'Featured sessions' },
   ];
 
   return (
@@ -387,9 +474,10 @@ export default function AdminPage() {
           ))}
         </div>
 
-        {tab === 'flags' && <FlagsTab />}
-        {tab === 'bans'  && <BansTab />}
-        {tab === 'words' && <WordsTab />}
+        {tab === 'flags'    && <FlagsTab />}
+        {tab === 'bans'     && <BansTab />}
+        {tab === 'words'    && <WordsTab />}
+        {tab === 'featured' && <FeaturedTab />}
       </main>
     </div>
   );

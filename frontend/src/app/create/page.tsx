@@ -33,6 +33,7 @@ export default function CreateSessionPage() {
   const [streamUrl, setStreamUrl]         = useState('');
   const [cutoffEnabled, setCutoffEnabled] = useState(false);
   const [cutoffMins, setCutoffMins]     = useState(15);
+  const [requiresApproval, setRequiresApproval] = useState(false);
 
   const [loading, setLoading]   = useState(false);
   const [error, setError]       = useState<string | null>(null);
@@ -82,6 +83,7 @@ export default function CreateSessionPage() {
         stream_url: streamUrl.trim() || undefined,
         starts_at: startsAt,
         submission_cutoff_at,
+        requires_approval: requiresApproval || undefined,
       });
 
       setJoinCode({ code: session.join_code, slug: session.slug, title: session.title });
@@ -267,6 +269,7 @@ export default function CreateSessionPage() {
           <Section title="Credits per person">
             <FormField
               label={`${credits} credit${credits !== 1 ? 's' : ''} — each question or Echo costs 1`}
+              hint="Everyone starts with this amount. Guests can earn up to 2 more over time; signed-in attendees keep earning throughout the event."
             >
               <div className="flex items-center gap-4">
                 <input
@@ -394,6 +397,21 @@ export default function CreateSessionPage() {
                   </div>
                 )}
               </div>
+
+            <div className="mt-4">
+              <label className="flex items-center gap-3 cursor-pointer">
+                <div
+                  onClick={() => setRequiresApproval(v => !v)}
+                  className={`w-10 h-6 rounded-full transition-colors relative flex-shrink-0 ${requiresApproval ? 'bg-brand-orange' : 'bg-brand-purple/40'}`}
+                >
+                  <div className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform ${requiresApproval ? 'translate-x-5' : 'translate-x-1'}`} />
+                </div>
+                <div>
+                  <span className="text-sm text-white">Require approval for questions</span>
+                  <p className="text-xs text-purple-200/40 mt-0.5">Questions are hidden from the audience until you approve them</p>
+                </div>
+              </label>
+            </div>
           </Section>
 
           {error && (

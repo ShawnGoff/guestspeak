@@ -10,6 +10,8 @@ import {
   addBannedWord,
   removeBannedWord,
   revealIdentity,
+  listSessionsAdmin,
+  featureSession,
 } from '../controllers/adminController';
 
 const router = Router();
@@ -32,6 +34,10 @@ router.delete('/bans/:id', liftBan);
 router.get('/banned-words',      listBannedWords);
 router.post('/banned-words',     addBannedWord);
 router.delete('/banned-words/:id', removeBannedWord);
+
+// ── Featured sessions ─────────────────────────────────────────────────────────
+router.get('/sessions',              listSessionsAdmin);
+router.patch('/sessions/:id/feature', featureSession);
 
 // ── Identity reveal ───────────────────────────────────────────────────────────
 router.get('/questions/:id/identity', revealIdentity);

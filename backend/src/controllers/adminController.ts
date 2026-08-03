@@ -59,9 +59,6 @@ export async function listFlags(req: Request, res: Response, next: NextFunction)
 
 // duration_hours: 24 = 1 day, 72 = 3 days, 168 = 1 week, null/omitted = permanent.
 // Mutually exclusive with expires_at — prefer duration_hours in the admin UI.
-const DURATION_LABEL: Record<number, string> = { 24: '1 day', 72: '3 days', 168: '1 week' };
-const ALLOWED_DURATIONS = [24, 72, 168] as const;
-
 const CreateBanSchema = z.object({
   user_id:        z.string().uuid().optional(),
   guest_token:    z.string().optional(),
@@ -258,6 +255,51 @@ export async function revealIdentity(req: Request, res: Response, next: NextFunc
 // ─── Admin self-check ─────────────────────────────────────────────────────────
 
 /** GET /api/admin/me — confirms caller is an admin (used by frontend to gate the panel) */
+// ─── Featured sessions ────────────────────────────────────────────────────────
+
+/**
+ * GET /api/admin/sessions — recent sessions for the admin feature-toggle panel
+ */
+export async function listSessionsAdmin(req: Request, res: Response, next: NextFunction) {
+  try {
+    const q = ((req.query.q as string) ?? '').trim();
+    const limit = Math.min(parseInt(req.query.limit as string) || 50, 100);
+    const params: unknown[] = [];
+    let where = '';
+    if (q) { params.push(`%${q}%`); where = `WHERE s.title ILIKE $${params.length}`; }
+    params.push(limit);
+    const result = await pool.query(
+      `SELECT s.id, s.title, s.slug, s.status, s.is_featured, s.created_at,
+              u.username AS host_username
+       FROM sessions s
+       JOIN users u ON u.id = s.host_id
+       ${where}
+       ORDER BY s.created_at DESC
+       LIMIT $${params.length}`,
+      params,
+    );
+    res.json(result.rows);
+  } catch (err) { next(err); }
+}
+
+/**
+ * PATCH /api/admin/sessions/:id/feature — toggle is_featured on a session
+ */
+export async function featureSession(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { id } = req.params;
+    const { featured } = z.object({ featured: z.boolean() }).parse(req.body);
+    const result = await pool.query(
+      `UPDATE sessions SET is_featured = $1 WHERE id = $2 RETURNING id, title, is_featured`,
+      [featured, id],
+    );
+    if (!result.rows[0]) throw new AppError(404, 'Session not found');
+    res.json(result.rows[0]);
+  } catch (err) { next(err); }
+}
+
+// ─── Admin identity ───────────────────────────────────────────────────────────
+
 export async function adminMe(req: Request, res: Response, next: NextFunction) {
   try {
     const result = await pool.query(

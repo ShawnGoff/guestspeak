@@ -27,6 +27,7 @@ const CreateSessionSchema = z.object({
   stream_url: z.string().url().max(1000)
     .refine(u => new URL(u).protocol === 'https:', { message: 'stream_url must use https' })
     .optional().or(z.literal('')),
+  requires_approval: z.boolean().optional(),
 });
 
 const UpdateSessionSchema = CreateSessionSchema.partial();

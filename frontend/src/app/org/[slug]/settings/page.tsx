@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { api, resolveAsset } from '@/lib/api';
-import { isLoggedIn, getUser } from '@/lib/auth';
+import { isLoggedIn, isGuest, getUser } from '@/lib/auth';
 import LocationAutocomplete, { type LocationResult } from '@/components/LocationAutocomplete';
 import { ORG_CATEGORIES } from '@/lib/categories';
 import AppNav from '@/components/AppNav';
@@ -72,7 +72,7 @@ export default function OrgSettingsPage({ params }: { params: { slug: string } }
 
   useEffect(() => {
     setMounted(true);
-    if (!isLoggedIn()) { router.push('/login'); return; }
+    if (!isLoggedIn() || isGuest()) { router.push('/login'); return; }
     loadData();
   }, [params.slug]);
 

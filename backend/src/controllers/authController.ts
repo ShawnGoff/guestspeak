@@ -45,8 +45,9 @@ export async function register(req: Request, res: Response, next: NextFunction) 
 
     const user = result.rows[0];
     const token = signToken({ userId: user.id, isGuest: false, v: user.token_version });
+    const { token_version: _tv, ...safeUser } = user;
 
-    res.status(201).json({ token, user });
+    res.status(201).json({ token, user: safeUser });
   } catch (err: any) {
     if (err?.code === '23505') {
       // unique violation
@@ -74,7 +75,7 @@ export async function login(req: Request, res: Response, next: NextFunction) {
     if (!valid) throw new AppError(401, 'Invalid credentials');
 
     const token = signToken({ userId: user.id, isGuest: false, v: user.token_version });
-    const { password_hash: _, ...safeUser } = user;
+    const { password_hash: _, token_version: _tv, ...safeUser } = user;
 
     res.json({ token, user: safeUser });
   } catch (err) {

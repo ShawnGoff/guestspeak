@@ -2,7 +2,7 @@ import { Router } from 'express';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
-import { requireAuth } from '../middleware/auth';
+import { requireRegistered } from '../middleware/auth';
 
 const router = Router();
 
@@ -29,7 +29,7 @@ const upload = multer({
 });
 
 // POST /api/upload — returns { url: '/uploads/<filename>' }
-router.post('/', requireAuth, upload.single('file'), (req, res) => {
+router.post('/', requireRegistered, upload.single('file'), (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
   res.json({ url: `/uploads/${req.file.filename}` });
 });

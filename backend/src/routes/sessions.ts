@@ -14,6 +14,7 @@ import {
   listMySessions,
   exportSession,
 } from '../controllers/sessionController';
+import { muteParticipant, removeParticipant } from '../controllers/moderatorController';
 import { requireAuth, requireRegistered, optionalAuth } from '../middleware/auth';
 import moderatorRoutes from './moderators';
 import sseRoutes from './sse';
@@ -58,6 +59,12 @@ router.post('/:id/join', optionalAuth, joinSession);
 
 // POST /api/sessions/:id/heartbeat — credit regen tick (guest or registered)
 router.post('/:id/heartbeat', optionalAuth, heartbeat);
+
+// PATCH /api/sessions/:id/participants/:participantId/mute  — mute/unmute (host or mod)
+router.patch('/:id/participants/:participantId/mute', requireAuth, muteParticipant);
+
+// DELETE /api/sessions/:id/participants/:participantId  — remove + ban (host or mod)
+router.delete('/:id/participants/:participantId', requireAuth, removeParticipant);
 
 // /api/sessions/:id/moderators    — moderator management (host only)
 router.use('/:id/moderators', moderatorRoutes);
