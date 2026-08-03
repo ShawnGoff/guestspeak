@@ -220,12 +220,12 @@ export default function EditSessionPage({ params }: { params: { slug: string } }
             <FormField label={`${credits} credit${credits !== 1 ? 's' : ''} — each question or Echo costs 1`}>
               <div className="flex items-center gap-4">
                 <input
-                  type="range" min={1} max={5} value={credits}
+                  type="range" min={1} max={6} value={credits}
                   onChange={e => setCredits(Number(e.target.value))}
                   className="flex-1 accent-brand-orange"
                 />
                 <div className="flex gap-1.5">
-                  {Array.from({ length: 5 }).map((_, i) => (
+                  {Array.from({ length: 6 }).map((_, i) => (
                     <div key={i} className={`w-3 h-3 rounded-full transition-colors ${i < credits ? 'bg-brand-orange' : 'bg-brand-border'}`} />
                   ))}
                 </div>
