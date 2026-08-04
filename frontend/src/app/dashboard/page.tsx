@@ -194,7 +194,7 @@ export default function DashboardPage() {
                 {orgs.map(org => (
                   <Link
                     key={org.id}
-                    href={`/org/${org.slug}/settings`}
+                    href={`/org/${org.slug}`}
                     className="card p-4 flex items-center gap-3 hover:border-brand-purple transition-colors group"
                   >
                     <div className="w-10 h-10 rounded-xl bg-brand-border/40 flex items-center justify-center flex-shrink-0 text-lg font-bold text-white group-hover:bg-brand-purple/20 transition-colors">

@@ -9,6 +9,7 @@
     "start": "node dist/index.js"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1102.0",
     "@types/helmet": "^0.0.48",
     "@types/multer": "^2.2.0",
     "bcrypt": "^5.1.1",

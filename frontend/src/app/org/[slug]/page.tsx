@@ -160,17 +160,31 @@ export default function OrgPage({ params }: OrgPageProps) {
               )}
             </div>
 
-            <button
-              onClick={toggleFollow}
-              disabled={followLoading}
-              className={`flex-shrink-0 text-sm font-semibold px-4 py-2 rounded-xl border transition-colors ${
-                following
-                  ? 'border-brand-purple bg-brand-purple/20 text-white'
-                  : 'border-brand-orange text-brand-orange hover:bg-brand-orange/10'
-              } disabled:opacity-40`}
-            >
-              {followLoading ? '…' : following ? 'Following' : 'Follow'}
-            </button>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              {isManager && (
+                <Link
+                  href={`/org/${params.slug}/settings`}
+                  className="flex items-center gap-1.5 text-sm font-semibold px-3 py-2 rounded-xl border border-brand-border text-purple-200/50 hover:text-white hover:border-brand-purple/60 transition-colors"
+                >
+                  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                  </svg>
+                  Edit
+                </Link>
+              )}
+              <button
+                onClick={toggleFollow}
+                disabled={followLoading}
+                className={`text-sm font-semibold px-4 py-2 rounded-xl border transition-colors ${
+                  following
+                    ? 'border-brand-purple bg-brand-purple/20 text-white'
+                    : 'border-brand-orange text-brand-orange hover:bg-brand-orange/10'
+                } disabled:opacity-40`}
+              >
+                {followLoading ? '…' : following ? 'Following' : 'Follow'}
+              </button>
+            </div>
           </div>
 
           {/* Stats bar */}
