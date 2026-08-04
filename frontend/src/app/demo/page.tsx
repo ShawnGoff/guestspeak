@@ -126,6 +126,8 @@ function LiveCard({ session }: { session: typeof LIVE_SESSIONS[0] }) {
 }
 
 function UpcomingCard({ session }: { session: typeof UPCOMING_SESSIONS[0] }) {
+  const [reminded, setReminded] = useState(false);
+
   return (
     <div className="card p-4 flex items-center gap-4 hover:border-brand-purple/40 transition-all group">
       <div className="flex-1 min-w-0">
@@ -143,9 +145,19 @@ function UpcomingCard({ session }: { session: typeof UPCOMING_SESSIONS[0] }) {
       </div>
       <div className="shrink-0 text-right">
         <p className="text-xs text-white/30 mb-1">{session.registered} registered</p>
-        <button className="text-xs font-semibold text-white/40 hover:text-white/70 border border-brand-border hover:border-brand-purple/40 px-3 py-1.5 rounded-lg transition-all">
-          Remind me
-        </button>
+        {reminded ? (
+          <span className="inline-flex items-center gap-1 text-xs font-semibold text-brand-orange border border-brand-orange/40 bg-brand-orange/10 px-3 py-1.5 rounded-lg">
+            <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M5 13l4 4L19 7"/></svg>
+            Reminder set
+          </span>
+        ) : (
+          <button
+            onClick={() => setReminded(true)}
+            className="text-xs font-semibold text-white/40 hover:text-white/70 border border-brand-border hover:border-brand-purple/40 px-3 py-1.5 rounded-lg transition-all"
+          >
+            Remind me
+          </button>
+        )}
       </div>
     </div>
   );
