@@ -7,10 +7,10 @@ export default function Footer() {
         <Link href="/" className="font-display font-bold tracking-tight text-lg">
           Guest<span className="text-brand-orange">Speak</span>
         </Link>
-        <p className="text-purple-200/40 text-sm">
-          © {new Date().getFullYear()} GuestSpeak. Built for live events.
+        <p className="text-purple-200/70 text-sm">
+          © {new Date().getFullYear()} GuestSpeak. Built for rooms full of questions.
         </p>
-        <nav className="flex flex-wrap justify-center gap-x-5 gap-y-1 text-sm text-purple-200/50">
+        <nav className="flex flex-wrap justify-center gap-x-5 gap-y-1 text-sm text-purple-200/75">
           <Link href="/about"   className="hover:text-purple-200/80 transition-colors">About</Link>
           <Link href="/privacy" className="hover:text-purple-200/80 transition-colors">Privacy</Link>
           <Link href="/terms"   className="hover:text-purple-200/80 transition-colors">Terms</Link>

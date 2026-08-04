@@ -72,15 +72,15 @@ function SearchPageInner() {
   return (
     <div className="min-h-screen bg-brand-bg">
       {/* Nav */}
-      <AppNav right={<Link href="/dashboard" className="text-sm text-purple-200/50 hover:text-white transition-colors">Dashboard</Link>} />
+      <AppNav right={<Link href="/dashboard" className="text-sm text-purple-200/75 hover:text-white transition-colors">Dashboard</Link>} />
 
       <main className="max-w-2xl mx-auto px-4 py-10">
         <h1 className="text-2xl font-extrabold text-white mb-1">Find people</h1>
-        <p className="text-purple-200/50 text-sm mb-6">Search by username to discover hosts and follow their sessions.</p>
+        <p className="text-purple-200/75 text-sm mb-6">Search by username to discover hosts and follow their sessions.</p>
 
         {/* Search input */}
         <div className="relative mb-6">
-          <SearchIcon className="absolute left-4 top-1/2 -translate-y-1/2 text-purple-200/30 w-4 h-4" />
+          <SearchIcon className="absolute left-4 top-1/2 -translate-y-1/2 text-purple-200/60 w-4 h-4" />
           <input
             ref={inputRef}
             value={query}
@@ -89,7 +89,7 @@ function SearchPageInner() {
             className="w-full bg-brand-card border border-brand-border rounded-2xl pl-10 pr-4 py-3 text-white text-sm placeholder-purple-200/30 focus:outline-none focus:border-brand-purple transition-colors"
           />
           {loading && (
-            <span className="absolute right-4 top-1/2 -translate-y-1/2 text-purple-200/30 text-xs">Searching…</span>
+            <span className="absolute right-4 top-1/2 -translate-y-1/2 text-purple-200/60 text-xs">Searching…</span>
           )}
         </div>
 
@@ -111,7 +111,7 @@ function SearchPageInner() {
                     <Link href={`/u/${user.username}`} className="font-semibold text-white hover:text-brand-amber transition-colors">
                       @{user.username}
                     </Link>
-                    <p className="text-xs text-purple-200/40 mt-0.5">
+                    <p className="text-xs text-purple-200/70 mt-0.5">
                       {user.follower_count} {user.follower_count === 1 ? 'follower' : 'followers'}
                       {user.session_count > 0 && ` · ${user.session_count} sessions`}
                     </p>
@@ -123,7 +123,7 @@ function SearchPageInner() {
                       onClick={() => toggleFollow(user)}
                       className={`text-sm px-4 py-1.5 rounded-lg border font-medium transition-colors flex-shrink-0 ${
                         isFollowing
-                          ? 'border-brand-border text-purple-200/60 hover:border-red-700/50 hover:text-red-400'
+                          ? 'border-brand-border text-purple-200/85 hover:border-red-700/50 hover:text-red-400'
                           : 'border-brand-orange text-brand-orange hover:bg-brand-orange/10'
                       }`}
                     >
@@ -138,14 +138,14 @@ function SearchPageInner() {
 
         {!loading && query.trim() && results.length === 0 && (
           <div className="text-center py-16">
-            <p className="text-purple-200/40 text-sm">No users found for "<span className="text-white">{query}</span>"</p>
+            <p className="text-purple-200/70 text-sm">No users found for "<span className="text-white">{query}</span>"</p>
           </div>
         )}
 
         {!query.trim() && (
           <div className="text-center py-16">
             <div className="text-4xl mb-3">👋</div>
-            <p className="text-purple-200/40 text-sm">Start typing to find hosts and creators.</p>
+            <p className="text-purple-200/70 text-sm">Start typing to find hosts and creators.</p>
           </div>
         )}
       </main>

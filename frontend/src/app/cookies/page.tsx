@@ -14,7 +14,7 @@ export default function CookiesPage() {
 
       <main className="flex-1 max-w-2xl mx-auto w-full px-6 py-16">
         <h1 className="text-4xl font-bold text-white mb-3">Cookie Policy</h1>
-        <p className="text-purple-200/50 text-sm mb-10">Effective: August 1, 2026</p>
+        <p className="text-purple-200/75 text-sm mb-10">Effective: August 1, 2026</p>
 
         <div className="space-y-8 text-purple-200/80 leading-relaxed">
           <p>
@@ -46,7 +46,7 @@ export default function CookiesPage() {
 
           <section>
             <h2 className="text-xl font-semibold text-white mb-3">What we don&apos;t use</h2>
-            <ul className="list-disc list-inside space-y-1 text-purple-200/70">
+            <ul className="list-disc list-inside space-y-1 text-purple-200/90">
               <li>Advertising or targeting cookies</li>
               <li>Third-party analytics (no Google Analytics, no Mixpanel)</li>
               <li>Social media tracking pixels</li>

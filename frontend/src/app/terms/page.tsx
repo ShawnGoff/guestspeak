@@ -14,7 +14,7 @@ export default function TermsPage() {
 
       <main className="flex-1 max-w-2xl mx-auto w-full px-6 py-16">
         <h1 className="text-4xl font-bold text-white mb-3">Terms of Service</h1>
-        <p className="text-purple-200/50 text-sm mb-10">Effective: August 1, 2026</p>
+        <p className="text-purple-200/75 text-sm mb-10">Effective: August 1, 2026</p>
 
         <div className="space-y-8 text-purple-200/80 leading-relaxed">
           <p>
@@ -24,7 +24,7 @@ export default function TermsPage() {
           <section>
             <h2 className="text-xl font-semibold text-white mb-3">1. Use of the service</h2>
             <p className="mb-3">GuestSpeak is a live Q&A platform for events. You may use it for lawful purposes only. You agree not to:</p>
-            <ul className="list-disc list-inside space-y-1 text-purple-200/70">
+            <ul className="list-disc list-inside space-y-1 text-purple-200/90">
               <li>Submit content that is hateful, discriminatory, or harassing</li>
               <li>Post slurs, threats, or content that targets individuals</li>
               <li>Spam sessions with duplicate or irrelevant questions</li>

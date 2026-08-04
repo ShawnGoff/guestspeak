@@ -1,0 +1,238 @@
+════════════════════════════════════════════════════════════════════════════════
+  GUESTSPEAK — NAVIGATION / LINK AUDIT
+  Generated : 8/3/2026, 9:45:45 PM
+  Files scanned: 41
+════════════════════════════════════════════════════════════════════════════════
+
+  ── PAGES  (app/) ──
+
+app/about/page.tsx   →   About  (/about)
+────────────────────────────────────────────────────────────────────────────────
+  Link             L10   /
+  Link             L44   mailto:guestspeak@protonmail.com
+  <a>              L44   mailto:guestspeak@protonmail.com
+
+app/admin/page.tsx   →   Admin panel  (/admin)
+────────────────────────────────────────────────────────────────────────────────
+  Link            L446   /
+  Link            L117   /s/[…]
+  router.replace   L421   /login
+
+app/contact/page.tsx   →   Contact  (/contact)
+────────────────────────────────────────────────────────────────────────────────
+  Link             L10   /
+  Link             L21   mailto:guestspeak@protonmail.com
+  <a>              L20   mailto:guestspeak@protonmail.com
+
+app/cookies/page.tsx   →   Cookie policy  (/cookies)
+────────────────────────────────────────────────────────────────────────────────
+  Link             L10   /
+  Link             L64   mailto:guestspeak@protonmail.com
+  <a>              L64   mailto:guestspeak@protonmail.com
+
+app/create/page.tsx   →   Create session  (/create)
+────────────────────────────────────────────────────────────────────────────────
+  Link            L197   /dashboard
+  router.push      L46   /login?next=/create
+  router.push     L177   /s/[…]
+
+app/dashboard/page.tsx   →   Dashboard  (/dashboard)
+────────────────────────────────────────────────────────────────────────────────
+  Link            L133   /
+  Link            L134   /discover
+  Link            L158   /create
+  Link            L159   /search
+  Link            L160   /settings
+                          ⚠  Settings/admin link from public page — verify this is intentional
+  Link            L181   /org/new
+  Link            L231   /sessions/mine
+  Link            L197   /org/[…]
+  Link            L330   /s/[…]
+  router.push      L60   /login
+  router.push     L100   /
+  router.push     L109   /s/[…]
+
+app/demo/create/page.tsx   →   Demo: create  (/demo/create)
+────────────────────────────────────────────────────────────────────────────────
+  Link             L37   /
+  Link             L46   /demo
+  router.push      L26   /demo/session?[…]
+
+app/demo/page.tsx   →   Demo: discover  (/demo)
+────────────────────────────────────────────────────────────────────────────────
+  Link            L187   /
+  Link            L200   /demo/create
+  Link             L76   /demo/session?title=[…]
+  router.push     L177   /demo/session?title=[…]
+
+app/demo/session/page.tsx   →   Demo: session  (/demo/session)
+────────────────────────────────────────────────────────────────────────────────
+  Link            L651   /demo
+  Link            L658   /
+
+app/discover/page.tsx   →   Discover  (/discover)
+────────────────────────────────────────────────────────────────────────────────
+  Link            L164   /login
+  Link            L165   /create
+  Link            L375   /s/[…]
+  Link            L459   /org/[…]
+  router.push      L32   /s/[…]
+
+app/forgot-password/page.tsx   →   Forgot password  (/forgot-password)
+────────────────────────────────────────────────────────────────────────────────
+  Link             L31   /login
+
+app/login/page.tsx   →   Login  (/login)
+────────────────────────────────────────────────────────────────────────────────
+  Link             L42   /
+  Link             L63   /forgot-password
+
+app/not-found.tsx   →   Landing  (/)
+────────────────────────────────────────────────────────────────────────────────
+  Link             L15   /
+  Link             L18   /discover
+
+app/org/[slug]/page.tsx   →   Channel public page  (/org/[slug])
+────────────────────────────────────────────────────────────────────────────────
+  Link            L456   /discover
+  Link            L101   /org/[…]/settings
+                          ⚠  Settings/admin link from public page — verify this is intentional
+  Link            L117   /s/[…]
+  <a>             L151   {org.website}
+
+app/org/[slug]/settings/page.tsx   →   Channel settings  (/org/[slug]/settings)
+────────────────────────────────────────────────────────────────────────────────
+  Link            L219   /dashboard
+  Link            L218   /org/[…]
+  router.push      L75   /login
+  router.push     L207   /dashboard
+
+app/org/new/page.tsx   →   New channel  (/org/new)
+────────────────────────────────────────────────────────────────────────────────
+  Link            L100   /dashboard
+  router.push      L37   /login?next=/org/new
+  router.push      L90   /org/[…]/settings
+                          ⚠  Settings/admin link from public page — verify this is intentional
+
+app/page.tsx   →   Landing  (/)
+────────────────────────────────────────────────────────────────────────────────
+  Link             L17   /discover
+  Link             L20   /login
+  Link             L23   /create
+  Link             L35   /
+  Link            L305   /demo
+  router.push     L234   /s/[…]
+
+app/privacy/page.tsx   →   Privacy policy  (/privacy)
+────────────────────────────────────────────────────────────────────────────────
+  Link             L10   /
+  Link             L21   mailto:guestspeak@protonmail.com
+  <a>              L21   mailto:guestspeak@protonmail.com
+
+app/register/page.tsx   →   Register  (/register)
+────────────────────────────────────────────────────────────────────────────────
+  Link             L42   /login
+  router.push      L30   /dashboard
+
+app/reset-password/page.tsx   →   Reset password  (/reset-password)
+────────────────────────────────────────────────────────────────────────────────
+  Link             L44   /login
+  router.push      L32   /login
+
+app/s/[slug]/SessionPageClient.tsx   →   /s/[slug]/SessionPageClient
+────────────────────────────────────────────────────────────────────────────────
+  Link            L933   /
+  Link            L554   /org/[…]
+  Link           L1062   /s/[…]/edit
+  Link           L1614   /register?next=[…]
+  Link           L1620   /login?next=[…]
+  router.push     L429   /dashboard
+  <a>            L1762   {info.watchUrl}
+
+app/s/[slug]/edit/page.tsx   →   Session edit  (/s/[slug]/edit)
+────────────────────────────────────────────────────────────────────────────────
+  Link            L108   /s/[…]
+  router.push      L47   /login?next=/s/[…]/edit
+  router.push     L146   /s/[…]
+
+app/search/page.tsx   →   Search  (/search)
+────────────────────────────────────────────────────────────────────────────────
+  Link             L75   /dashboard
+  Link            L111   /u/[…]
+  router.push      L54   /login?next=/search
+
+app/sessions/mine/page.tsx   →   My sessions  (/sessions/mine)
+────────────────────────────────────────────────────────────────────────────────
+  Link             L88   /create
+  Link            L167   /s/[…]
+  router.push      L35   /login
+
+app/settings/page.tsx   →   Account settings  (/settings)
+────────────────────────────────────────────────────────────────────────────────
+  Link             L95   /dashboard
+  router.push      L38   /login?next=/settings
+
+app/terms/page.tsx   →   Terms of service  (/terms)
+────────────────────────────────────────────────────────────────────────────────
+  Link             L10   /
+  Link             L21   mailto:guestspeak@protonmail.com
+  <a>              L21   mailto:guestspeak@protonmail.com
+
+app/u/[username]/page.tsx   →   User profile  (/u/[username])
+────────────────────────────────────────────────────────────────────────────────
+  Link             L98   /search
+  Link            L112   /dashboard
+  Link            L187   /s/[…]
+  Link            L231   /u/[…]
+  router.push      L65   /login?next=/u/[…]
+
+  ── COMPONENTS  (components/) ──
+
+components/AppNav.tsx   →   (component)
+────────────────────────────────────────────────────────────────────────────────
+  Link             L61   /settings
+  Link             L96   /
+  Link            L100   /discover
+  router.push      L39   /
+
+components/Footer.tsx   →   (component)
+────────────────────────────────────────────────────────────────────────────────
+  Link              L7   /
+  Link             L14   /about
+  Link             L15   /privacy
+  Link             L16   /terms
+  Link             L17   /cookies
+  Link             L18   /contact
+
+components/GuestUsernameModal.tsx   →   (component)
+────────────────────────────────────────────────────────────────────────────────
+  Link            L246   /login?next=[…]
+
+  ── LIB  (lib/) ──
+
+lib/api.ts   →   (component)
+────────────────────────────────────────────────────────────────────────────────
+  location         L39   /login?next=[…]
+
+════════════════════════════════════════════════════════════════════════════════
+  FLAGGED ITEMS
+════════════════════════════════════════════════════════════════════════════════
+
+  ⚠  Settings/admin link from public page — verify this is intentional
+    File : app/dashboard/page.tsx
+    Type : Link
+    Dest : /settings
+
+  ⚠  Settings/admin link from public page — verify this is intentional
+    File : app/org/[slug]/page.tsx
+    Type : Link
+    Dest : /org/[…]/settings
+
+  ⚠  Settings/admin link from public page — verify this is intentional
+    File : app/org/new/page.tsx
+    Type : router.push
+    Dest : /org/[…]/settings
+
+════════════════════════════════════════════════════════════════════════════════
+  SUMMARY   108 total navigation items   3 flagged
+════════════════════════════════════════════════════════════════════════════════

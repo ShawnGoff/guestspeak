@@ -133,7 +133,7 @@ function MockQAWidget() {
               </span>
             </div>
           </div>
-          <div className="flex items-center gap-1.5 shrink-0 text-purple-200/40 text-xs">
+          <div className="flex items-center gap-1.5 shrink-0 text-purple-200/70 text-xs">
             <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
             <span>42 attending</span>
           </div>
@@ -152,14 +152,14 @@ function MockQAWidget() {
                   className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold transition-all duration-300 ${
                     i === 0
                       ? 'bg-brand-orange/20 text-brand-orange border border-brand-orange/30'
-                      : 'bg-brand-bg text-purple-200/40 border border-brand-border/40'
+                      : 'bg-brand-bg text-purple-200/70 border border-brand-border/40'
                   } ${flash === i ? 'scale-110' : ''}`}
                 >
                   ↑
                 </div>
                 <span
                   className={`text-xs font-bold tabular-nums transition-all duration-300 ${
-                    flash === i ? 'text-brand-orange scale-110' : i === 0 ? 'text-brand-amber' : 'text-purple-200/50'
+                    flash === i ? 'text-brand-orange scale-110' : i === 0 ? 'text-brand-amber' : 'text-purple-200/75'
                   }`}
                 >
                   {echoes[i]}
@@ -171,7 +171,7 @@ function MockQAWidget() {
                     className="absolute -top-1 left-1/2 -translate-x-1/2 bg-brand-orange text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-lg pointer-events-none whitespace-nowrap z-10"
                     style={{ animation: 'floatBadge 0.7s ease-out forwards' }}
                   >
-                    +1 echo
+                    +1 Echo
                   </div>
                 )}
               </div>
@@ -184,7 +184,7 @@ function MockQAWidget() {
                   </div>
                 )}
                 <p className="text-white text-xs leading-relaxed">{q.text}</p>
-                <p className="text-purple-200/35 text-[10px] mt-1.5">{q.author} · {q.ago} ago</p>
+                <p className="text-purple-200/65 text-[10px] mt-1.5">{q.author} · {q.ago} ago</p>
               </div>
             </div>
           ))}
@@ -199,9 +199,8 @@ function MockQAWidget() {
             </div>
             <button className="btn-primary text-xs px-4 py-2.5 rounded-xl shrink-0">Ask</button>
           </div>
-          <div className="flex items-center justify-between mt-2 px-0.5">
-            <span className="text-purple-200/30 text-[10px]">3 credits remaining</span>
-            <span className="text-purple-200/30 text-[10px]">Ask anonymously</span>
+          <div className="flex items-center justify-end mt-2 px-0.5">
+            <span className="text-purple-200/60 text-[10px]">Ask anonymously</span>
           </div>
         </div>
       </div>
@@ -233,7 +232,7 @@ function Hero() {
       const session = await api.get<{ slug: string }>(`/sessions/code/${code.trim().toUpperCase()}`);
       router.push(`/s/${session.slug}`);
     } catch {
-      setJoinError('No session found with that code.');
+      setJoinError('That code didn\'t match a session — double-check it and try again.');
       setJoining(false);
     }
   }
@@ -253,18 +252,18 @@ function Hero() {
             {/* Eyebrow */}
             <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-brand-purple/50 bg-brand-purple/10 text-brand-amber text-sm font-medium mb-6">
               <span className="w-1.5 h-1.5 rounded-full bg-brand-amber animate-pulse-slow" />
-              Live Audience Q&amp;A Platform
+              Live Q&amp;A for real rooms
             </div>
 
             {/* Headline */}
             <h1 className="text-5xl sm:text-6xl xl:text-7xl font-extrabold leading-[1.05] mb-6">
-              <span className="text-white">Bring your whole audience</span>
+              <span className="text-white">Bring the whole room</span>
               <br />
               <span className="text-orange-gradient">into the conversation.</span>
             </h1>
 
-            <p className="text-lg sm:text-xl text-purple-200/70 mb-10 max-w-xl lg:max-w-none">
-              Real-time Q&amp;A where the crowd surfaces the best questions — no account needed to join, no friction.
+            <p className="text-lg sm:text-xl text-purple-200/90 mb-10 max-w-xl lg:max-w-none">
+              Your audience asks, adds Echoes to what resonates, and the best questions rise to the top — live, in any browser, no account needed to join.
             </p>
 
             {/* CTAs */}
@@ -297,8 +296,8 @@ function Hero() {
 
             {joinError && <p className="text-red-400 text-sm mb-3">{joinError}</p>}
 
-            <p className="text-purple-200/40 text-sm mb-4">
-              Free to use · No account needed to join or ask · Account required to host
+            <p className="text-purple-200/70 text-sm mb-4">
+              Free to use · Join and ask without an account · Hosting takes a free account
             </p>
 
             <Link
@@ -331,8 +330,8 @@ function DemoStrip() {
         <div className="rounded-2xl bg-gradient-to-r from-brand-orange/10 via-brand-purple/10 to-brand-orange/5 border border-brand-orange/20 px-6 sm:px-10 py-7 flex flex-col sm:flex-row items-center justify-between gap-6">
           <div>
             <p className="text-xs text-brand-orange font-semibold uppercase tracking-widest mb-1">Interactive demo</p>
-            <p className="text-white font-bold text-lg leading-snug">See the full audience experience</p>
-            <p className="text-purple-200/55 text-sm mt-1">Submit questions, add Echoes, and watch the feed update in real time — no account needed.</p>
+            <p className="text-white font-bold text-lg leading-snug">See both sides — host and audience</p>
+            <p className="text-purple-200/80 text-sm mt-1">Ask a question, add an Echo, then flip over to the host controls — all live.</p>
           </div>
           <Link
             href="/demo"
@@ -354,19 +353,19 @@ const HOW_IT_WORKS = [
     step: '01',
     icon: <LinkIcon />,
     title: 'Host shares a link',
-    desc: 'Create a session in seconds. Share the link or join code with your audience — no signup required to join.',
+    desc: 'Spin up a session in seconds, then share the link or join code. Your audience is in — no signups, no downloads.',
   },
   {
     step: '02',
     icon: <QuestionIcon />,
-    title: 'Audience asks questions',
-    desc: 'Anyone can submit a question instantly. Each person gets a handful of asks — encouraging quality over quantity.',
+    title: 'The room asks questions',
+    desc: 'Anyone can ask, instantly. Everyone gets a handful of asks per session, so people bring the questions they really mean.',
   },
   {
     step: '03',
     icon: <EchoIconLg />,
-    title: 'Best questions rise to the top',
-    desc: 'The audience adds Echoes to questions they want answered. The most-supported questions automatically move to the top.',
+    title: 'The best questions rise',
+    desc: 'Attendees add Echoes to the questions they want answered. Whatever resonates with the room climbs to the top — no shouting required.',
   },
 ];
 
@@ -378,7 +377,7 @@ function HowItWorks() {
         <h2 className="text-4xl sm:text-5xl font-extrabold text-white text-center mb-4">
           Simple for everyone
         </h2>
-        <p className="text-purple-200/55 text-center text-lg mb-16 max-w-xl mx-auto">
+        <p className="text-purple-200/80 text-center text-lg mb-16 max-w-xl mx-auto">
           Hosts see what the room actually wants to talk about. Three steps, that's it.
         </p>
 
@@ -395,7 +394,7 @@ function HowItWorks() {
               </div>
 
               <h3 className="text-lg font-bold text-white mb-2">{item.title}</h3>
-              <p className="text-purple-200/60 text-sm leading-relaxed">{item.desc}</p>
+              <p className="text-purple-200/85 text-sm leading-relaxed">{item.desc}</p>
             </div>
           ))}
         </div>
@@ -410,32 +409,32 @@ const FEATURES = [
   {
     icon: <BoltIcon />,
     title: 'Real-time, always',
-    desc: 'Questions and Echoes appear live for everyone in the session — no refresh needed.',
+    desc: 'Questions and Echoes land in front of everyone the moment they happen — no refreshing, no waiting.',
   },
   {
     icon: <ShieldIcon />,
     title: 'Moderation built in',
-    desc: 'Pin important questions, hide off-topic ones, and mark questions answered — all from a simple host dashboard.',
+    desc: 'Pin the big questions, hide the off-topic ones, mark things answered — host controls that stay out of your way.',
   },
   {
     icon: <SimilarIcon />,
     title: 'Duplicate detection',
-    desc: 'Before posting, audiences see similar questions already in the feed — so the same question doesn\'t get asked five times.',
+    desc: 'Before a question posts, attendees see similar ones already in the feed — and can Echo those instead of asking the same thing twice.',
   },
   {
     icon: <CreditIcon />,
-    title: 'Credit system',
-    desc: 'Each guest gets a limited number of questions and Echoes to spend — so people think before they post, and the most resonant questions rise to the top.',
+    title: 'Quality over quantity',
+    desc: 'Everyone gets a few questions and Echoes to spend, so people post what they mean — and the room\'s real priorities shine through.',
   },
   {
     icon: <MobileIcon />,
     title: 'Mobile first',
-    desc: 'Designed for the phone in your audience\'s hand. Fast, thumb-friendly, no friction.',
+    desc: 'Built for the phone already in your audience\'s hand. Fast, thumb-friendly, ready before the host finishes reading out the join code.',
   },
   {
     icon: <GuestIcon />,
     title: 'No account required',
-    desc: 'Guests jump straight in. Registration is only needed to host or moderate a session.',
+    desc: 'Attendees jump straight in. An account is only needed to host or moderate a session.',
   },
 ];
 
@@ -447,8 +446,8 @@ function Features() {
         <h2 className="text-4xl sm:text-5xl font-extrabold text-white text-center mb-4">
           Everything you need,<br />nothing you don&apos;t
         </h2>
-        <p className="text-purple-200/55 text-center text-lg mb-16 max-w-xl mx-auto">
-          Built for live events, conferences, AMAs, classrooms, and anywhere questions matter.
+        <p className="text-purple-200/80 text-center text-lg mb-16 max-w-xl mx-auto">
+          Built for AMAs, panels, classrooms, town halls — anywhere the room has questions.
         </p>
 
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -458,7 +457,7 @@ function Features() {
                 {f.icon}
               </div>
               <h3 className="font-bold text-white mb-1">{f.title}</h3>
-              <p className="text-purple-200/60 text-sm leading-relaxed">{f.desc}</p>
+              <p className="text-purple-200/85 text-sm leading-relaxed">{f.desc}</p>
             </div>
           ))}
         </div>
@@ -498,21 +497,16 @@ function EarlyAccess() {
   }
 
   return (
-    <section className="py-24 px-4 border-t border-brand-border/40">
+    <section className="py-12 px-4 border-t border-brand-border/40">
       <div className="max-w-xl mx-auto text-center relative">
         <div className="absolute left-1/2 -translate-x-1/2 w-[500px] h-[200px] bg-brand-orange/8 blur-[100px] pointer-events-none" />
 
         <div className="relative">
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-brand-orange/30 bg-brand-orange/10 text-brand-amber text-sm font-medium mb-6">
-            <span className="w-1.5 h-1.5 rounded-full bg-brand-orange animate-pulse-slow" />
-            Launching soon
-          </div>
-
-          <h2 className="text-4xl sm:text-5xl font-extrabold text-white mb-4">
-            Be first to know
+          <h2 className="text-2xl sm:text-3xl font-extrabold text-white mb-3">
+            Hosting tips &amp; updates
           </h2>
-          <p className="text-purple-200/60 text-lg mb-10">
-            GuestSpeak is almost ready. Drop your email and we&apos;ll reach out when we launch.
+          <p className="text-purple-200/85 text-base mb-8">
+            New features, session ideas, and hosting tips — straight to your inbox. No noise.
           </p>
 
           {status === 'done' ? (
@@ -520,8 +514,8 @@ function EarlyAccess() {
               <div className="w-12 h-12 rounded-full bg-brand-orange/20 border border-brand-orange/30 flex items-center justify-center text-brand-orange text-xl">
                 ✓
               </div>
-              <p className="text-white font-bold text-lg">You&apos;re on the list.</p>
-              <p className="text-purple-200/50 text-sm">We&apos;ll be in touch when GuestSpeak launches.</p>
+              <p className="text-white font-bold text-lg">You&apos;re in.</p>
+              <p className="text-purple-200/75 text-sm">We&apos;ll send you the good stuff and nothing else.</p>
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-3">
@@ -540,22 +534,14 @@ function EarlyAccess() {
                 disabled={status === 'loading'}
                 className="btn-primary px-7 py-3.5 text-sm whitespace-nowrap disabled:opacity-60"
               >
-                {status === 'loading' ? 'Sending…' : 'Notify me →'}
+                {status === 'loading' ? 'Sending…' : 'Subscribe →'}
               </button>
             </form>
           )}
 
           {status !== 'done' && (
-            <p className="text-purple-200/30 text-xs mt-4">No spam. One email when we launch.</p>
+            <p className="text-purple-200/60 text-xs mt-4">No spam. Unsubscribe anytime.</p>
           )}
-
-          <div className="flex flex-wrap justify-center gap-2 mt-10">
-            {['Real-time Q&A', 'Works in any browser', 'Free to start', 'Built for live events'].map(f => (
-              <span key={f} className="px-3 py-1.5 rounded-full border border-brand-border text-purple-200/50 text-xs">
-                {f}
-              </span>
-            ))}
-          </div>
         </div>
       </div>
     </section>
@@ -566,17 +552,17 @@ function EarlyAccess() {
 
 function CTA() {
   return (
-    <section className="py-24 px-4">
+    <section className="py-12 px-4">
       <div className="max-w-2xl mx-auto text-center">
         <div className="relative card p-10 sm:p-14 overflow-hidden">
           <div className="absolute inset-0 bg-purple-gradient opacity-5 pointer-events-none" />
           <div className="absolute top-0 left-1/2 -translate-x-1/2 w-64 h-40 bg-brand-orange/10 blur-3xl pointer-events-none" />
 
           <h2 className="relative text-4xl sm:text-5xl font-extrabold mb-4">
-            <span className="text-orange-gradient">Ready to go?</span>
+            <span className="text-orange-gradient">Ready to hear the room?</span>
           </h2>
-          <p className="relative text-purple-200/70 text-lg mb-8">
-            Create your first session in under a minute. Free, forever.
+          <p className="relative text-purple-200/90 text-lg mb-8">
+            Your first session takes under a minute to set up. Free, forever.
           </p>
           <div className="relative flex flex-col sm:flex-row gap-3 justify-center">
             <Link href="/create" className="btn-primary px-10 py-4 text-lg">
@@ -697,8 +683,8 @@ export default function HomePage() {
       <DemoStrip />
       <HowItWorks />
       <Features />
-      <EarlyAccess />
       <CTA />
+      <EarlyAccess />
       <Footer />
     </main>
   );

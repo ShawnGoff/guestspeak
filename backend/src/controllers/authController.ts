@@ -12,6 +12,8 @@ const RegisterSchema = z.object({
   email: z.string().email(),
   username: z.string().min(3).max(50).regex(/^[a-zA-Z0-9_]+$/),
   password: z.string().min(8),
+  // Optional: guest_token to migrate participant/question records to the new account
+  guest_token: z.string().optional(),
 });
 
 const UpdateMeSchema = z.object({
@@ -31,12 +33,15 @@ const LoginSchema = z.object({
 });
 
 export async function register(req: Request, res: Response, next: NextFunction) {
+  const client = await pool.connect();
   try {
-    const { email, username, password } = RegisterSchema.parse(req.body);
+    const { email, username, password, guest_token } = RegisterSchema.parse(req.body);
     if (containsBannedWord(username)) throw new AppError(400, 'Inappropriate language detected');
     const passwordHash = await bcrypt.hash(password, 12);
 
-    const result = await pool.query(
+    await client.query('BEGIN');
+
+    const result = await client.query(
       `INSERT INTO users (email, username, password_hash, is_guest)
        VALUES ($1, $2, $3, false)
        RETURNING id, email, username, is_guest, created_at, token_version`,
@@ -44,17 +49,38 @@ export async function register(req: Request, res: Response, next: NextFunction) 
     );
 
     const user = result.rows[0];
+
+    // If registering from a guest session, migrate participant and question records
+    if (guest_token) {
+      await client.query(
+        `UPDATE session_participants
+         SET user_id = $1, guest_token = NULL
+         WHERE guest_token = $2`,
+        [user.id, guest_token],
+      );
+      await client.query(
+        `UPDATE questions
+         SET author_id = $1
+         WHERE author_guest_token = $2 AND author_id IS NULL`,
+        [user.id, guest_token],
+      );
+    }
+
+    await client.query('COMMIT');
+
     const token = signToken({ userId: user.id, isGuest: false, v: user.token_version });
     const { token_version: _tv, ...safeUser } = user;
 
     res.status(201).json({ token, user: safeUser });
   } catch (err: any) {
+    await client.query('ROLLBACK').catch(() => {});
     if (err?.code === '23505') {
-      // unique violation
       next(new AppError(409, 'Email or username already taken'));
     } else {
       next(err);
     }
+  } finally {
+    client.release();
   }
 }
 

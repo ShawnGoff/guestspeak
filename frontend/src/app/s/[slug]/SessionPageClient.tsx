@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { api, sseUrl } from '@/lib/api';
+import { saveAuth } from '@/lib/auth';
 import type { Question, Session, CallerRole } from '@ask-away/shared/types';
 
 const API_BASE = (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001');
@@ -60,6 +61,8 @@ export default function SessionPageClient({ params }: SessionPageProps) {
   const REGEN_CAP   = isRegistered ? 6 : 2;
   const REGEN_SECS  = 10 * 60; // 10 minutes
   const [nextCreditSecs, setNextCreditSecs] = useState(REGEN_SECS);
+  const [regenExhausted, setRegenExhausted] = useState(false);
+  const [showRegenModal, setShowRegenModal] = useState(false);
 
   const [showSignupPrompt, setShowSignupPrompt]   = useState(false);
 
@@ -255,8 +258,16 @@ export default function SessionPageClient({ params }: SessionPageProps) {
       setNextCreditSecs(prev => {
         if (prev <= 1) {
           // Time's up — send heartbeat
-          api.post<{ credits_remaining: number }>(`/sessions/${session.id}/heartbeat`, {})
-            .then(r => setCredits(r.credits_remaining))
+          api.post<{ credits_remaining: number; regen_exhausted?: boolean }>(`/sessions/${session.id}/heartbeat`, {})
+            .then(r => {
+              setCredits(r.credits_remaining);
+              if (r.regen_exhausted) {
+                setRegenExhausted((prev: boolean) => {
+                  if (!prev) setShowRegenModal(true); // only fire the modal on first exhaustion
+                  return true;
+                });
+              }
+            })
             .catch(() => {});
           return REGEN_SECS;
         }
@@ -515,7 +526,7 @@ export default function SessionPageClient({ params }: SessionPageProps) {
         isMod={isMod}
         hostView={hostView}
         participantCount={participantCount}
-        nextCreditSecs={!isMod ? nextCreditSecs : undefined}
+        nextCreditSecs={!isMod && !regenExhausted ? nextCreditSecs : undefined}
         creditCap={CREDIT_CAP}
         regenCap={REGEN_CAP}
         onToggleHostView={() => setHostView(v => !v)}
@@ -545,10 +556,10 @@ export default function SessionPageClient({ params }: SessionPageProps) {
         <aside className="hidden lg:flex flex-col w-56 xl:w-64 border-r border-brand-border shrink-0 sticky top-[57px] h-[calc(100vh-57px)] overflow-y-auto">
           <div className="p-5 flex flex-col gap-5">
             <div>
-              <p className="text-[10px] font-bold text-purple-200/50 uppercase tracking-widest mb-3">Session</p>
+              <p className="text-[10px] font-bold text-purple-200/75 uppercase tracking-widest mb-3">Session</p>
               <h2 className="font-bold text-white text-sm leading-snug mb-1">{session.title}</h2>
               {session.host_username && (
-                <p className="text-xs text-purple-200/60">Hosted by <span className="text-brand-amber font-semibold">{session.host_username}</span></p>
+                <p className="text-xs text-purple-200/85">Hosted by <span className="text-brand-amber font-semibold">{session.host_username}</span></p>
               )}
               {session.org_name && (
                 <Link href={`/org/${session.org_slug}`} className="text-xs text-brand-orange/70 hover:text-brand-orange mt-0.5 flex items-center gap-1">
@@ -570,13 +581,13 @@ export default function SessionPageClient({ params }: SessionPageProps) {
                 { label: 'Answered', value: questions.filter(q => q.status === 'answered').length },
               ].map(s => (
                 <div key={s.label} className="flex items-center justify-between">
-                  <span className="text-xs text-purple-200/60">{s.label}</span>
+                  <span className="text-xs text-purple-200/85">{s.label}</span>
                   <span className="text-lg font-bold text-white">{s.value}</span>
                 </div>
               ))}
               {participantCount !== null && (
                 <div className="flex items-center justify-between">
-                  <span className="text-xs text-purple-200/60">Attending</span>
+                  <span className="text-xs text-purple-200/85">Attending</span>
                   <span className="text-lg font-bold text-white flex items-center gap-1">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-400/60" />
                     {participantCount}
@@ -589,7 +600,7 @@ export default function SessionPageClient({ params }: SessionPageProps) {
             {session.join_code && session.status !== 'closed' && (
               <div className="mt-auto border-t border-brand-border/40 pt-4">
                 <div className="rounded-xl bg-brand-purple/15 border border-brand-purple/25 p-3.5 text-center">
-                  <p className="text-xs font-bold text-purple-200/70 mb-1">Join code</p>
+                  <p className="text-xs font-bold text-purple-200/90 mb-1">Join code</p>
                   <p className="text-xl font-bold text-brand-amber tracking-[0.2em] mb-2">{session.join_code}</p>
                   <p className="text-xs text-brand-orange font-semibold">guestspeak.app</p>
                 </div>
@@ -611,20 +622,20 @@ export default function SessionPageClient({ params }: SessionPageProps) {
             <div className="card p-4 mb-6 flex flex-wrap gap-6 items-center">
               <div className="text-center">
                 <p className="text-2xl font-extrabold text-white">{(session as any).question_count ?? questions.length}</p>
-                <p className="text-xs text-purple-200/40 mt-0.5">Questions</p>
+                <p className="text-xs text-purple-200/70 mt-0.5">Questions</p>
               </div>
               <div className="text-center">
                 <p className="text-2xl font-extrabold text-white">{(session as any).participant_count ?? '—'}</p>
-                <p className="text-xs text-purple-200/40 mt-0.5">Participants</p>
+                <p className="text-xs text-purple-200/70 mt-0.5">Participants</p>
               </div>
               <div className="text-center">
                 <p className="text-2xl font-extrabold text-brand-amber">{(session as any).total_echoes ?? '—'}</p>
-                <p className="text-xs text-purple-200/40 mt-0.5">Total Echoes</p>
+                <p className="text-xs text-purple-200/70 mt-0.5">Total Echoes</p>
               </div>
               {session.ends_at && (
                 <div className="text-center">
                   <p className="text-sm font-semibold text-white">{new Date(session.ends_at).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}</p>
-                  <p className="text-xs text-purple-200/40 mt-0.5">Session date</p>
+                  <p className="text-xs text-purple-200/70 mt-0.5">Session date</p>
                 </div>
               )}
             </div>
@@ -650,7 +661,7 @@ export default function SessionPageClient({ params }: SessionPageProps) {
                 className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border transition-colors ${
                   pendingQuestions.length > 0
                     ? 'bg-amber-500/10 border-amber-500/30 text-amber-300'
-                    : 'bg-brand-card border-brand-border/50 text-purple-200/40'
+                    : 'bg-brand-card border-brand-border/50 text-purple-200/70'
                 }`}
               >
                 <div className="flex items-center gap-2">
@@ -668,12 +679,12 @@ export default function SessionPageClient({ params }: SessionPageProps) {
               {showPending && (
                 <div className="mt-2 space-y-2">
                   {pendingQuestions.length === 0 && (
-                    <p className="text-center text-xs text-purple-200/30 py-4">No questions waiting for approval.</p>
+                    <p className="text-center text-xs text-purple-200/60 py-4">No questions waiting for approval.</p>
                   )}
                   {pendingQuestions.map(q => (
                     <div key={q.id} className="card p-4 border-amber-500/20">
                       <p className="text-white text-sm leading-relaxed mb-1">{q.body}</p>
-                      {q.author_username && <p className="text-xs text-purple-200/30 mb-3">{q.author_username}</p>}
+                      {q.author_username && <p className="text-xs text-purple-200/60 mb-3">{q.author_username}</p>}
                       <div className="flex gap-2">
                         <button onClick={() => approveQuestion(q.id)} className="flex-1 text-sm py-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-semibold hover:bg-emerald-500/20 transition-colors min-h-[44px]">✓ Approve</button>
                         <button onClick={() => { if (confirm('Reject this question?')) rejectQuestion(q.id); }} className="flex-1 text-sm py-2.5 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 font-semibold hover:bg-red-500/20 transition-colors min-h-[44px]">✕ Reject</button>
@@ -711,7 +722,7 @@ export default function SessionPageClient({ params }: SessionPageProps) {
 
             {/* Remaining questions */}
             {listQuestions.length === 0 && !featuredQuestion && (
-              <div className="text-center py-16 text-purple-200/40">
+              <div className="text-center py-16 text-purple-200/70">
                 <p className="text-4xl mb-3">
                   {sort === 'starred' ? '★' : sort === 'answered' ? '✓' : '❓'}
                 </p>
@@ -752,7 +763,7 @@ export default function SessionPageClient({ params }: SessionPageProps) {
         {/* ── Right sidebar (desktop only) ────────────────────────────────── */}
         <aside className="hidden xl:flex flex-col w-64 border-l border-brand-border shrink-0 sticky top-[57px] h-[calc(100vh-57px)] overflow-y-auto">
           <div className="p-5">
-            <p className="text-[10px] font-bold text-purple-200/50 uppercase tracking-widest mb-4">Top Questions</p>
+            <p className="text-[10px] font-bold text-purple-200/75 uppercase tracking-widest mb-4">Top Questions</p>
             <div className="flex flex-col gap-3">
               {questions
                 .filter(q => q.status !== 'hidden' && q.status !== 'answered')
@@ -760,7 +771,7 @@ export default function SessionPageClient({ params }: SessionPageProps) {
                 .slice(0, 5)
                 .map((q, i) => (
                   <div key={q.id} className="flex items-start gap-2.5">
-                    <span className={`text-xs font-bold w-4 shrink-0 mt-0.5 ${i === 0 ? 'text-brand-amber' : 'text-purple-200/25'}`}>
+                    <span className={`text-xs font-bold w-4 shrink-0 mt-0.5 ${i === 0 ? 'text-brand-amber' : 'text-purple-200/55'}`}>
                       {i + 1}
                     </span>
                     <div className="flex-1 min-w-0">
@@ -770,7 +781,7 @@ export default function SessionPageClient({ params }: SessionPageProps) {
                   </div>
                 ))}
               {questions.filter(q => q.status !== 'hidden').length === 0 && (
-                <p className="text-xs text-purple-200/40 text-center py-4">No questions yet</p>
+                <p className="text-xs text-purple-200/70 text-center py-4">No questions yet</p>
               )}
             </div>
           </div>
@@ -796,13 +807,13 @@ export default function SessionPageClient({ params }: SessionPageProps) {
       )}
 
       {submissionClosed && session.status !== 'closed' && (
-        <div className="fixed bottom-0 inset-x-0 bg-brand-card border-t border-brand-border px-4 pt-4 pb-[calc(1rem+env(safe-area-inset-bottom))] text-center text-sm text-purple-200/60">
+        <div className="fixed bottom-0 inset-x-0 bg-brand-card border-t border-brand-border px-4 pt-4 pb-[calc(1rem+env(safe-area-inset-bottom))] text-center text-sm text-purple-200/85">
           Question submission has closed for this session.
         </div>
       )}
 
       {session.status === 'closed' && (
-        <div className="fixed bottom-0 inset-x-0 bg-brand-card border-t border-brand-border px-4 pt-4 pb-[calc(1rem+env(safe-area-inset-bottom))] text-center text-sm text-purple-200/60">
+        <div className="fixed bottom-0 inset-x-0 bg-brand-card border-t border-brand-border px-4 pt-4 pb-[calc(1rem+env(safe-area-inset-bottom))] text-center text-sm text-purple-200/85">
           This session has ended. Questions are archived below.
         </div>
       )}
@@ -850,6 +861,11 @@ export default function SessionPageClient({ params }: SessionPageProps) {
         <GuestSignupPrompt slug={params.slug} onDismiss={() => setShowSignupPrompt(false)} />
       )}
 
+      {/* Regen-exhausted upgrade modal — shown when guest uses their last free regen credit */}
+      {showRegenModal && !isRegistered && !showSignupPrompt && session && (
+        <RegenUpgradeModal slug={params.slug} onDismiss={() => setShowRegenModal(false)} />
+      )}
+
       {/* Moderator panel */}
       {showModPanel && session && (
         <ModeratorPanel sessionId={session.id} onClose={() => setShowModPanel(false)} />
@@ -891,7 +907,7 @@ function SessionHeader({ session, isLiveSoon, credits, isMod, hostView, particip
           <div className="flex items-center gap-2 mb-0.5">
             <StatusBadge status={session.status} isLiveSoon={isLiveSoon} />
             {session.status === 'live' && participantCount !== null && (
-              <span className="text-xs text-purple-200/40 flex items-center gap-1">
+              <span className="text-xs text-purple-200/70 flex items-center gap-1">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400/60" />
                 {participantCount}
               </span>
@@ -911,7 +927,7 @@ function SessionHeader({ session, isLiveSoon, credits, isMod, hostView, particip
           </div>
           <h1 className="text-white font-bold text-base leading-tight truncate">{session.title}</h1>
           {session.host_username && (
-            <p className="text-purple-200/50 text-xs mt-0.5">hosted by {session.host_username}</p>
+            <p className="text-purple-200/75 text-xs mt-0.5">hosted by {session.host_username}</p>
           )}
         </div>
 
@@ -923,14 +939,14 @@ function SessionHeader({ session, isLiveSoon, credits, isMod, hostView, particip
               className={`text-xs font-semibold px-2.5 py-1 rounded-lg border transition-colors ${
                 hostView
                   ? 'bg-brand-orange/20 border-brand-orange text-brand-orange'
-                  : 'border-brand-border text-purple-200/50 hover:border-brand-orange hover:text-brand-orange'
+                  : 'border-brand-border text-purple-200/75 hover:border-brand-orange hover:text-brand-orange'
               }`}
             >
               {hostView ? '★ Host view' : 'Host view'}
             </button>
           )}
           {!isMod && (
-            <Link href="/" className="text-xs text-purple-200/30 hover:text-purple-200/60">Guest<span className="text-brand-orange/40">Speak</span></Link>
+            <Link href="/" className="text-xs text-purple-200/60 hover:text-purple-200/85">Guest<span className="text-brand-orange/40">Speak</span></Link>
           )}
         </div>
       </div>
@@ -1004,8 +1020,8 @@ function HostControlBar({ session, closing, reopening, deleting, onGoLive, onClo
           )}
           {session.status === 'closed' && (
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-xs font-semibold text-purple-200/40 uppercase tracking-wider">Session ended</span>
-              <button onClick={onExport} className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-brand-border text-purple-200/50 hover:text-white transition-colors">
+              <span className="text-xs font-semibold text-purple-200/70 uppercase tracking-wider">Session ended</span>
+              <button onClick={onExport} className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-brand-border text-purple-200/75 hover:text-white transition-colors">
                 <DownloadIcon /> Export CSV
               </button>
               <button onClick={onReopen} disabled={reopening} className="text-xs px-3 py-1.5 rounded-lg border border-emerald-600/50 text-emerald-400 hover:bg-emerald-900/20 transition-colors disabled:opacity-40">
@@ -1026,7 +1042,7 @@ function HostControlBar({ session, closing, reopening, deleting, onGoLive, onClo
                 copied ? 'border-emerald-500/50 text-emerald-400' : 'border-brand-border text-white hover:border-brand-purple'
               }`}
             >
-              <span className="text-purple-200/40 text-xs font-sans">Code</span>
+              <span className="text-purple-200/70 text-xs font-sans">Code</span>
               <span className="text-sm font-bold tracking-widest">{joinCode}</span>
               {copied ? <CheckIcon /> : <CopyIcon />}
             </button>
@@ -1037,7 +1053,7 @@ function HostControlBar({ session, closing, reopening, deleting, onGoLive, onClo
             <button
               onClick={() => setShowQR(v => !v)}
               title="Show QR code"
-              className={`p-2.5 rounded-lg border transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center ${showQR ? 'border-brand-purple text-brand-purple' : 'border-brand-border text-purple-200/40 hover:text-white hover:border-brand-border'}`}
+              className={`p-2.5 rounded-lg border transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center ${showQR ? 'border-brand-purple text-brand-purple' : 'border-brand-border text-purple-200/70 hover:text-white hover:border-brand-border'}`}
             >
               <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" />
@@ -1050,7 +1066,7 @@ function HostControlBar({ session, closing, reopening, deleting, onGoLive, onClo
           {/* Share */}
           {session.status !== 'closed' && (
             <button onClick={share} title="Share session link"
-              className={`p-2.5 rounded-lg border transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center ${shared ? 'border-emerald-500/50 text-emerald-400' : 'border-brand-border text-purple-200/40 hover:text-white hover:border-brand-border'}`}>
+              className={`p-2.5 rounded-lg border transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center ${shared ? 'border-emerald-500/50 text-emerald-400' : 'border-brand-border text-purple-200/70 hover:text-white hover:border-brand-border'}`}>
               {shared ? <CheckIcon /> : <ShareIcon />}
             </button>
           )}
@@ -1059,9 +1075,9 @@ function HostControlBar({ session, closing, reopening, deleting, onGoLive, onClo
         {/* Secondary row — owner-only admin actions */}
         {isOwner && (
           <div className="flex items-center gap-2 mt-2 pt-2 border-t border-brand-border/30 max-w-7xl">
-            <Link href={`/s/${session.slug}/edit`} className="text-xs text-purple-200/40 hover:text-purple-200/70 transition-colors">Edit session</Link>
+            <Link href={`/s/${session.slug}/edit`} className="text-xs text-purple-200/70 hover:text-purple-200/90 transition-colors">Edit session</Link>
             <span className="text-brand-border">·</span>
-            <button onClick={onManageMods} className="text-xs text-purple-200/40 hover:text-purple-200/70 transition-colors">Manage moderators</button>
+            <button onClick={onManageMods} className="text-xs text-purple-200/70 hover:text-purple-200/90 transition-colors">Manage moderators</button>
           </div>
         )}
       </div>
@@ -1072,7 +1088,7 @@ function HostControlBar({ session, closing, reopening, deleting, onGoLive, onClo
           <div className="bg-white rounded-2xl p-4 inline-block">
             <QRCode value={joinUrl} size={160} />
           </div>
-          <p className="text-xs text-purple-200/40">Audience scans to join — no app needed</p>
+          <p className="text-xs text-purple-200/70">Audience scans to join — no app needed</p>
         </div>
       )}
     </div>
@@ -1089,24 +1105,22 @@ function CreditDisplay({ credits, max, nextCreditSecs, creditCap, regenCap }: {
   regenCap?: number;
 }) {
   const cap = creditCap ?? max;
-  // Countdown shows when credits are below the regen ceiling (regenCap), not the display cap.
-  // For guests regenCap=2 so the countdown only appears when regen is actually relevant.
-  const countdownThreshold = regenCap ?? cap;
-  const showCountdown = nextCreditSecs !== undefined && credits < countdownThreshold;
+  // Show countdown whenever any credit has been spent — as soon as you use one, you see when it comes back.
+  const showCountdown = nextCreditSecs !== undefined && credits < cap;
   const mins = Math.floor((nextCreditSecs ?? 0) / 60);
   const secs = String((nextCreditSecs ?? 0) % 60).padStart(2, '0');
 
   return (
     <div className="flex items-center gap-1.5">
-      <span className="text-xs text-purple-200/60 hidden sm:inline">Credits</span>
+      <span className="text-xs text-purple-200/85 hidden sm:inline">Credits</span>
       <div className="flex gap-1">
         {Array.from({ length: cap }).map((_, i) => (
           <div key={i} className={`w-2.5 h-2.5 rounded-full transition-colors ${i < credits ? 'bg-brand-orange' : 'bg-brand-border/60'}`} />
         ))}
       </div>
-      <span className={`text-xs font-bold ${credits > 0 ? 'text-brand-amber' : 'text-purple-200/40'}`}>{credits}</span>
+      <span className={`text-xs font-bold ${credits > 0 ? 'text-brand-amber' : 'text-purple-200/70'}`}>{credits}</span>
       {showCountdown && (
-        <span className="text-xs text-purple-200/50 tabular-nums">+1 in {mins}:{secs}</span>
+        <span className="text-xs text-purple-200/75 tabular-nums">+1 in {mins}:{secs}</span>
       )}
     </div>
   );
@@ -1126,7 +1140,7 @@ function StatusBadge({ status, isLiveSoon }: { status: string; isLiveSoon: boole
     </span>
   );
   if (status === 'closed') return (
-    <span className="px-2 py-0.5 rounded-full bg-brand-border/30 text-purple-200/50 text-xs font-semibold">Ended</span>
+    <span className="px-2 py-0.5 rounded-full bg-brand-border/30 text-purple-200/75 text-xs font-semibold">Ended</span>
   );
   return (
     <span className="px-2 py-0.5 rounded-full bg-brand-purple/20 text-brand-amber text-xs font-semibold">Upcoming</span>
@@ -1152,7 +1166,7 @@ function SortTabs({ sort, onChange }: { sort: SortOption; onChange: (s: SortOpti
           className={`px-4 py-3 text-sm font-semibold border-b-2 -mb-px whitespace-nowrap transition-all ${
             sort === tab.value
               ? 'border-brand-orange text-white'
-              : 'border-transparent text-purple-200/40 hover:text-purple-200/70'
+              : 'border-transparent text-purple-200/70 hover:text-purple-200/90'
           }`}
         >
           {tab.label}
@@ -1202,7 +1216,7 @@ function FeaturedQuestionCard({ question, isEchoed, isMine, creditsLeft, onEcho,
             )}
             {isMine && <span className="text-xs text-brand-orange/60 font-medium">Your question</span>}
             {question.author_username && (
-              <span className={`text-xs ${question.post_anonymously ? 'text-purple-300/50 italic' : 'text-purple-200/40'}`}>
+              <span className={`text-xs ${question.post_anonymously ? 'text-purple-300/50 italic' : 'text-purple-200/70'}`}>
                 {question.author_username}
               </span>
             )}
@@ -1216,9 +1230,9 @@ function FeaturedQuestionCard({ question, isEchoed, isMine, creditsLeft, onEcho,
           {hostView && (
             <div className="mt-4 pt-3 border-t border-brand-border/30 space-y-2">
               <div className="flex items-center gap-2">
-                <button onClick={onSpotlight} className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-2.5 rounded-lg border transition-colors min-h-[44px] ${isSpotlighted ? 'bg-amber-500/20 border-amber-400/50 text-amber-300' : 'border-brand-border/60 text-purple-200/50 hover:border-amber-400/40 hover:text-amber-300'}`}>🎙 {isSpotlighted ? 'Now Answering' : 'Spotlight'}</button>
-                <button onClick={onStar} className={`text-xs font-bold px-3 py-2.5 rounded-lg border transition-colors min-h-[44px] ${question.status === 'starred' ? 'bg-yellow-500/15 border-yellow-500/40 text-yellow-400' : 'border-brand-border/60 text-purple-200/40 hover:text-yellow-400'}`}>★ Star</button>
-                <button onClick={onAnswered} className={`text-xs font-semibold px-3 py-2.5 rounded-lg border transition-colors min-h-[44px] ${question.status === 'answered' ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-400' : 'border-brand-border/60 text-purple-200/40 hover:text-emerald-400'}`}>{question.status === 'answered' ? 'Answered' : '✓'}</button>
+                <button onClick={onSpotlight} className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-2.5 rounded-lg border transition-colors min-h-[44px] ${isSpotlighted ? 'bg-amber-500/20 border-amber-400/50 text-amber-300' : 'border-brand-border/60 text-purple-200/75 hover:border-amber-400/40 hover:text-amber-300'}`}>🎙 {isSpotlighted ? 'Now Answering' : 'Spotlight'}</button>
+                <button onClick={onStar} className={`text-xs font-bold px-3 py-2.5 rounded-lg border transition-colors min-h-[44px] ${question.status === 'starred' ? 'bg-yellow-500/15 border-yellow-500/40 text-yellow-400' : 'border-brand-border/60 text-purple-200/70 hover:text-yellow-400'}`}>★ Star</button>
+                <button onClick={onAnswered} className={`text-xs font-semibold px-3 py-2.5 rounded-lg border transition-colors min-h-[44px] ${question.status === 'answered' ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-400' : 'border-brand-border/60 text-purple-200/70 hover:text-emerald-400'}`}>{question.status === 'answered' ? 'Answered' : '✓'}</button>
               </div>
               <div className="flex items-center gap-1.5 flex-wrap">
                 <ModButton onClick={onPin} title={question.is_pinned ? 'Unpin' : 'Pin'} active={!!question.is_pinned}>{question.is_pinned ? 'Unpin' : 'Pin'}</ModButton>
@@ -1240,8 +1254,8 @@ function FeaturedQuestionCard({ question, isEchoed, isMine, creditsLeft, onEcho,
               isEchoed
                 ? 'border-brand-amber/50 bg-brand-amber/10 text-brand-amber'
                 : canEcho
-                ? 'border-brand-border text-purple-200/50 hover:border-brand-orange/60 hover:bg-brand-orange/10 hover:text-brand-orange'
-                : 'border-brand-border/30 text-purple-200/20 cursor-not-allowed'
+                ? 'border-brand-border text-purple-200/75 hover:border-brand-orange/60 hover:bg-brand-orange/10 hover:text-brand-orange'
+                : 'border-brand-border/30 text-purple-200/50 cursor-not-allowed'
             }`}
           >
             <span className="text-xl font-black leading-none">↑</span>
@@ -1304,7 +1318,7 @@ function QuestionCard({ question, isEchoed, isMine, creditsLeft, onEcho,
             {question.status === 'starred'  && <span className="text-xs text-yellow-400 font-semibold">★ Starred</span>}
             {question.status === 'answered' && <span className="text-xs text-emerald-400 font-semibold">✓ Answered</span>}
             {question.author_username && (
-              <span className={`text-xs ${question.post_anonymously ? 'text-purple-300/50 italic' : 'text-purple-200/30'}`}>
+              <span className={`text-xs ${question.post_anonymously ? 'text-purple-300/50 italic' : 'text-purple-200/60'}`}>
                 {question.author_username}
               </span>
             )}
@@ -1330,7 +1344,7 @@ function QuestionCard({ question, isEchoed, isMine, creditsLeft, onEcho,
                   className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-2.5 rounded-lg border transition-colors min-h-[44px] ${
                     isSpotlighted
                       ? 'bg-amber-500/20 border-amber-400/50 text-amber-300'
-                      : 'border-brand-border/60 text-purple-200/50 hover:border-amber-400/40 hover:text-amber-300 hover:bg-amber-500/10'
+                      : 'border-brand-border/60 text-purple-200/75 hover:border-amber-400/40 hover:text-amber-300 hover:bg-amber-500/10'
                   }`}
                 >
                   🎙 {isSpotlighted ? 'Now Answering' : 'Spotlight'}
@@ -1343,7 +1357,7 @@ function QuestionCard({ question, isEchoed, isMine, creditsLeft, onEcho,
                   className={`text-xs font-bold px-3 py-2.5 rounded-lg border transition-colors min-h-[44px] ${
                     question.status === 'starred'
                       ? 'bg-yellow-500/15 border-yellow-500/40 text-yellow-400'
-                      : 'border-brand-border/60 text-purple-200/40 hover:text-yellow-400 hover:border-yellow-500/30'
+                      : 'border-brand-border/60 text-purple-200/70 hover:text-yellow-400 hover:border-yellow-500/30'
                   }`}
                 >
                   ★ Star
@@ -1356,7 +1370,7 @@ function QuestionCard({ question, isEchoed, isMine, creditsLeft, onEcho,
                   className={`text-xs font-semibold px-3 py-2.5 rounded-lg border transition-colors min-h-[44px] ${
                     question.status === 'answered'
                       ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-400'
-                      : 'border-brand-border/60 text-purple-200/40 hover:text-emerald-400 hover:border-emerald-500/30'
+                      : 'border-brand-border/60 text-purple-200/70 hover:text-emerald-400 hover:border-emerald-500/30'
                   }`}
                 >
                   {question.status === 'answered' ? 'Answered' : '✓'}
@@ -1395,8 +1409,8 @@ function QuestionCard({ question, isEchoed, isMine, creditsLeft, onEcho,
               isEchoed
                 ? 'border-brand-amber/50 bg-brand-amber/10 text-brand-amber'
                 : canEcho
-                ? 'border-brand-border text-purple-200/50 hover:border-brand-orange/60 hover:bg-brand-orange/10 hover:text-brand-orange'
-                : 'border-brand-border/30 text-purple-200/20 cursor-not-allowed'
+                ? 'border-brand-border text-purple-200/75 hover:border-brand-orange/60 hover:bg-brand-orange/10 hover:text-brand-orange'
+                : 'border-brand-border/30 text-purple-200/50 cursor-not-allowed'
             }`}
           >
             <span className="text-base font-black leading-none">↑</span>
@@ -1423,7 +1437,7 @@ function ModButton({ children, active, danger, onClick, title }: {
       className={`text-xs px-3 py-2.5 rounded-lg border transition-colors font-semibold min-h-[44px] ${
         active  ? 'border-emerald-500/50 bg-emerald-500/10 text-emerald-400' :
         danger  ? 'border-red-700/40 text-red-400 hover:bg-red-900/20' :
-                  'border-brand-border/60 text-purple-200/50 hover:border-brand-purple hover:text-white'
+                  'border-brand-border/60 text-purple-200/75 hover:border-brand-purple hover:text-white'
       }`}
     >
       {children}
@@ -1446,11 +1460,11 @@ function ReplyModal({ question, reply, loading, onChange, onSubmit, onClose }: {
       <div className="card p-6 w-full max-w-lg">
         <div className="flex items-center justify-between mb-2">
           <h2 className="font-bold text-white">Host reply</h2>
-          <button onClick={onClose} className="text-purple-200/40 hover:text-white transition-colors p-1" aria-label="Close">
+          <button onClick={onClose} className="text-purple-200/70 hover:text-white transition-colors p-1" aria-label="Close">
             <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
           </button>
         </div>
-        <p className="text-purple-200/50 text-sm mb-4 line-clamp-2">{question.body}</p>
+        <p className="text-purple-200/75 text-sm mb-4 line-clamp-2">{question.body}</p>
         <form onSubmit={e => { e.preventDefault(); onSubmit(); }}>
           <textarea
             value={reply}
@@ -1498,7 +1512,7 @@ function SubmitBar({ body, setBody, credits, submitting, similarQuestions, onSub
           <div className="space-y-2 mb-3 max-h-[100px] sm:max-h-none overflow-y-auto">
             {similarQuestions.slice(0, 3).map(q => (
               <div key={q.id} className="flex items-center gap-3 bg-brand-card rounded-xl px-3 py-2 border border-brand-border/50">
-                <p className="flex-1 text-xs text-purple-200/70 leading-snug">{q.body}</p>
+                <p className="flex-1 text-xs text-purple-200/90 leading-snug">{q.body}</p>
                 <div className="flex items-center gap-2 flex-shrink-0">
                   <span className="text-xs text-brand-amber font-bold">{q.vote_count} Echoes</span>
                   <button
@@ -1528,7 +1542,7 @@ function SubmitBar({ body, setBody, credits, submitting, similarQuestions, onSub
                        text-white text-base placeholder-purple-200/40 resize-none
                        focus:outline-none focus:border-brand-purple transition-colors disabled:opacity-40"
           />
-          <span className={`absolute right-3 bottom-3 text-xs ${remaining < 50 ? 'text-red-400' : 'text-purple-200/40'}`}>
+          <span className={`absolute right-3 bottom-3 text-xs ${remaining < 50 ? 'text-red-400' : 'text-purple-200/70'}`}>
             {remaining} left
           </span>
         </div>
@@ -1542,7 +1556,7 @@ function SubmitBar({ body, setBody, credits, submitting, similarQuestions, onSub
               className={`flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg border transition-colors ${
                 postAnonymously
                   ? 'bg-purple-500/15 border-purple-500/30 text-purple-300'
-                  : 'bg-white/5 border-white/10 text-purple-200/40 hover:text-purple-200/70'
+                  : 'bg-white/5 border-white/10 text-purple-200/70 hover:text-purple-200/90'
               }`}
             >
               {/* Mask icon */}
@@ -1571,7 +1585,7 @@ function LoadingScreen() {
     <div className="min-h-screen bg-brand-bg flex items-center justify-center">
       <div className="text-center">
         <div className="w-8 h-8 border-2 border-brand-orange border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-        <p className="text-purple-200/50 text-sm">Joining session…</p>
+        <p className="text-purple-200/75 text-sm">Joining session…</p>
       </div>
     </div>
   );
@@ -1583,7 +1597,7 @@ function ErrorScreen({ message }: { message: string }) {
       <div className="text-center card p-8 max-w-sm">
         <p className="text-4xl mb-3">🔍</p>
         <h2 className="text-white font-bold text-lg mb-2">Session not found</h2>
-        <p className="text-purple-200/50 text-sm mb-6">{message}</p>
+        <p className="text-purple-200/75 text-sm mb-6">{message}</p>
         <Link href="/" className="btn-primary">Back to GuestSpeak</Link>
       </div>
     </div>
@@ -1604,7 +1618,7 @@ function GuestSignupPrompt({ slug, onDismiss }: { slug: string; onDismiss: () =>
         </div>
 
         <h2 className="text-white font-bold text-xl mb-2">Keep contributing!</h2>
-        <p className="text-purple-200/55 text-sm leading-relaxed mb-6">
+        <p className="text-purple-200/80 text-sm leading-relaxed mb-6">
           You&apos;ve used your credits for now. Sign up free and there&apos;s{' '}
           <span className="text-brand-amber font-semibold">no cap on additional earned credits</span>{' '}
           — keep earning as long as the event goes on.
@@ -1618,15 +1632,148 @@ function GuestSignupPrompt({ slug, onDismiss }: { slug: string; onDismiss: () =>
         </Link>
         <Link
           href={`/login?next=${encodeURIComponent('/s/' + slug)}`}
-          className="block text-sm text-purple-200/50 hover:text-white transition-colors mb-4"
+          className="block text-sm text-purple-200/75 hover:text-white transition-colors mb-4"
         >
           Already have an account? Sign in
         </Link>
         <button
           onClick={onDismiss}
-          className="text-xs text-purple-200/30 hover:text-purple-200/50 transition-colors"
+          className="text-xs text-purple-200/60 hover:text-purple-200/75 transition-colors"
         >
           Maybe later — continue watching
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ─── Regen upgrade modal — inline signup when guest regen is exhausted ────────
+
+function RegenUpgradeModal({ slug, onDismiss }: { slug: string; onDismiss: () => void }) {
+  const [email, setEmail]       = useState('');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [loading, setLoading]   = useState(false);
+  const [error, setError]       = useState<string | null>(null);
+  const [success, setSuccess]   = useState(false);
+
+  // Extract guest_token from the current JWT payload (client-side, no verification needed)
+  const guestToken = (() => {
+    try {
+      const jwt = localStorage.getItem('aa_token') ?? '';
+      const payload = JSON.parse(atob(jwt.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+      return payload.guestToken as string | undefined;
+    } catch { return undefined; }
+  })();
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!email || !username || !password) return;
+    setLoading(true); setError(null);
+    try {
+      const result = await api.post<{ token: string; user: any }>('/auth/register', {
+        email, username, password, ...(guestToken && { guest_token: guestToken }),
+      });
+      saveAuth(result.token, result.user);
+      setSuccess(true);
+      setTimeout(() => window.location.reload(), 1400);
+    } catch (err: any) {
+      setError(err.message ?? 'Registration failed. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  if (success) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-brand-bg/70 backdrop-blur-sm px-4 pb-[env(safe-area-inset-bottom)]">
+        <div className="card p-7 w-full max-w-sm text-center mb-4 sm:mb-0">
+          <div className="w-14 h-14 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center mx-auto mb-4">
+            <svg className="w-7 h-7 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M5 13l4 4L19 7" />
+            </svg>
+          </div>
+          <h2 className="text-white font-bold text-xl mb-2">You&apos;re in!</h2>
+          <p className="text-purple-200/75 text-sm">Reloading your session with unlimited replenishment…</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-brand-bg/70 backdrop-blur-sm px-4 pb-[env(safe-area-inset-bottom)]">
+      <div className="card p-7 w-full max-w-sm mb-4 sm:mb-0">
+        {/* Icon */}
+        <div className="w-14 h-14 rounded-2xl bg-brand-purple/20 border border-brand-purple/30 flex items-center justify-center mx-auto mb-5">
+          <svg className="w-7 h-7 text-brand-purple" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="23 4 23 10 17 10" />
+            <polyline points="1 20 1 14 7 14" />
+            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+          </svg>
+        </div>
+
+        <h2 className="text-white font-bold text-xl text-center mb-1">Keep up your contribution!</h2>
+        <p className="text-purple-200/75 text-sm text-center mb-6">
+          Create a free account to receive{' '}
+          <span className="text-brand-amber font-semibold">unlimited credit replenishment</span>{' '}
+          for the rest of this event.
+        </p>
+
+        <form onSubmit={handleSubmit} className="space-y-3">
+          <input
+            type="email"
+            placeholder="Email"
+            value={email}
+            onChange={e => setEmail(e.target.value)}
+            autoComplete="email"
+            required
+            className="w-full bg-brand-bg border border-brand-border rounded-xl px-4 py-3 text-sm text-white placeholder-purple-200/40 focus:outline-none focus:border-brand-purple transition-colors"
+          />
+          <input
+            type="text"
+            placeholder="Username"
+            value={username}
+            onChange={e => setUsername(e.target.value.replace(/[^a-zA-Z0-9_]/g, ''))}
+            autoComplete="username"
+            required
+            className="w-full bg-brand-bg border border-brand-border rounded-xl px-4 py-3 text-sm text-white placeholder-purple-200/40 focus:outline-none focus:border-brand-purple transition-colors"
+          />
+          <input
+            type="password"
+            placeholder="Password (8+ characters)"
+            value={password}
+            onChange={e => setPassword(e.target.value)}
+            autoComplete="new-password"
+            required
+            className="w-full bg-brand-bg border border-brand-border rounded-xl px-4 py-3 text-sm text-white placeholder-purple-200/40 focus:outline-none focus:border-brand-purple transition-colors"
+          />
+
+          {error && <p className="text-red-400 text-xs">{error}</p>}
+
+          <button
+            type="submit"
+            disabled={loading || !email || !username || password.length < 8}
+            className="btn-primary w-full py-3 text-sm disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            {loading ? 'Creating account…' : 'Create account — it\'s free'}
+          </button>
+        </form>
+
+        <p className="text-xs text-purple-200/60 text-center mt-4">
+          Already have an account?{' '}
+          <Link
+            href={`/login?next=${encodeURIComponent('/s/' + slug)}`}
+            className="text-brand-orange hover:text-brand-amber transition-colors"
+          >
+            Sign in instead
+          </Link>
+        </p>
+
+        <button
+          onClick={onDismiss}
+          className="block w-full text-center text-xs text-purple-200/50 hover:text-purple-200/70 transition-colors mt-3"
+        >
+          Maybe later — I still have credits
         </button>
       </div>
     </div>
@@ -1666,13 +1813,13 @@ function WelcomeScreen({ session, onEnter }: {
         <h1 className="text-white font-bold text-xl leading-snug mb-3">{session.title}</h1>
 
         {session.description && (
-          <p className="text-purple-200/50 text-sm leading-relaxed mb-6">{session.description}</p>
+          <p className="text-purple-200/75 text-sm leading-relaxed mb-6">{session.description}</p>
         )}
 
         <div className="flex items-center justify-center gap-2 mb-8">
           <StatusBadge status={session.status} isLiveSoon={false} />
           {session.host_username && (
-            <span className="text-xs text-purple-200/40">· hosted by {session.host_username}</span>
+            <span className="text-xs text-purple-200/70">· hosted by {session.host_username}</span>
           )}
         </div>
 
@@ -1680,7 +1827,7 @@ function WelcomeScreen({ session, onEnter }: {
           Enter Q&amp;A
         </button>
 
-        <p className="text-xs text-purple-200/20 mt-5">Powered by GuestSpeak</p>
+        <p className="text-xs text-purple-200/50 mt-5">Powered by GuestSpeak</p>
       </div>
     </div>
   );
@@ -1758,7 +1905,7 @@ function StreamEmbed({ url, sessionSlug }: { url: string; sessionSlug: string })
           <circle cx="12" cy="12" r="10" />
           <polygon points="10 8 16 12 10 16 10 8" fill="currentColor" stroke="none" />
         </svg>
-        <span className="text-sm text-purple-200/60 flex-1">This session is streaming live</span>
+        <span className="text-sm text-purple-200/85 flex-1">This session is streaming live</span>
         <a
           href={info.watchUrl}
           target="_blank"
@@ -1780,13 +1927,13 @@ function StreamEmbed({ url, sessionSlug }: { url: string; sessionSlug: string })
             <circle cx="12" cy="12" r="10" />
             <polygon points="10 8 16 12 10 16 10 8" fill="currentColor" stroke="none" />
           </svg>
-          <span className="text-xs font-semibold text-purple-200/50 uppercase tracking-wider">
+          <span className="text-xs font-semibold text-purple-200/75 uppercase tracking-wider">
             {info.type === 'youtube' ? 'YouTube Live' : 'Twitch Stream'}
           </span>
         </div>
         <button
           onClick={toggle}
-          className="text-xs text-purple-200/40 hover:text-purple-200/70 transition-colors flex items-center gap-1"
+          className="text-xs text-purple-200/70 hover:text-purple-200/90 transition-colors flex items-center gap-1"
         >
           {hidden ? (
             <>
@@ -1818,7 +1965,7 @@ function StreamEmbed({ url, sessionSlug }: { url: string; sessionSlug: string })
       {/* When hidden — compact pill so they can still find the stream */}
       {hidden && (
         <div className="flex items-center justify-between bg-brand-card border border-brand-border/50 rounded-xl px-4 py-2.5">
-          <span className="text-sm text-purple-200/40">Stream hidden</span>
+          <span className="text-sm text-purple-200/70">Stream hidden</span>
           <a
             href={info.watchUrl}
             target="_blank"

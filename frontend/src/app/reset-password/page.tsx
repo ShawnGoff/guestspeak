@@ -47,7 +47,7 @@ function ResetPasswordForm() {
         <div className="text-center py-4">
           <div className="text-4xl mb-3">✅</div>
           <p className="text-white font-semibold mb-2">Password updated!</p>
-          <p className="text-purple-200/50 text-sm">Redirecting you to sign in…</p>
+          <p className="text-purple-200/75 text-sm">Redirecting you to sign in…</p>
         </div>
       ) : (
         <form onSubmit={handleSubmit} className="space-y-4">

@@ -12,6 +12,7 @@ import {
   deleteSession,
   listSessions,
   listMySessions,
+  listAttendedSessions,
   exportSession,
 } from '../controllers/sessionController';
 import { muteParticipant, removeParticipant } from '../controllers/moderatorController';
@@ -29,6 +30,9 @@ router.post('/', requireRegistered, createSession);
 
 // GET  /api/sessions/mine          — caller's hosted sessions (must be before /:slug)
 router.get('/mine', requireAuth, listMySessions);
+
+// GET  /api/sessions/attended      — sessions caller attended as a participant (must be before /:slug)
+router.get('/attended', requireAuth, listAttendedSessions);
 
 // GET  /api/sessions/code/:code   — look up by join code (must be before :slug to avoid clash)
 router.get('/code/:code', optionalAuth, getSessionByCode);

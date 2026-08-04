@@ -21,7 +21,7 @@ export default function CreateSessionPage() {
   const [description, setDescription]   = useState('');
   const [visibility, setVisibility]     = useState<'public' | 'unlisted' | 'private'>('public');
   const [orgId, setOrgId]               = useState('');
-  const [credits, setCredits]           = useState(3);
+  const [credits, setCredits]           = useState(6);
   const [city, setCity]                 = useState('');
   const [region, setRegion]             = useState('');
   const [country, setCountry]           = useState('');
@@ -53,8 +53,8 @@ export default function CreateSessionPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    if (!title.trim()) { setError('Title is required'); return; }
-    if (!startDate || !startTime) { setError('Date and time are required'); return; }
+    if (!title.trim()) { setError('Your session needs a title.'); return; }
+    if (!startDate || !startTime) { setError('Pick a date and time for your session.'); return; }
     setLoading(true);
 
     try {
@@ -130,7 +130,7 @@ export default function CreateSessionPage() {
             <h1 className="text-2xl sm:text-3xl font-extrabold text-white leading-tight mb-2">
               {joinCode.title}
             </h1>
-            <p className="text-purple-200/50 text-sm">Your audience can join right now.</p>
+            <p className="text-purple-200/75 text-sm">The room is open — your audience can join right now.</p>
           </div>
 
           {/* QR + code card */}
@@ -141,7 +141,7 @@ export default function CreateSessionPage() {
             </div>
 
             {/* Big join code */}
-            <p className="text-xs text-purple-200/40 uppercase tracking-widest mb-2">Join code</p>
+            <p className="text-xs text-purple-200/70 uppercase tracking-widest mb-2">Join code</p>
             <button
               onClick={copyCode}
               className="text-5xl font-extrabold text-orange-gradient tracking-[0.15em] mb-1 hover:opacity-80 transition-opacity cursor-copy"
@@ -149,7 +149,7 @@ export default function CreateSessionPage() {
             >
               {joinCode.code}
             </button>
-            <p className={`text-xs mb-6 transition-colors ${copiedCode ? 'text-emerald-400' : 'text-purple-200/30'}`}>
+            <p className={`text-xs mb-6 transition-colors ${copiedCode ? 'text-emerald-400' : 'text-purple-200/60'}`}>
               {copiedCode ? 'Code copied!' : 'Tap code to copy'}
             </p>
 
@@ -183,8 +183,8 @@ export default function CreateSessionPage() {
           </div>
 
           {/* Helper note */}
-          <p className="text-xs text-purple-200/30 leading-relaxed">
-            Audience scans the QR or goes to <span className="text-white/50">guestspeak.app</span> and types the code — no app or account needed.
+          <p className="text-xs text-purple-200/60 leading-relaxed">
+            Attendees scan the QR or go to <span className="text-white/80">guestspeak.app</span> and enter the code — no app, no account, no waiting.
           </p>
         </div>
       </div>
@@ -194,11 +194,11 @@ export default function CreateSessionPage() {
   // ── Form ──────────────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-brand-bg">
-      <AppNav right={<Link href="/dashboard" className="text-sm text-purple-200/50 hover:text-white transition-colors">Dashboard</Link>} />
+      <AppNav right={<Link href="/dashboard" className="text-sm text-purple-200/75 hover:text-white transition-colors">Dashboard</Link>} />
 
       <main className="max-w-2xl mx-auto px-4 py-10">
         <h1 className="text-2xl font-extrabold text-white mb-1">Create a session</h1>
-        <p className="text-purple-200/50 text-sm mb-8">Fill in the details below.</p>
+        <p className="text-purple-200/75 text-sm mb-8">Give it a title and a start time — everything else is optional.</p>
 
         <form onSubmit={handleSubmit} className="space-y-6">
 
@@ -218,7 +218,7 @@ export default function CreateSessionPage() {
               <textarea
                 value={description}
                 onChange={e => setDescription(e.target.value)}
-                placeholder="What's this session about?"
+                placeholder="What should the room know before they ask?"
                 rows={3}
                 maxLength={1000}
                 className="input resize-none"
@@ -227,7 +227,7 @@ export default function CreateSessionPage() {
 
             {/* Org selector — only shown if user has orgs */}
             {orgs.length > 0 && (
-              <FormField label="Post under channel" hint="Sessions under a channel inherit channel moderators automatically">
+              <FormField label="Post under channel" hint="Channel sessions automatically share the channel's moderators — no need to re-invite anyone">
                 <select value={orgId} onChange={e => setOrgId(e.target.value)} className="input">
                   <option value="">My personal account</option>
                   {orgs.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
@@ -258,7 +258,7 @@ export default function CreateSessionPage() {
                   />
                   <div>
                     <p className="text-white text-sm font-semibold">{opt.label}</p>
-                    <p className="text-purple-200/50 text-xs mt-0.5">{opt.desc}</p>
+                    <p className="text-purple-200/75 text-xs mt-0.5">{opt.desc}</p>
                   </div>
                 </label>
               ))}
@@ -269,7 +269,7 @@ export default function CreateSessionPage() {
           <Section title="Credits per person">
             <FormField
               label={`${credits} credit${credits !== 1 ? 's' : ''} — each question or Echo costs 1`}
-              hint="Everyone starts with this amount. Guests can earn up to 2 more over time; signed-in attendees keep earning throughout the event."
+              hint="Everyone starts with this many. Guests can earn up to 2 more over time; signed-in attendees keep earning throughout the session."
             >
               <div className="flex items-center gap-4">
                 <input
@@ -335,7 +335,7 @@ export default function CreateSessionPage() {
 
             {!isOnline && (
               <div className="mt-4">
-                <FormField label="Location (optional)" hint="Helps people find you in Nearby">
+                <FormField label="Location (optional)" hint="Helps people nearby discover your session">
                   <LocationAutocomplete
                     value={city}
                     onChange={setCity}
@@ -378,7 +378,7 @@ export default function CreateSessionPage() {
                       cutoffEnabled ? 'translate-x-5' : 'translate-x-1'
                     }`} />
                   </div>
-                  <span className="text-sm text-white">Close questions before event starts</span>
+                  <span className="text-sm text-white">Close questions before the session starts</span>
                 </label>
 
                 {cutoffEnabled && (
@@ -408,7 +408,7 @@ export default function CreateSessionPage() {
                 </div>
                 <div>
                   <span className="text-sm text-white">Require approval for questions</span>
-                  <p className="text-xs text-purple-200/40 mt-0.5">Questions are hidden from the audience until you approve them</p>
+                  <p className="text-xs text-purple-200/70 mt-0.5">New questions stay hidden until you approve them — you decide what the room sees</p>
                 </div>
               </label>
             </div>
@@ -449,7 +449,7 @@ function FormField({ label, hint, children }: { label: string; hint?: string; ch
     <div>
       <label className="block text-sm font-semibold text-white mb-1.5">{label}</label>
       {children}
-      {hint && <p className="text-xs text-purple-200/40 mt-1.5">{hint}</p>}
+      {hint && <p className="text-xs text-purple-200/70 mt-1.5">{hint}</p>}
     </div>
   );
 }
@@ -463,7 +463,7 @@ const VISIBILITY_OPTIONS = [
   {
     value: 'unlisted',
     label: 'Unlisted',
-    desc: 'Link and join code only. Perfect for fan clubs, private shows, or invite-only events.',
+    desc: 'Only people with the link or join code can find it. Perfect for fan clubs, private shows, and invite-only rooms.',
   },
   {
     value: 'private',

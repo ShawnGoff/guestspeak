@@ -21,7 +21,7 @@ export default function GlobalError({
       <div className="relative max-w-sm">
         <p className="text-5xl mb-4">⚠️</p>
         <h1 className="text-2xl font-bold text-white mb-3">Something went wrong</h1>
-        <p className="text-purple-200/50 mb-8">
+        <p className="text-purple-200/75 mb-8">
           An unexpected error occurred. If this keeps happening, let us know.
         </p>
         <button onClick={reset} className="btn-primary px-6 py-3 text-sm">

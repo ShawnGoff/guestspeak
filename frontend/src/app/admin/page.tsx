@@ -88,8 +88,8 @@ function FlagsTab() {
     alert(`Author: ${data.username ?? data.guest_username ?? 'unknown'}\nEmail: ${data.email ?? '—'}\nGuest token: ${data.guest_token ?? '—'}`);
   }
 
-  if (loading) return <p className="text-purple-200/40 py-10 text-center">Loading…</p>;
-  if (!flags.length) return <p className="text-purple-200/40 py-10 text-center">No flagged questions.</p>;
+  if (loading) return <p className="text-purple-200/70 py-10 text-center">Loading…</p>;
+  if (!flags.length) return <p className="text-purple-200/70 py-10 text-center">No flagged questions.</p>;
 
   // Dedupe by question_id, keep highest flag_count
   const seen = new Set<string>();
@@ -106,12 +106,12 @@ function FlagsTab() {
               {f.is_moderator_flag && <Badge color="purple">mod flag</Badge>}
               <Badge color={f.status === 'hidden' ? 'green' : 'purple'}>{f.status}</Badge>
             </div>
-            <span className="text-xs text-purple-200/30 shrink-0">{fmt(f.flagged_at)}</span>
+            <span className="text-xs text-purple-200/60 shrink-0">{fmt(f.flagged_at)}</span>
           </div>
 
           <p className="text-white text-sm leading-relaxed mb-2">"{f.body}"</p>
 
-          <div className="flex items-center gap-2 text-xs text-purple-200/40 mb-3 flex-wrap">
+          <div className="flex items-center gap-2 text-xs text-purple-200/70 mb-3 flex-wrap">
             {f.author_username && <span>by {f.author_username}</span>}
             <span>·</span>
             <Link href={`/s/${f.session_slug}`} className="hover:text-brand-amber transition-colors">
@@ -130,7 +130,7 @@ function FlagsTab() {
             )}
             <button
               onClick={() => revealIdentity(f.question_id)}
-              className="text-xs px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-purple-200/60 hover:text-white transition-colors"
+              className="text-xs px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-purple-200/85 hover:text-white transition-colors"
             >
               Reveal identity
             </button>
@@ -190,28 +190,28 @@ function BansTab() {
         <form onSubmit={submitBan} className="space-y-3">
           <div className="grid sm:grid-cols-3 gap-3">
             <div>
-              <label className="block text-xs text-purple-200/50 mb-1">User ID (UUID)</label>
+              <label className="block text-xs text-purple-200/75 mb-1">User ID (UUID)</label>
               <input value={form.user_id} onChange={e => setForm(f => ({ ...f, user_id: e.target.value }))}
                 placeholder="uuid" className="input w-full text-sm py-2" />
             </div>
             <div>
-              <label className="block text-xs text-purple-200/50 mb-1">Guest token</label>
+              <label className="block text-xs text-purple-200/75 mb-1">Guest token</label>
               <input value={form.guest_token} onChange={e => setForm(f => ({ ...f, guest_token: e.target.value }))}
                 placeholder="token" className="input w-full text-sm py-2" />
             </div>
             <div>
-              <label className="block text-xs text-purple-200/50 mb-1">IP address</label>
+              <label className="block text-xs text-purple-200/75 mb-1">IP address</label>
               <input value={form.ip_address} onChange={e => setForm(f => ({ ...f, ip_address: e.target.value }))}
                 placeholder="1.2.3.4" className="input w-full text-sm py-2 font-mono" />
             </div>
           </div>
           <div>
-            <label className="block text-xs text-purple-200/50 mb-1">Reason <span className="text-red-400">*</span></label>
+            <label className="block text-xs text-purple-200/75 mb-1">Reason <span className="text-red-400">*</span></label>
             <input value={form.reason} onChange={e => setForm(f => ({ ...f, reason: e.target.value }))}
               placeholder="Reason for ban" className="input w-full text-sm py-2" required />
           </div>
           <div>
-            <label className="block text-xs text-purple-200/50 mb-1">Expires (leave blank for permanent)</label>
+            <label className="block text-xs text-purple-200/75 mb-1">Expires (leave blank for permanent)</label>
             <input type="datetime-local" value={form.expires_at} onChange={e => setForm(f => ({ ...f, expires_at: e.target.value }))}
               className="input w-full text-sm py-2" />
           </div>
@@ -223,9 +223,9 @@ function BansTab() {
       </div>
 
       {/* Active bans list */}
-      {loading ? <p className="text-purple-200/40 text-center py-6">Loading…</p> : (
+      {loading ? <p className="text-purple-200/70 text-center py-6">Loading…</p> : (
         <div className="space-y-3">
-          {bans.length === 0 && <p className="text-purple-200/40 text-center py-6">No active bans.</p>}
+          {bans.length === 0 && <p className="text-purple-200/70 text-center py-6">No active bans.</p>}
           {bans.map(b => (
             <div key={b.id} className="card p-4 flex items-start justify-between gap-3">
               <div className="flex-1 min-w-0">
@@ -235,13 +235,13 @@ function BansTab() {
                   {!b.expires_at && <Badge color="red">permanent</Badge>}
                   {b.expires_at && <Badge color="amber">expires {fmt(b.expires_at)}</Badge>}
                 </div>
-                <p className="text-purple-200/60 text-sm">{b.reason}</p>
-                <p className="text-purple-200/30 text-xs mt-1">
+                <p className="text-purple-200/85 text-sm">{b.reason}</p>
+                <p className="text-purple-200/60 text-xs mt-1">
                   Banned by {b.banned_by_username} · {fmt(b.banned_at)}
                 </p>
               </div>
               <button onClick={() => liftBan(b.id)}
-                className="shrink-0 text-xs px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-purple-200/50 hover:text-white transition-colors">
+                className="shrink-0 text-xs px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-purple-200/75 hover:text-white transition-colors">
                 Lift ban
               </button>
             </div>
@@ -297,19 +297,19 @@ function WordsTab() {
             {adding ? 'Adding…' : 'Add'}
           </button>
         </form>
-        <p className="text-purple-200/30 text-xs mt-2">
+        <p className="text-purple-200/60 text-xs mt-2">
           Enter the plain form — the filter handles leet-speak and spacing automatically.
         </p>
       </div>
 
-      {loading ? <p className="text-purple-200/40 text-center py-6">Loading…</p> : (
+      {loading ? <p className="text-purple-200/70 text-center py-6">Loading…</p> : (
         <div className="card divide-y divide-brand-border/30">
-          {words.length === 0 && <p className="text-purple-200/40 text-center py-6">No words in filter yet.</p>}
+          {words.length === 0 && <p className="text-purple-200/70 text-center py-6">No words in filter yet.</p>}
           {words.map(w => (
             <div key={w.id} className="flex items-center justify-between px-4 py-3 gap-3">
               <div>
                 <span className="font-mono text-white text-sm">{w.word}</span>
-                <span className="text-purple-200/30 text-xs ml-3">
+                <span className="text-purple-200/60 text-xs ml-3">
                   Added {fmt(w.added_at)}{w.added_by_username ? ` by ${w.added_by_username}` : ''}
                 </span>
               </div>
@@ -373,9 +373,9 @@ function FeaturedTab() {
         />
         <button onClick={() => load(q)} className="btn-primary text-sm px-4 py-2">Search</button>
       </div>
-      {loading ? <p className="text-purple-200/40 py-8 text-center">Loading…</p> : (
+      {loading ? <p className="text-purple-200/70 py-8 text-center">Loading…</p> : (
         <div className="space-y-2">
-          {sessions.length === 0 && <p className="text-purple-200/40 py-8 text-center">No sessions found.</p>}
+          {sessions.length === 0 && <p className="text-purple-200/70 py-8 text-center">No sessions found.</p>}
           {sessions.map(s => (
             <div key={s.id} className="card p-4 flex items-center justify-between gap-3">
               <div className="flex-1 min-w-0">
@@ -386,7 +386,7 @@ function FeaturedTab() {
                   {s.is_featured && <Badge color="amber">featured</Badge>}
                   <Badge color={s.status === 'live' ? 'green' : 'purple'}>{s.status}</Badge>
                 </div>
-                <p className="text-xs text-purple-200/40">@{s.host_username} · {fmt(s.created_at)}</p>
+                <p className="text-xs text-purple-200/70">@{s.host_username} · {fmt(s.created_at)}</p>
               </div>
               <button
                 onClick={() => toggle(s)}
@@ -394,7 +394,7 @@ function FeaturedTab() {
                 className={`shrink-0 text-xs px-3 py-1.5 rounded-lg border transition-colors disabled:opacity-40 ${
                   s.is_featured
                     ? 'bg-amber-500/10 border-amber-500/30 text-amber-400 hover:bg-amber-500/20'
-                    : 'bg-white/5 border-white/10 text-purple-200/50 hover:text-white'
+                    : 'bg-white/5 border-white/10 text-purple-200/75 hover:text-white'
                 }`}
               >
                 {toggling === s.id ? '…' : s.is_featured ? 'Unfeature' : 'Feature'}
@@ -424,7 +424,7 @@ export default function AdminPage() {
 
   if (checking) return (
     <div className="min-h-screen bg-brand-bg flex items-center justify-center">
-      <p className="text-purple-200/40">Verifying access…</p>
+      <p className="text-purple-200/70">Verifying access…</p>
     </div>
   );
 
@@ -450,7 +450,7 @@ export default function AdminPage() {
               ADMIN
             </span>
           </div>
-          <span className="text-xs text-purple-200/40">{admin.username}</span>
+          <span className="text-xs text-purple-200/70">{admin.username}</span>
         </div>
       </header>
 
@@ -466,7 +466,7 @@ export default function AdminPage() {
               className={`px-4 py-2 text-sm font-semibold rounded-t-lg transition-colors ${
                 tab === t.id
                   ? 'text-white bg-brand-card border border-brand-border/60 border-b-brand-card -mb-px'
-                  : 'text-purple-200/40 hover:text-purple-200/70'
+                  : 'text-purple-200/70 hover:text-purple-200/90'
               }`}
             >
               {t.label}

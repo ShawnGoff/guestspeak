@@ -51,7 +51,7 @@ export default function NewOrgPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    if (!name.trim()) { setError('Name is required'); return; }
+    if (!name.trim()) { setError('Your channel needs a name.'); return; }
     setLoading(true);
 
     try {
@@ -97,12 +97,12 @@ export default function NewOrgPage() {
 
   return (
     <div className="min-h-screen bg-brand-bg">
-      <AppNav right={<Link href="/dashboard" className="text-sm text-purple-200/50 hover:text-white transition-colors">Dashboard</Link>} />
+      <AppNav right={<Link href="/dashboard" className="text-sm text-purple-200/75 hover:text-white transition-colors">Dashboard</Link>} />
 
       <main className="max-w-2xl mx-auto px-4 py-10">
         <h1 className="text-2xl font-extrabold text-white mb-1">Create a channel</h1>
-        <p className="text-purple-200/50 text-sm mb-8">
-          Running multiple sessions? Create a channel to keep everything organized and easy to discover.
+        <p className="text-purple-200/75 text-sm mb-8">
+          Running more than one session? A channel keeps them all together — and makes you easier to find.
         </p>
 
         <form onSubmit={handleSubmit} className="card p-6 space-y-5">
@@ -118,7 +118,7 @@ export default function NewOrgPage() {
                 <img src={avatarPreview} alt="Channel photo" className="w-full h-full object-cover" />
               ) : (
                 <div className="flex flex-col items-center justify-center h-full gap-1">
-                  <svg className="w-6 h-6 text-purple-200/30 group-hover:text-brand-purple transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                  <svg className="w-6 h-6 text-purple-200/60 group-hover:text-brand-purple transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
                   </svg>
                 </div>
@@ -134,7 +134,7 @@ export default function NewOrgPage() {
 
             <div>
               <p className="text-sm font-semibold text-white mb-0.5">Channel photo</p>
-              <p className="text-xs text-purple-200/40">JPEG, PNG, or WebP · max 5 MB</p>
+              <p className="text-xs text-purple-200/70">JPEG, PNG, or WebP · max 5 MB</p>
               <button
                 type="button"
                 onClick={() => fileRef.current?.click()}
@@ -157,7 +157,7 @@ export default function NewOrgPage() {
             <input
               value={name}
               onChange={e => setName(e.target.value)}
-              placeholder="e.g. Podcast Name, Conference Name, Festival Name, Radio Station"
+              placeholder="e.g. The Midnight Hour, Westside Records, KGMZ 99.1"
               maxLength={255}
               className={INPUT_CLASS}
             />
@@ -167,7 +167,7 @@ export default function NewOrgPage() {
             <textarea
               value={description}
               onChange={e => setDescription(e.target.value)}
-              placeholder="A brief description of your show or station…"
+              placeholder="Tell people what your sessions are about…"
               rows={3}
               maxLength={1000}
               className={`${INPUT_CLASS} resize-none`}
@@ -215,7 +215,7 @@ export default function NewOrgPage() {
             )}
           </div>
 
-          <OrgField label="Categories" hint="Select all that apply — helps people find you by type.">
+          <OrgField label="Categories" hint="Pick all that apply, so the right audience can find you.">
             <div className="grid grid-cols-3 gap-2 mt-1">
               {ORG_CATEGORIES.map(cat => {
                 const checked = categories.includes(cat);
@@ -225,7 +225,7 @@ export default function NewOrgPage() {
                     className={`flex items-center gap-2 px-3 py-2 rounded-xl border cursor-pointer transition-colors text-sm ${
                       checked
                         ? 'border-brand-purple bg-brand-purple/10 text-white'
-                        : 'border-brand-border text-purple-200/50 hover:border-brand-border/80'
+                        : 'border-brand-border text-purple-200/75 hover:border-brand-border/80'
                     }`}
                   >
                     <input
@@ -268,7 +268,7 @@ function OrgField({ label, hint, children }: { label: string; hint?: string; chi
     <div>
       <label className="block text-sm font-semibold text-white mb-1.5">{label}</label>
       {children}
-      {hint && <p className="text-xs text-purple-200/40 mt-1.5">{hint}</p>}
+      {hint && <p className="text-xs text-purple-200/70 mt-1.5">{hint}</p>}
     </div>
   );
 }

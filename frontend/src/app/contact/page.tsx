@@ -14,7 +14,7 @@ export default function ContactPage() {
 
       <main className="flex-1 max-w-2xl mx-auto w-full px-6 py-16">
         <h1 className="text-4xl font-bold text-white mb-3">Contact</h1>
-        <p className="text-purple-200/60 text-lg mb-12">We&apos;re a small team. Reach us directly.</p>
+        <p className="text-purple-200/85 text-lg mb-12">We&apos;re a small team. Reach us directly.</p>
 
         <div className="space-y-6">
           <a
@@ -28,20 +28,20 @@ export default function ContactPage() {
             </div>
             <div>
               <p className="text-white font-medium group-hover:text-brand-orange transition-colors">guestspeak@protonmail.com</p>
-              <p className="text-purple-200/50 text-sm mt-0.5">General inquiries, feedback, support</p>
+              <p className="text-purple-200/75 text-sm mt-0.5">General inquiries, feedback, support</p>
             </div>
           </a>
 
           <div className="p-5 bg-brand-card border border-brand-border rounded-2xl">
             <p className="text-white font-medium mb-1">Privacy &amp; data requests</p>
-            <p className="text-purple-200/60 text-sm">
+            <p className="text-purple-200/85 text-sm">
               To request access to, correction of, or deletion of your personal data, email us at the address above with the subject line &quot;Data Request&quot;. We respond within 30 days.
             </p>
           </div>
 
           <div className="p-5 bg-brand-card border border-brand-border rounded-2xl">
             <p className="text-white font-medium mb-1">Report abuse</p>
-            <p className="text-purple-200/60 text-sm">
+            <p className="text-purple-200/85 text-sm">
               If you&apos;ve encountered harassment, hate speech, or other abuse on GuestSpeak, email us with the session details. We take all reports seriously.
             </p>
           </div>

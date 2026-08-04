@@ -92,12 +92,12 @@ export default function SettingsPage() {
 
   return (
     <div className="min-h-screen bg-brand-bg">
-      <AppNav right={<Link href="/dashboard" className="text-sm text-purple-200/50 hover:text-white transition-colors">Dashboard</Link>} />
+      <AppNav right={<Link href="/dashboard" className="text-sm text-purple-200/75 hover:text-white transition-colors">Dashboard</Link>} />
 
       <main className="max-w-2xl mx-auto px-4 py-10 space-y-6">
         <div>
           <h1 className="text-2xl font-extrabold text-white">Settings</h1>
-          {me && <p className="text-purple-200/40 text-sm mt-0.5">@{me.username} · {me.email}</p>}
+          {me && <p className="text-purple-200/70 text-sm mt-0.5">@{me.username} · {me.email}</p>}
         </div>
 
         {loading ? (
@@ -110,7 +110,7 @@ export default function SettingsPage() {
             <div className="card p-6 space-y-4">
               <div>
                 <h2 className="text-xs font-bold text-brand-orange uppercase tracking-widest mb-1">Join code prefix</h2>
-                <p className="text-purple-200/50 text-sm">
+                <p className="text-purple-200/75 text-sm">
                   Audiences type your join code to enter a session. A prefix makes it recognizable — great for radio stations, podcasts, or recurring shows.
                 </p>
               </div>
@@ -118,7 +118,7 @@ export default function SettingsPage() {
               <form onSubmit={savePrefix} className="space-y-4">
                 <div>
                   <label className="block text-sm font-semibold text-white mb-1.5">
-                    Prefix <span className="text-purple-200/30 font-normal">(2–8 characters, letters and numbers only)</span>
+                    Prefix <span className="text-purple-200/60 font-normal">(2–8 characters, letters and numbers only)</span>
                   </label>
                   <div className="flex gap-3">
                     <input
@@ -140,7 +140,7 @@ export default function SettingsPage() {
 
                   {/* Live preview */}
                   <div className="mt-3 flex items-center gap-3">
-                    <p className="text-xs text-purple-200/40">Your codes will look like:</p>
+                    <p className="text-xs text-purple-200/70">Your codes will look like:</p>
                     <span className="font-mono text-sm font-bold text-orange-gradient tracking-widest">
                       {previewCode}
                     </span>
@@ -176,7 +176,7 @@ export default function SettingsPage() {
                         setTimeout(() => setPrefixMsg(null), 3000);
                       }
                     }}
-                    className="text-xs text-purple-200/30 hover:text-red-400 transition-colors"
+                    className="text-xs text-purple-200/60 hover:text-red-400 transition-colors"
                   >
                     Remove prefix (use random codes)
                   </button>
@@ -188,7 +188,7 @@ export default function SettingsPage() {
             <div className="card p-6 space-y-4">
               <div>
                 <h2 className="text-xs font-bold text-brand-orange uppercase tracking-widest mb-1">Change password</h2>
-                <p className="text-purple-200/50 text-sm">You'll stay logged in on this device.</p>
+                <p className="text-purple-200/75 text-sm">You'll stay logged in on this device.</p>
               </div>
 
               <form onSubmit={changePassword} className="space-y-3">
@@ -242,7 +242,7 @@ function SettingsField({ label, type, value, onChange, placeholder }: {
 }) {
   return (
     <div>
-      <label className="block text-xs font-semibold text-purple-200/60 mb-1.5">{label}</label>
+      <label className="block text-xs font-semibold text-purple-200/85 mb-1.5">{label}</label>
       <input
         type={type}
         value={value}

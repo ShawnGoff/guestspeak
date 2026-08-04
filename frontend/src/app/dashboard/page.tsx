@@ -40,14 +40,26 @@ interface MySession {
   org_name: string | null;
 }
 
+interface AttendedSession {
+  id: string;
+  title: string;
+  slug: string;
+  status: 'upcoming' | 'live' | 'closed';
+  created_at: string;
+  starts_at: string | null;
+  host_username: string;
+  question_count: number;
+}
+
 export default function DashboardPage() {
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
-  const [sessions, setSessions]   = useState<MySession[]>([]);
-  const [orgs, setOrgs]           = useState<MyOrg[]>([]);
-  const [discover, setDiscover]   = useState<DiscoverResponse | null>(null);
+  const [sessions, setSessions]         = useState<MySession[]>([]);
+  const [attendedSessions, setAttendedSessions] = useState<AttendedSession[]>([]);
+  const [orgs, setOrgs]                 = useState<MyOrg[]>([]);
+  const [discover, setDiscover]         = useState<DiscoverResponse | null>(null);
   const [discoverOrgs, setDiscoverOrgs] = useState<DiscoverOrg[] | null>(null);
-  const [loading, setLoading]     = useState(true);
+  const [loading, setLoading]           = useState(true);
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
   const [joinCode, setJoinCode] = useState('');
   const [joining, setJoining]   = useState(false);
@@ -64,6 +76,9 @@ export default function DashboardPage() {
         .catch(() => {}),
       api.get<{ orgs: MyOrg[] }>('/orgs/mine')
         .then(o => setOrgs(o.orgs))
+        .catch(() => {}),
+      api.get<{ sessions: AttendedSession[] }>('/sessions/attended')
+        .then(r => setAttendedSessions(r.sessions))
         .catch(() => {}),
     ]).finally(() => setLoading(false));
 
@@ -108,7 +123,7 @@ export default function DashboardPage() {
       const session = await api.get<{ slug: string }>(`/sessions/code/${joinCode.trim().toUpperCase()}`);
       router.push(`/s/${session.slug}`);
     } catch (err: any) {
-      setJoinError(err.message ?? 'Session not found');
+      setJoinError(err.message ?? 'That code didn\'t match a session.');
     } finally {
       setJoining(false);
     }
@@ -131,11 +146,11 @@ export default function DashboardPage() {
         <div className="max-w-5xl mx-auto px-4 h-14 flex items-center justify-between gap-3">
           <div className="flex items-center gap-5 flex-shrink-0">
             <Link href="/" className="text-xl font-bold tracking-tight text-white">Guest<span className="text-brand-orange">Speak</span></Link>
-            <Link href="/discover" className="text-sm font-medium text-purple-200/50 hover:text-white transition-colors hidden sm:block">Discover</Link>
+            <Link href="/discover" className="text-sm font-medium text-purple-200/75 hover:text-white transition-colors hidden sm:block">Discover</Link>
           </div>
 
           <div className="flex items-center gap-3 ml-auto">
-            <span className="text-sm text-purple-200/70 hidden sm:block">@{user?.username}</span>
+            <span className="text-sm text-purple-200/90 hidden sm:block">@{user?.username}</span>
 
             {/* Join code — hidden on mobile */}
             <form onSubmit={handleJoin} className="hidden sm:flex items-center gap-1.5">
@@ -156,9 +171,9 @@ export default function DashboardPage() {
             </form>
 
             <Link href="/create" className="btn-primary text-sm py-2 px-4">+ New session</Link>
-            <Link href="/search" className="text-sm text-purple-200/70 hover:text-white transition-colors hidden sm:block">Find people</Link>
-            <Link href="/settings" className="text-sm text-purple-200/70 hover:text-white transition-colors hidden sm:block">Settings</Link>
-            <button onClick={handleSignOut} className="text-sm text-purple-200/70 hover:text-white transition-colors hidden sm:block">
+            <Link href="/search" className="text-sm text-purple-200/90 hover:text-white transition-colors hidden sm:block">Find people</Link>
+            <Link href="/settings" className="text-sm text-purple-200/90 hover:text-white transition-colors hidden sm:block">Settings</Link>
+            <button onClick={handleSignOut} className="text-sm text-purple-200/90 hover:text-white transition-colors hidden sm:block">
               Sign out
             </button>
           </div>
@@ -175,7 +190,7 @@ export default function DashboardPage() {
         <div className="flex items-start justify-between mb-8">
           <div>
             <h1 className="text-2xl font-extrabold text-white">Dashboard</h1>
-            <p className="text-purple-200/50 text-sm mt-0.5">Manage your sessions and channels.</p>
+            <p className="text-purple-200/75 text-sm mt-0.5">Everything you host, in one place.</p>
           </div>
           <div className="hidden sm:flex items-center gap-2">
             <Link href="/org/new" className="btn-ghost py-2.5 px-4 text-sm">+ New channel</Link>
@@ -204,19 +219,19 @@ export default function DashboardPage() {
                     </div>
                     <div className="min-w-0">
                       <p className="font-semibold text-white text-sm truncate">{org.name}</p>
-                      <p className="text-xs text-purple-200/40 capitalize">{org.role}</p>
+                      <p className="text-xs text-purple-200/70 capitalize">{org.role}</p>
                     </div>
-                    <ChevronRightIcon className="ml-auto text-purple-200/20 group-hover:text-brand-orange transition-colors flex-shrink-0" />
+                    <ChevronRightIcon className="ml-auto text-purple-200/50 group-hover:text-brand-orange transition-colors flex-shrink-0" />
                   </Link>
                 ))}
                 <Link
                   href="/org/new"
                   className="card p-4 flex items-center gap-3 border-dashed hover:border-brand-purple transition-colors group"
                 >
-                  <div className="w-10 h-10 rounded-xl border border-dashed border-brand-border flex items-center justify-center flex-shrink-0 text-purple-200/30 group-hover:border-brand-purple group-hover:text-brand-purple transition-colors">
+                  <div className="w-10 h-10 rounded-xl border border-dashed border-brand-border flex items-center justify-center flex-shrink-0 text-purple-200/60 group-hover:border-brand-purple group-hover:text-brand-purple transition-colors">
                     <PlusIcon />
                   </div>
-                  <p className="text-sm text-purple-200/40 group-hover:text-white transition-colors">New channel</p>
+                  <p className="text-sm text-purple-200/70 group-hover:text-white transition-colors">New channel</p>
                 </Link>
               </div>
             </section>
@@ -228,7 +243,7 @@ export default function DashboardPage() {
               <section className="space-y-4">
                 <div className="flex items-center justify-between">
                   <h2 className="text-xs font-bold text-brand-orange uppercase tracking-widest">My Sessions</h2>
-                  <Link href="/sessions/mine" className="text-xs text-purple-200/40 hover:text-brand-orange transition-colors flex items-center gap-1">
+                  <Link href="/sessions/mine" className="text-xs text-purple-200/70 hover:text-brand-orange transition-colors flex items-center gap-1">
                     {archivedCount > 0 && <span className="px-1.5 py-0.5 rounded-full bg-brand-border/40 font-mono">{archivedCount} archived</span>}
                     View all →
                   </Link>
@@ -240,10 +255,39 @@ export default function DashboardPage() {
                   <SessionGroup title="Upcoming" sessions={upcoming} onCopy={copyCode} copiedCode={copiedCode} />
                 )}
                 {live.length === 0 && upcoming.length === 0 && (
-                  <p className="text-sm text-purple-200/40 py-4">
-                    No active sessions. <Link href="/create" className="text-brand-orange hover:text-brand-amber">Create one →</Link>
+                  <p className="text-sm text-purple-200/70 py-4">
+                    Nothing live or upcoming right now. <Link href="/create" className="text-brand-orange hover:text-brand-amber">Start a session →</Link>
                   </p>
                 )}
+              </section>
+            )}
+
+            {/* Recently attended */}
+            {attendedSessions.length > 0 && (
+              <section className="space-y-3">
+                <h2 className="text-xs font-bold text-brand-orange uppercase tracking-widest">Recently Attended</h2>
+                <div className="space-y-3">
+                  {attendedSessions.map(s => (
+                    <div key={s.id} className="card p-4 flex flex-col sm:flex-row sm:items-center gap-4">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <StatusBadge status={s.status} />
+                        </div>
+                        <Link href={`/s/${s.slug}`} className="font-bold text-white hover:text-brand-amber transition-colors line-clamp-1">
+                          {s.title}
+                        </Link>
+                        <div className="flex items-center gap-4 mt-1 text-xs text-purple-200/70">
+                          <span>@{s.host_username}</span>
+                          {s.question_count > 0 && <span>{s.question_count} question{s.question_count !== 1 ? 's' : ''} asked</span>}
+                          <span>{formatDate(s.created_at)}</span>
+                        </div>
+                      </div>
+                      <Link href={`/s/${s.slug}`} className="btn-ghost text-sm py-1.5 px-3 flex-shrink-0">
+                        {s.status === 'live' ? 'Rejoin' : 'View'}
+                      </Link>
+                    </div>
+                  ))}
+                </div>
               </section>
             )}
 
@@ -255,7 +299,7 @@ export default function DashboardPage() {
 
       {/* Mobile footer nav — visible on small screens only */}
       <nav className="sm:hidden fixed bottom-0 inset-x-0 bg-brand-bg/95 backdrop-blur border-t border-brand-border/50 flex items-center justify-around px-4 py-2 z-40">
-        <Link href="/search" className="flex flex-col items-center gap-0.5 text-purple-200/60 hover:text-white transition-colors py-1">
+        <Link href="/search" className="flex flex-col items-center gap-0.5 text-purple-200/85 hover:text-white transition-colors py-1">
           <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" />
           </svg>
@@ -267,14 +311,14 @@ export default function DashboardPage() {
           </svg>
           <span className="text-[10px] font-medium">New</span>
         </Link>
-        <Link href="/settings" className="flex flex-col items-center gap-0.5 text-purple-200/60 hover:text-white transition-colors py-1">
+        <Link href="/settings" className="flex flex-col items-center gap-0.5 text-purple-200/85 hover:text-white transition-colors py-1">
           <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="12" cy="12" r="3" />
             <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
           </svg>
           <span className="text-[10px] font-medium">Settings</span>
         </Link>
-        <button onClick={handleSignOut} className="flex flex-col items-center gap-0.5 text-purple-200/60 hover:text-white transition-colors py-1">
+        <button onClick={handleSignOut} className="flex flex-col items-center gap-0.5 text-purple-200/85 hover:text-white transition-colors py-1">
           <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" />
           </svg>
@@ -323,14 +367,14 @@ function SessionRow({ session: s, onCopy, copiedCode, onDelete, isDeleting }: {
         <div className="flex items-center gap-2 mb-1">
           <StatusBadge status={s.status} />
           {s.org_name && (
-            <span className="text-xs text-purple-200/40">{s.org_name}</span>
+            <span className="text-xs text-purple-200/70">{s.org_name}</span>
           )}
           <VisibilityPill visibility={s.visibility} />
         </div>
         <Link href={`/s/${s.slug}`} className="font-bold text-white hover:text-brand-amber transition-colors line-clamp-1">
           {s.title}
         </Link>
-        <div className="flex items-center gap-4 mt-1 text-xs text-purple-200/40">
+        <div className="flex items-center gap-4 mt-1 text-xs text-purple-200/70">
           <span>{s.participant_count} joined</span>
           <span>{s.question_count} questions</span>
           {s.starts_at && s.status !== 'live' && (
@@ -366,7 +410,7 @@ function SessionRow({ session: s, onCopy, copiedCode, onDelete, isDeleting }: {
             onClick={() => onDelete(s.id, s.title)}
             disabled={isDeleting}
             title="Delete session"
-            className="text-purple-200/30 hover:text-red-400 transition-colors disabled:opacity-40 p-1.5"
+            className="text-purple-200/60 hover:text-red-400 transition-colors disabled:opacity-40 p-1.5"
           >
             {isDeleting ? (
               <span className="text-xs">…</span>
@@ -386,9 +430,9 @@ function EmptyState() {
   return (
     <div className="text-center py-20">
       <div className="text-5xl mb-4">🎙</div>
-      <h2 className="text-xl font-bold text-white mb-2">No sessions yet</h2>
-      <p className="text-purple-200/40 text-sm mb-6">Create your first session and share your join code with the audience.</p>
-      <Link href="/create" className="btn-primary py-3 px-8">Create a session</Link>
+      <h2 className="text-xl font-bold text-white mb-2">No sessions yet — your mic is waiting</h2>
+      <p className="text-purple-200/70 text-sm mb-6">Start your first one and share the join code. The room will take it from there.</p>
+      <Link href="/create" className="btn-primary py-3 px-8">Start your first session</Link>
     </div>
   );
 }
@@ -423,7 +467,7 @@ function StatusBadge({ status }: { status: MySession['status'] }) {
     );
   }
   return (
-    <span className="px-2 py-0.5 rounded-full bg-brand-border/30 text-purple-200/40 text-xs font-semibold">
+    <span className="px-2 py-0.5 rounded-full bg-brand-border/30 text-purple-200/70 text-xs font-semibold">
       Ended
     </span>
   );
@@ -432,7 +476,7 @@ function StatusBadge({ status }: { status: MySession['status'] }) {
 function VisibilityPill({ visibility }: { visibility: MySession['visibility'] }) {
   if (visibility === 'public') return null;
   return (
-    <span className="px-2 py-0.5 rounded-full border border-brand-border/50 text-purple-200/30 text-xs">
+    <span className="px-2 py-0.5 rounded-full border border-brand-border/50 text-purple-200/60 text-xs">
       {visibility}
     </span>
   );
@@ -512,7 +556,7 @@ function DiscoverFeed({ data, orgs }: { data: DiscoverResponse | null; orgs: Dis
           <button
             onClick={() => setTab('sessions')}
             className={`text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors ${
-              tab === 'sessions' ? 'bg-brand-purple text-white' : 'text-purple-200/50 hover:text-white'
+              tab === 'sessions' ? 'bg-brand-purple text-white' : 'text-purple-200/75 hover:text-white'
             }`}
           >
             Sessions
@@ -520,13 +564,13 @@ function DiscoverFeed({ data, orgs }: { data: DiscoverResponse | null; orgs: Dis
           <button
             onClick={() => setTab('channels')}
             className={`text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors ${
-              tab === 'channels' ? 'bg-brand-purple text-white' : 'text-purple-200/50 hover:text-white'
+              tab === 'channels' ? 'bg-brand-purple text-white' : 'text-purple-200/75 hover:text-white'
             }`}
           >
             Channels
           </button>
         </div>
-        <Link href="/discover" className="text-xs text-purple-200/40 hover:text-brand-orange transition-colors">
+        <Link href="/discover" className="text-xs text-purple-200/70 hover:text-brand-orange transition-colors">
           Browse all →
         </Link>
       </div>
@@ -536,8 +580,8 @@ function DiscoverFeed({ data, orgs }: { data: DiscoverResponse | null; orgs: Dis
         <div className="space-y-6">
           {!hasSessions && (
             <div className="card p-8 text-center border-dashed">
-              <p className="text-purple-200/40 text-sm">No public sessions right now.</p>
-              <p className="text-purple-200/30 text-xs mt-1">When other hosts go live, they'll show here.</p>
+              <p className="text-purple-200/70 text-sm">No public sessions at the moment.</p>
+              <p className="text-purple-200/60 text-xs mt-1">When other hosts go live, you'll see them here.</p>
             </div>
           )}
           {following.length > 0 && (
@@ -560,9 +604,9 @@ function DiscoverFeed({ data, orgs }: { data: DiscoverResponse | null; orgs: Dis
         <div>
           {channels.length === 0 ? (
             <div className="card p-8 text-center border-dashed">
-              <p className="text-purple-200/40 text-sm">No public channels yet.</p>
+              <p className="text-purple-200/70 text-sm">No public channels yet.</p>
               <Link href="/org/new" className="text-xs text-brand-orange hover:text-brand-amber mt-2 inline-block">
-                Create the first one →
+                Yours could be the first →
               </Link>
             </div>
           ) : (
@@ -625,7 +669,7 @@ function DiscoverCard({ session: s }: { session: Session & { distance_km?: numbe
         )}
       </div>
 
-      <div className="flex items-center gap-3 text-xs text-purple-200/40 mt-auto">
+      <div className="flex items-center gap-3 text-xs text-purple-200/70 mt-auto">
         <span>@{s.host_username}</span>
         {s.city && <span>{s.city}</span>}
         {s.distance_km !== undefined && (
@@ -655,12 +699,12 @@ function DiscoverChannelCard({ org }: { org: DiscoverOrg }) {
       </div>
       <div className="min-w-0 flex-1">
         <p className="font-semibold text-white text-sm truncate group-hover:text-brand-amber transition-colors">{org.name}</p>
-        <p className="text-xs text-purple-200/40 truncate">
+        <p className="text-xs text-purple-200/70 truncate">
           {org.is_online ? 'Online' : org.city ?? ''}
           {org.member_count > 0 && ` · ${org.member_count} member${org.member_count !== 1 ? 's' : ''}`}
         </p>
       </div>
-      <ChevronRightIcon className="text-purple-200/20 group-hover:text-brand-orange transition-colors flex-shrink-0" />
+      <ChevronRightIcon className="text-purple-200/50 group-hover:text-brand-orange transition-colors flex-shrink-0" />
     </Link>
   );
 }

@@ -132,7 +132,7 @@ export default function GuestUsernameModal({
         <div className="mb-5">
           <p className="text-xs text-brand-orange font-bold uppercase tracking-widest mb-1">Joining</p>
           <h2 className="text-white font-bold text-lg leading-snug line-clamp-2">{sessionTitle}</h2>
-          <p className="text-purple-200/50 text-sm mt-1">You'll post as this name. No account needed.</p>
+          <p className="text-purple-200/75 text-sm mt-1">You'll post as this name. No account needed.</p>
         </div>
 
         {/* Auto-name pill */}
@@ -143,7 +143,7 @@ export default function GuestUsernameModal({
               type="button"
               onClick={shuffle}
               title="Try another name"
-              className="flex items-center gap-1.5 text-xs text-purple-200/50 hover:text-purple-200 transition-colors shrink-0 py-1.5 px-2 -mr-2 min-h-[44px]"
+              className="flex items-center gap-1.5 text-xs text-purple-200/75 hover:text-purple-200 transition-colors shrink-0 py-1.5 px-2 -mr-2 min-h-[44px]"
             >
               {/* Shuffle icon */}
               <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -170,7 +170,7 @@ export default function GuestUsernameModal({
                 setAvailability('idle');
                 setTimeout(() => inputRef.current?.focus(), 0);
               }}
-              className="text-xs text-purple-200/40 hover:text-purple-200/70 transition-colors w-full text-center py-3 min-h-[44px] flex items-center justify-center"
+              className="text-xs text-purple-200/70 hover:text-purple-200/90 transition-colors w-full text-center py-3 min-h-[44px] flex items-center justify-center"
             >
               Or type your own name →
             </button>
@@ -190,7 +190,7 @@ export default function GuestUsernameModal({
                 {/* Status icon */}
                 <div className="absolute right-3 top-1/2 -translate-y-1/2">
                   {availability === 'checking' && (
-                    <svg className="w-4 h-4 text-purple-200/30 animate-spin" viewBox="0 0 24 24" fill="none">
+                    <svg className="w-4 h-4 text-purple-200/60 animate-spin" viewBox="0 0 24 24" fill="none">
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
                     </svg>
@@ -213,13 +213,13 @@ export default function GuestUsernameModal({
                 {availability === 'invalid' && <span className="text-red-400">2–30 chars, letters/numbers/underscores only</span>}
                 {availability === 'taken'   && <span className="text-red-400">That name is taken by a registered user</span>}
                 {availability === 'available' && <span className="text-emerald-400">Looks good!</span>}
-                {availability === 'idle'    && <span className="text-purple-200/30">Letters, numbers, and underscores only</span>}
+                {availability === 'idle'    && <span className="text-purple-200/60">Letters, numbers, and underscores only</span>}
               </p>
 
               <button
                 type="button"
                 onClick={shuffle}
-                className="text-xs text-purple-200/40 hover:text-purple-200/70 transition-colors w-full text-center py-3 min-h-[44px] flex items-center justify-center"
+                className="text-xs text-purple-200/70 hover:text-purple-200/90 transition-colors w-full text-center py-3 min-h-[44px] flex items-center justify-center"
               >
                 ← Back to a suggested name
               </button>
@@ -240,7 +240,7 @@ export default function GuestUsernameModal({
         </form>
 
         {/* Login link */}
-        <p className="text-center text-xs text-purple-200/30 mt-4">
+        <p className="text-center text-xs text-purple-200/60 mt-4">
           Have an account?{' '}
           <Link
             href={`/login?next=${encodeURIComponent(typeof window !== 'undefined' ? window.location.pathname : '/')}`}

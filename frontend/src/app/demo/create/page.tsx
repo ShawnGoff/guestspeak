@@ -43,20 +43,20 @@ export default function DemoCreatePage() {
           </div>
 
           <nav className="hidden sm:flex items-center gap-1 text-sm">
-            <Link href="/demo" className="px-3 py-1.5 rounded-lg text-white/35 hover:text-white/70 transition-colors font-medium">
+            <Link href="/demo" className="px-3 py-1.5 rounded-lg text-white/65 hover:text-white/70 transition-colors font-medium">
               Discover
             </Link>
-            <span className="text-white/20 mx-1">→</span>
+            <span className="text-white/50 mx-1">→</span>
             <span className="px-3 py-1.5 rounded-lg bg-brand-orange/10 text-brand-orange font-semibold">
               Create
             </span>
-            <span className="text-white/20 mx-1">→</span>
-            <span className="px-3 py-1.5 rounded-lg text-white/20 font-medium">
+            <span className="text-white/50 mx-1">→</span>
+            <span className="px-3 py-1.5 rounded-lg text-white/50 font-medium">
               Session
             </span>
           </nav>
 
-          <Link href="/demo" className="text-white/40 hover:text-white/70 text-sm font-medium transition-colors">
+          <Link href="/demo" className="text-white/70 hover:text-white/70 text-sm font-medium transition-colors">
             ← Back
           </Link>
         </div>
@@ -68,7 +68,7 @@ export default function DemoCreatePage() {
         <div className="mb-10">
           <p className="text-brand-orange text-sm font-semibold uppercase tracking-widest mb-2">Step 2 of 3</p>
           <h1 className="text-3xl sm:text-4xl font-extrabold text-white mb-2">Create a session</h1>
-          <p className="text-purple-200/50">Set up your session — you'll land in the Q&amp;A as the host.</p>
+          <p className="text-purple-200/75">Set up your session — you'll land in the Q&amp;A as the host.</p>
         </div>
 
         <form onSubmit={handleLaunch} className="flex flex-col gap-7">
@@ -89,13 +89,13 @@ export default function DemoCreatePage() {
                          text-white placeholder-white/30 text-base
                          focus:outline-none focus:border-brand-purple transition-colors"
             />
-            <p className="text-white/25 text-xs mt-1.5">{80 - title.length} characters remaining</p>
+            <p className="text-white/55 text-xs mt-1.5">{80 - title.length} characters remaining</p>
           </div>
 
           {/* Description */}
           <div>
             <label className="block text-sm font-semibold text-white/80 mb-2">
-              Description <span className="text-white/30 font-normal">(optional)</span>
+              Description <span className="text-white/60 font-normal">(optional)</span>
             </label>
             <textarea
               value={desc}
@@ -132,7 +132,7 @@ export default function DemoCreatePage() {
                     </div>
                     <span className="text-sm font-semibold text-white capitalize">{v}</span>
                   </div>
-                  <p className="text-xs text-white/40 text-left leading-relaxed">
+                  <p className="text-xs text-white/70 text-left leading-relaxed">
                     {v === 'public'
                       ? 'Listed on Discover. Anyone can find and join.'
                       : 'Only people with the link or code can join.'}
@@ -147,7 +147,7 @@ export default function DemoCreatePage() {
             <label className="block text-sm font-semibold text-white/80 mb-1">
               Credits per guest
             </label>
-            <p className="text-white/35 text-xs mb-4">
+            <p className="text-white/65 text-xs mb-4">
               Each credit lets a guest ask a question or echo one. Quality over volume.
             </p>
             <div className="bg-brand-card border border-brand-border rounded-xl p-5">
@@ -162,7 +162,7 @@ export default function DemoCreatePage() {
                       className={`w-8 h-8 rounded-full border-2 transition-all ${
                         n <= credits
                           ? 'border-brand-orange bg-brand-orange/20 text-brand-orange'
-                          : 'border-brand-border bg-transparent text-white/20'
+                          : 'border-brand-border bg-transparent text-white/50'
                       }`}
                     >
                       <span className="text-xs font-bold">{n}</span>
@@ -170,7 +170,7 @@ export default function DemoCreatePage() {
                   ))}
                 </div>
               </div>
-              <div className="flex justify-between text-xs text-white/30">
+              <div className="flex justify-between text-xs text-white/60">
                 <span>1 = curated, focused</span>
                 <span>5 = open, high volume</span>
               </div>
@@ -203,7 +203,7 @@ export default function DemoCreatePage() {
                     </div>
                     <span className="text-sm font-semibold text-white">{opt.label}</span>
                   </div>
-                  <p className="text-xs text-white/40 text-left">{opt.desc}</p>
+                  <p className="text-xs text-white/70 text-left">{opt.desc}</p>
                 </button>
               ))}
             </div>
@@ -226,16 +226,16 @@ export default function DemoCreatePage() {
           {/* Preview */}
           {title && (
             <div className="rounded-xl border border-brand-purple/30 bg-brand-purple/5 p-4">
-              <p className="text-xs font-bold text-white/30 uppercase tracking-widest mb-3">Preview</p>
+              <p className="text-xs font-bold text-white/60 uppercase tracking-widest mb-3">Preview</p>
               <div className="flex items-center gap-2 mb-1">
                 <span className="flex items-center gap-1.5 text-[11px] font-bold text-red-400 bg-red-500/10 border border-red-500/20 px-2 py-0.5 rounded-full">
                   <span className="w-1.5 h-1.5 rounded-full bg-red-400" />
                   LIVE
                 </span>
-                <span className="text-xs text-white/30">{visibility === 'public' ? 'Public' : 'Unlisted'}</span>
+                <span className="text-xs text-white/60">{visibility === 'public' ? 'Public' : 'Unlisted'}</span>
               </div>
               <p className="font-bold text-white">{title}</p>
-              <p className="text-xs text-white/40 mt-1">{credits} credit{credits !== 1 ? 's' : ''} per guest · Starts {startNow ? 'immediately' : 'at scheduled time'}</p>
+              <p className="text-xs text-white/70 mt-1">{credits} credit{credits !== 1 ? 's' : ''} per guest · Starts {startNow ? 'immediately' : 'at scheduled time'}</p>
             </div>
           )}
 
@@ -246,7 +246,7 @@ export default function DemoCreatePage() {
             className={`w-full py-4 rounded-xl text-base font-bold transition-all ${
               title.trim() && !launching
                 ? 'bg-orange-gradient text-white shadow-orange-glow hover:brightness-110 active:scale-[0.98]'
-                : 'bg-brand-card border border-brand-border text-white/20 cursor-default'
+                : 'bg-brand-card border border-brand-border text-white/50 cursor-default'
             }`}
           >
             {launching ? (
@@ -259,7 +259,7 @@ export default function DemoCreatePage() {
             )}
           </button>
 
-          <p className="text-center text-white/25 text-xs -mt-3">
+          <p className="text-center text-white/55 text-xs -mt-3">
             This is a demo — no account needed, nothing is saved.
           </p>
 

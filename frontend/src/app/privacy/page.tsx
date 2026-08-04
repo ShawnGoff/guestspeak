@@ -14,7 +14,7 @@ export default function PrivacyPage() {
 
       <main className="flex-1 max-w-2xl mx-auto w-full px-6 py-16">
         <h1 className="text-4xl font-bold text-white mb-3">Privacy Policy</h1>
-        <p className="text-purple-200/50 text-sm mb-10">Effective: August 1, 2026</p>
+        <p className="text-purple-200/75 text-sm mb-10">Effective: August 1, 2026</p>
 
         <div className="space-y-8 text-purple-200/80 leading-relaxed">
           <p>
@@ -32,7 +32,7 @@ export default function PrivacyPage() {
           <section>
             <h2 className="text-xl font-semibold text-white mb-3">2. How we use your information</h2>
             <p className="mb-3">We use your information solely to provide and improve GuestSpeak. Specifically:</p>
-            <ul className="list-disc list-inside space-y-1 text-purple-200/70">
+            <ul className="list-disc list-inside space-y-1 text-purple-200/90">
               <li>To authenticate you and maintain your session</li>
               <li>To display your questions and echoes in sessions you participate in</li>
               <li>To enforce session credit limits and regeneration</li>

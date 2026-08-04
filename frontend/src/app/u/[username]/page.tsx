@@ -86,7 +86,7 @@ export default function UserProfilePage({ params }: { params: { username: string
   if (loading) {
     return (
       <div className="min-h-screen bg-brand-bg flex items-center justify-center">
-        <div className="text-purple-200/40 text-sm">Loading…</div>
+        <div className="text-purple-200/70 text-sm">Loading…</div>
       </div>
     );
   }
@@ -107,9 +107,9 @@ export default function UserProfilePage({ params }: { params: { username: string
       {/* Nav */}
       <AppNav right={
         <>
-          <Link href="/search" className="text-sm text-purple-200/50 hover:text-white transition-colors">Find people</Link>
+          <Link href="/search" className="text-sm text-purple-200/75 hover:text-white transition-colors">Find people</Link>
           {isLoggedIn() && (
-            <Link href="/dashboard" className="text-sm text-purple-200/50 hover:text-white transition-colors">Dashboard</Link>
+            <Link href="/dashboard" className="text-sm text-purple-200/75 hover:text-white transition-colors">Dashboard</Link>
           )}
         </>
       } />
@@ -122,21 +122,21 @@ export default function UserProfilePage({ params }: { params: { username: string
           </div>
           <div className="flex-1 min-w-0">
             <h1 className="text-xl font-extrabold text-white">@{profile.username}</h1>
-            <p className="text-purple-200/40 text-xs mt-0.5">
+            <p className="text-purple-200/70 text-xs mt-0.5">
               Joined {new Date(profile.created_at).toLocaleDateString([], { month: 'long', year: 'numeric' })}
             </p>
             <div className="flex items-center gap-4 mt-3">
               <button onClick={() => setTab('followers')} className="text-sm hover:text-brand-amber transition-colors">
                 <span className="font-bold text-white">{profile.follower_count}</span>
-                <span className="text-purple-200/50 ml-1">followers</span>
+                <span className="text-purple-200/75 ml-1">followers</span>
               </button>
               <button onClick={() => setTab('following')} className="text-sm hover:text-brand-amber transition-colors">
                 <span className="font-bold text-white">{profile.following_count}</span>
-                <span className="text-purple-200/50 ml-1">following</span>
+                <span className="text-purple-200/75 ml-1">following</span>
               </button>
               <span className="text-sm">
                 <span className="font-bold text-white">{profile.session_count}</span>
-                <span className="text-purple-200/50 ml-1">sessions</span>
+                <span className="text-purple-200/75 ml-1">sessions</span>
               </span>
             </div>
           </div>
@@ -147,7 +147,7 @@ export default function UserProfilePage({ params }: { params: { username: string
               disabled={followLoading}
               className={`flex-shrink-0 px-5 py-2 rounded-xl text-sm font-semibold border transition-colors disabled:opacity-40 ${
                 isFollowing
-                  ? 'border-brand-border text-purple-200/60 hover:border-red-700/50 hover:text-red-400'
+                  ? 'border-brand-border text-purple-200/85 hover:border-red-700/50 hover:text-red-400'
                   : 'border-brand-orange bg-brand-orange/10 text-brand-orange hover:bg-brand-orange/20'
               }`}
             >
@@ -165,7 +165,7 @@ export default function UserProfilePage({ params }: { params: { username: string
               className={`px-4 py-2.5 text-sm font-medium capitalize border-b-2 -mb-px transition-colors ${
                 tab === t
                   ? 'border-brand-orange text-brand-orange'
-                  : 'border-transparent text-purple-200/40 hover:text-white'
+                  : 'border-transparent text-purple-200/70 hover:text-white'
               }`}
             >
               {t}
@@ -177,7 +177,7 @@ export default function UserProfilePage({ params }: { params: { username: string
         {tab === 'sessions' && (
           sessions.length === 0 ? (
             <div className="text-center py-16">
-              <p className="text-purple-200/40 text-sm">No public sessions yet.</p>
+              <p className="text-purple-200/70 text-sm">No public sessions yet.</p>
             </div>
           ) : (
             <div className="space-y-3">
@@ -194,12 +194,12 @@ export default function UserProfilePage({ params }: { params: { username: string
                     <p className="font-semibold text-white text-sm group-hover:text-brand-amber transition-colors truncate">
                       {s.title}
                     </p>
-                    <p className="text-xs text-purple-200/40 mt-0.5">
+                    <p className="text-xs text-purple-200/70 mt-0.5">
                       {s.participant_count} joined · {s.question_count} questions
                       {s.starts_at && ` · ${new Date(s.starts_at).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}`}
                     </p>
                   </div>
-                  <span className="text-purple-200/20 group-hover:text-brand-orange transition-colors text-lg">›</span>
+                  <span className="text-purple-200/50 group-hover:text-brand-orange transition-colors text-lg">›</span>
                 </Link>
               ))}
             </div>
@@ -216,7 +216,7 @@ export default function UserProfilePage({ params }: { params: { username: string
             </div>
           ) : tabUsers.length === 0 ? (
             <div className="text-center py-16">
-              <p className="text-purple-200/40 text-sm">
+              <p className="text-purple-200/70 text-sm">
                 {tab === 'followers' ? 'No followers yet.' : 'Not following anyone yet.'}
               </p>
             </div>
@@ -231,9 +231,9 @@ export default function UserProfilePage({ params }: { params: { username: string
                     <Link href={`/u/${u.username}`} className="font-semibold text-white hover:text-brand-amber transition-colors">
                       @{u.username}
                     </Link>
-                    <p className="text-xs text-purple-200/40 mt-0.5">{u.follower_count} followers</p>
+                    <p className="text-xs text-purple-200/70 mt-0.5">{u.follower_count} followers</p>
                   </div>
-                  <Link href={`/u/${u.username}`} className="text-sm text-purple-200/30 hover:text-brand-orange transition-colors">
+                  <Link href={`/u/${u.username}`} className="text-sm text-purple-200/60 hover:text-brand-orange transition-colors">
                     View →
                   </Link>
                 </div>
@@ -262,7 +262,7 @@ function StatusBadge({ status }: { status: ProfileSession['status'] }) {
     );
   }
   return (
-    <span className="px-2 py-0.5 rounded-full bg-brand-border/30 text-purple-200/40 text-xs font-semibold">
+    <span className="px-2 py-0.5 rounded-full bg-brand-border/30 text-purple-200/70 text-xs font-semibold">
       Ended
     </span>
   );

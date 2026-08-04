@@ -64,7 +64,7 @@ const UPCOMING_SESSIONS = [
 
 function TagPill({ label }: { label: string }) {
   return (
-    <span className="text-[11px] text-white/40 bg-white/5 border border-white/10 px-2 py-0.5 rounded-full whitespace-nowrap">
+    <span className="text-[11px] text-white/70 bg-white/5 border border-white/10 px-2 py-0.5 rounded-full whitespace-nowrap">
       {label}
     </span>
   );
@@ -84,14 +84,14 @@ function LiveCard({ session }: { session: typeof LIVE_SESSIONS[0] }) {
               <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse" />
               LIVE
             </span>
-            <span className="text-xs text-white/30">{session.org}</span>
+            <span className="text-xs text-white/60">{session.org}</span>
           </div>
           <h3 className="font-bold text-white text-base leading-snug group-hover:text-brand-amber transition-colors">
             {session.title}
           </h3>
         </div>
         <div className="bg-brand-card border border-brand-border rounded-xl px-3 py-2 text-center shrink-0">
-          <p className="text-[10px] text-white/25 font-medium mb-0.5">code</p>
+          <p className="text-[10px] text-white/55 font-medium mb-0.5">code</p>
           <p className="text-sm font-bold text-brand-amber tracking-widest">{session.code}</p>
         </div>
       </div>
@@ -103,21 +103,21 @@ function LiveCard({ session }: { session: typeof LIVE_SESSIONS[0] }) {
 
       {/* Footer */}
       <div className="flex items-center justify-between pt-1 border-t border-brand-border/40">
-        <div className="flex items-center gap-3 text-xs text-white/35">
+        <div className="flex items-center gap-3 text-xs text-white/65">
           <span className="flex items-center gap-1">
-            <span className="text-white/50 font-bold">{session.attendees}</span> attending
+            <span className="text-white/80 font-bold">{session.attendees}</span> attending
           </span>
           <span className="flex items-center gap-1">
-            <span className="text-white/50 font-bold">{session.questions}</span> questions
+            <span className="text-white/80 font-bold">{session.questions}</span> questions
           </span>
         </div>
         {session.isHost ? (
           <span className="text-sm font-bold text-brand-orange group-hover:text-brand-amber transition-colors flex items-center gap-1">
-            Join as host <span>→</span>
+            Step in as host <span>→</span>
           </span>
         ) : (
           <span className="text-sm font-bold text-brand-orange group-hover:text-brand-amber transition-colors flex items-center gap-1">
-            Join as audience <span>→</span>
+            Join the room <span>→</span>
           </span>
         )}
       </div>
@@ -133,8 +133,8 @@ function UpcomingCard({ session }: { session: typeof UPCOMING_SESSIONS[0] }) {
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 mb-1">
           <span className="text-xs text-brand-amber/70 font-medium">{session.when}</span>
-          <span className="text-white/20">·</span>
-          <span className="text-xs text-white/30">{session.org}</span>
+          <span className="text-white/50">·</span>
+          <span className="text-xs text-white/60">{session.org}</span>
         </div>
         <p className="font-semibold text-white text-sm leading-snug group-hover:text-brand-amber transition-colors">
           {session.title}
@@ -144,7 +144,7 @@ function UpcomingCard({ session }: { session: typeof UPCOMING_SESSIONS[0] }) {
         </div>
       </div>
       <div className="shrink-0 text-right">
-        <p className="text-xs text-white/30 mb-1">{session.registered} registered</p>
+        <p className="text-xs text-white/60 mb-1">{session.registered} registered</p>
         {reminded ? (
           <span className="inline-flex items-center gap-1 text-xs font-semibold text-brand-orange border border-brand-orange/40 bg-brand-orange/10 px-3 py-1.5 rounded-lg">
             <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M5 13l4 4L19 7"/></svg>
@@ -153,7 +153,7 @@ function UpcomingCard({ session }: { session: typeof UPCOMING_SESSIONS[0] }) {
         ) : (
           <button
             onClick={() => setReminded(true)}
-            className="text-xs font-semibold text-white/40 hover:text-white/70 border border-brand-border hover:border-brand-purple/40 px-3 py-1.5 rounded-lg transition-all"
+            className="text-xs font-semibold text-white/70 hover:text-white/70 border border-brand-border hover:border-brand-purple/40 px-3 py-1.5 rounded-lg transition-all"
           >
             Remind me
           </button>
@@ -196,12 +196,12 @@ export default function DiscoverPage() {
             <span className="px-3 py-1.5 rounded-lg bg-brand-orange/10 text-brand-orange font-semibold">
               Discover
             </span>
-            <span className="text-white/20 mx-1">→</span>
-            <Link href="/demo/create" className="px-3 py-1.5 rounded-lg text-white/35 hover:text-white/70 transition-colors font-medium">
+            <span className="text-white/50 mx-1">→</span>
+            <Link href="/demo/create" className="px-3 py-1.5 rounded-lg text-white/65 hover:text-white/70 transition-colors font-medium">
               Create
             </Link>
-            <span className="text-white/20 mx-1">→</span>
-            <span className="px-3 py-1.5 rounded-lg text-white/20 font-medium">
+            <span className="text-white/50 mx-1">→</span>
+            <span className="px-3 py-1.5 rounded-lg text-white/50 font-medium">
               Session
             </span>
           </nav>
@@ -225,8 +225,8 @@ export default function DiscoverPage() {
               <h1 className="text-3xl sm:text-4xl font-extrabold text-white mb-3">
                 Live sessions happening now
               </h1>
-              <p className="text-purple-200/55 text-lg max-w-xl">
-                Join a live session as an audience member, or host your own to see GuestSpeak from both sides.
+              <p className="text-purple-200/80 text-lg max-w-xl">
+                Slip into a live session as part of the room, or host your own — see GuestSpeak from both sides.
               </p>
             </div>
 
@@ -269,8 +269,8 @@ export default function DiscoverPage() {
         {/* Divider + Host CTA */}
         <div className="rounded-2xl bg-gradient-to-r from-brand-orange/10 via-brand-purple/10 to-brand-orange/5 border border-brand-orange/20 px-6 py-6 mb-10 flex flex-col sm:flex-row items-center justify-between gap-5">
           <div>
-            <p className="font-bold text-white text-lg mb-1">Want to see the host experience?</p>
-            <p className="text-purple-200/55 text-sm">Create a session in seconds. You'll land in the Q&A as the host.</p>
+            <p className="font-bold text-white text-lg mb-1">Curious what the host sees?</p>
+            <p className="text-purple-200/80 text-sm">Create a session in seconds — you'll land in the room with the host controls in hand.</p>
           </div>
           <Link
             href="/demo/create"
@@ -284,7 +284,7 @@ export default function DiscoverPage() {
         <section>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-bold text-white">Upcoming sessions</h2>
-            <span className="text-xs text-white/30">{UPCOMING_SESSIONS.length} scheduled</span>
+            <span className="text-xs text-white/60">{UPCOMING_SESSIONS.length} scheduled</span>
           </div>
           <div className="flex flex-col gap-3">
             {UPCOMING_SESSIONS.map(s => <UpcomingCard key={s.id} session={s} />)}
@@ -296,7 +296,7 @@ export default function DiscoverPage() {
       {/* Footer */}
       <footer className="border-t border-brand-border/40 mt-16 py-6 px-4">
         <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
-          <p className="text-white/25 text-xs">This is a demo — data is simulated, nothing is saved.</p>
+          <p className="text-white/55 text-xs">This is a demo — everything here is simulated, and nothing is saved.</p>
           <Link href="/" className="text-brand-orange text-sm font-semibold hover:text-brand-amber transition-colors">
             ← Back to guestspeak.app
           </Link>

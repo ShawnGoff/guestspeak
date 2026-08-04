@@ -125,7 +125,7 @@ export default function LocationAutocomplete({
         />
         {searching && (
           <svg
-            className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-purple-200/30 animate-spin"
+            className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-purple-200/60 animate-spin"
             viewBox="0 0 24 24" fill="none"
           >
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
@@ -152,7 +152,7 @@ export default function LocationAutocomplete({
                 className="w-full text-left px-4 py-3 hover:bg-brand-border/20 transition-colors border-b border-brand-border/30 last:border-0"
               >
                 <p className="text-sm text-white font-medium">{line1}</p>
-                {line2 && <p className="text-xs text-purple-200/40 mt-0.5">{line2}</p>}
+                {line2 && <p className="text-xs text-purple-200/70 mt-0.5">{line2}</p>}
               </button>
             );
           })}

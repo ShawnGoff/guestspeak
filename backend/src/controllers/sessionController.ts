@@ -14,7 +14,7 @@ const CreateSessionSchema = z.object({
   title: z.string().min(1).max(255),
   description: z.string().optional(),
   visibility: z.enum(['public', 'unlisted', 'private']).default('public'),
-  credits_per_user: z.number().int().min(1).max(6).default(3),
+  credits_per_user: z.number().int().min(1).max(6).default(6),
   starts_at: z.string().optional(),
   org_id: z.string().uuid().optional(),
   submission_cutoff_at: z.string().optional(),
@@ -508,28 +508,31 @@ export async function joinSession(req: Request, res: Response, next: NextFunctio
   }
 }
 
-const GUEST_CREDIT_CAP   = 2;   // Guests cap out here — sign up to get more
-const USER_CREDIT_CAP    = 6;   // Signed-in users can accumulate up to 6
+const GUEST_REGEN_LIMIT  = 2;   // Guests get at most 2 regen credits lifetime per session, then must sign up
+const USER_CREDIT_CAP    = 6;   // Signed-in users regen up to this ceiling
 const CREDIT_REGEN_MINUTES = 10;
 
 /**
  * POST /api/sessions/:id/heartbeat
  * Called by the frontend every 10 minutes while a participant is in the session.
- * Awards 1 credit if the participant is below the cap and at least 10 minutes
- * have elapsed since the last credit was awarded.
+ * Registered users: awards 1 credit if below USER_CREDIT_CAP.
+ * Guests: awards 1 credit if they haven't yet hit GUEST_REGEN_LIMIT lifetime regen credits.
+ *   After GUEST_REGEN_LIMIT regen events, guests must sign up to keep earning.
  * Server-side enforcement prevents spam.
  */
 export async function heartbeat(req: Request, res: Response, next: NextFunction) {
   try {
     const { id } = req.params;
-    const userId    = req.user?.isGuest === false ? req.user.userId : null;
+    const userId     = req.user?.isGuest === false ? req.user.userId : null;
     const guestToken = req.user?.guestToken ?? null;
 
     if (!userId && !guestToken) throw new AppError(401, 'Authentication required');
 
     let credits_remaining: number;
+    let regen_exhausted = false;
 
     if (userId) {
+      // Registered users: ceiling-based regen up to USER_CREDIT_CAP
       const result = await pool.query(
         `UPDATE session_participants
          SET credits_remaining = LEAST(credits_remaining + 1, $1),
@@ -541,7 +544,6 @@ export async function heartbeat(req: Request, res: Response, next: NextFunction)
          RETURNING credits_remaining`,
         [USER_CREDIT_CAP, id, userId],
       );
-      // If no row updated (already at cap or too soon), just read current value
       if (!result.rows[0]) {
         const cur = await pool.query(
           `SELECT credits_remaining FROM session_participants WHERE session_id = $1 AND user_id = $2`,
@@ -552,29 +554,33 @@ export async function heartbeat(req: Request, res: Response, next: NextFunction)
         credits_remaining = result.rows[0].credits_remaining;
       }
     } else {
+      // Guests: lifetime cap of GUEST_REGEN_LIMIT regen credits — after that, sign up to get more
       const result = await pool.query(
         `UPDATE session_participants
-         SET credits_remaining = LEAST(credits_remaining + 1, $1),
-             last_credit_at    = NOW()
+         SET credits_remaining = credits_remaining + 1,
+             last_credit_at    = NOW(),
+             regen_count       = regen_count + 1
          WHERE session_id  = $2
            AND guest_token = $3
-           AND credits_remaining < $1
+           AND regen_count < $1
            AND (last_credit_at IS NULL OR last_credit_at < NOW() - INTERVAL '${CREDIT_REGEN_MINUTES} minutes')
-         RETURNING credits_remaining`,
-        [GUEST_CREDIT_CAP, id, guestToken],
+         RETURNING credits_remaining, regen_count`,
+        [GUEST_REGEN_LIMIT, id, guestToken],
       );
       if (!result.rows[0]) {
         const cur = await pool.query(
-          `SELECT credits_remaining FROM session_participants WHERE session_id = $1 AND guest_token = $2`,
+          `SELECT credits_remaining, regen_count FROM session_participants WHERE session_id = $1 AND guest_token = $2`,
           [id, guestToken],
         );
         credits_remaining = cur.rows[0]?.credits_remaining ?? 0;
+        regen_exhausted   = (cur.rows[0]?.regen_count ?? 0) >= GUEST_REGEN_LIMIT;
       } else {
         credits_remaining = result.rows[0].credits_remaining;
+        regen_exhausted   = result.rows[0].regen_count >= GUEST_REGEN_LIMIT;
       }
     }
 
-    res.json({ credits_remaining });
+    res.json({ credits_remaining, regen_exhausted });
   } catch (err) {
     next(err);
   }
@@ -707,6 +713,28 @@ export async function listSessions(req: Request, res: Response, next: NextFuncti
   } catch (err) {
     next(err);
   }
+}
+
+/** GET /api/sessions/attended — sessions the caller attended as a participant (not host) */
+export async function listAttendedSessions(req: Request, res: Response, next: NextFunction) {
+  try {
+    const userId = req.user!.userId;
+    const result = await pool.query(
+      `SELECT s.id, s.title, s.slug, s.status, s.created_at, s.starts_at,
+              u.username AS host_username,
+              COUNT(DISTINCT q.id)::int AS question_count
+       FROM session_participants sp
+       JOIN sessions s ON s.id = sp.session_id
+       JOIN users u ON u.id = s.host_id
+       LEFT JOIN questions q ON q.session_id = s.id AND q.author_id = $1
+       WHERE sp.user_id = $1 AND s.host_id != $1
+       GROUP BY s.id, s.title, s.slug, s.status, s.created_at, s.starts_at, u.username, sp.joined_at
+       ORDER BY sp.joined_at DESC
+       LIMIT 10`,
+      [userId],
+    );
+    res.json({ sessions: result.rows });
+  } catch (err) { next(err); }
 }
 
 /** GET /api/sessions/mine — all sessions hosted by the caller */

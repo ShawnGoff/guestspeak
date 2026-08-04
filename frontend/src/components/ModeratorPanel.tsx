@@ -140,7 +140,7 @@ export default function ModeratorPanel({ sessionId, onClose }: {
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-brand-border/50">
           <h2 className="font-bold text-white">Moderators</h2>
-          <button onClick={onClose} className="text-purple-200/40 hover:text-white transition-colors p-1">
+          <button onClick={onClose} className="text-purple-200/70 hover:text-white transition-colors p-1">
             <CloseIcon />
           </button>
         </div>
@@ -179,13 +179,13 @@ export default function ModeratorPanel({ sessionId, onClose }: {
               <div className="space-y-3">
                 <div className="bg-brand-bg rounded-xl p-3 flex items-center justify-between">
                   <span className="text-sm text-white font-medium">@{selected.username}</span>
-                  <button onClick={() => { setSelected(null); setSearch(''); }} className="text-purple-200/40 hover:text-white text-xs">
+                  <button onClick={() => { setSelected(null); setSearch(''); }} className="text-purple-200/70 hover:text-white text-xs">
                     Clear
                   </button>
                 </div>
 
                 <div className="space-y-2">
-                  <p className="text-xs text-purple-200/50 font-semibold">Permissions</p>
+                  <p className="text-xs text-purple-200/75 font-semibold">Permissions</p>
                   {PERM_LABELS.map(({ key, label }) => (
                     <PermToggle
                       key={key}
@@ -222,7 +222,7 @@ export default function ModeratorPanel({ sessionId, onClose }: {
             ) : error && mods.length === 0 ? (
               <p className="text-sm text-red-400 text-center py-6">{error}</p>
             ) : mods.length === 0 ? (
-              <p className="text-sm text-purple-200/40 text-center py-6">No moderators yet.</p>
+              <p className="text-sm text-purple-200/70 text-center py-6">No moderators yet.</p>
             ) : (
               <div className="space-y-3">
                 {mods.map(mod => (
@@ -279,7 +279,7 @@ function PermToggle({ label, checked, onChange, small }: {
             : `w-5 h-5 ${checked ? 'translate-x-4.5' : 'translate-x-0.5'}`
         }`} />
       </div>
-      <span className={`text-purple-200/60 select-none ${small ? 'text-xs' : 'text-sm'}`}>{label}</span>
+      <span className={`text-purple-200/85 select-none ${small ? 'text-xs' : 'text-sm'}`}>{label}</span>
     </label>
   );
 }

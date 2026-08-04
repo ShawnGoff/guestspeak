@@ -7,16 +7,16 @@ export default function NotFound() {
 
       <div className="relative">
         <p className="text-8xl font-display font-bold text-orange-gradient mb-4">404</p>
-        <h1 className="text-2xl font-bold text-white mb-3">Page not found</h1>
-        <p className="text-purple-200/50 mb-8 max-w-sm">
-          This page doesn&apos;t exist, or the session or channel you&apos;re looking for may have moved.
+        <h1 className="text-2xl font-bold text-white mb-3">This room has gone quiet</h1>
+        <p className="text-purple-200/75 mb-8 max-w-sm">
+          The page doesn&apos;t exist — or the session or channel you&apos;re looking for has moved on.
         </p>
         <div className="flex items-center justify-center gap-3">
           <Link href="/" className="btn-primary px-6 py-3 text-sm">
-            Go home
+            Back to home
           </Link>
           <Link href="/discover" className="btn-ghost px-6 py-3 text-sm">
-            Browse sessions
+            Find a live session
           </Link>
         </div>
       </div>

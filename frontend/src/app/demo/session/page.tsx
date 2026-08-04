@@ -70,7 +70,7 @@ const SEED_MUSIC: Q[] = [
     text: "How do you decide what makes the final cut vs what stays in the vault?",
     echoes: 44, echoed: false, answered: false, pinned: false,
     author: 'backstage_beats', authorColor: '#D97706',
-    ago: '8m ago', tags: ['A&R', 'Editing'], comments: 6,
+    ago: '8m ago', tags: ['Tracklist', 'Editing'], comments: 6,
     ts: BASE_TS - 480000,
   },
   {
@@ -221,7 +221,7 @@ function getAutoQ(title: string): Pick<Q, 'text' | 'tags'> {
 
 const INIT_ACTIVITY: ActivityItem[] = [
   { id: 1, kind: 'host',     text: 'Host is answering a question',           time: 'just now' },
-  { id: 2, kind: 'echo',     text: '+3 echoes for the top question',         time: '6s ago' },
+  { id: 2, kind: 'echo',     text: '+3 Echoes for the top question',         time: '6s ago' },
   { id: 3, kind: 'question', text: 'backstage_beats asked a question',       time: '11s ago' },
   { id: 4, kind: 'echo',     text: 'record_collector echoed a question',     time: '18s ago' },
   { id: 5, kind: 'move',     text: 'Question moved up the feed',             time: '25s ago' },
@@ -230,9 +230,9 @@ const INIT_ACTIVITY: ActivityItem[] = [
 const ACTIVITY_POOL: Pick<ActivityItem, 'kind' | 'text'>[] = [
   { kind: 'echo',     text: 'vinyl_vibes echoed a question' },
   { kind: 'echo',     text: 'melody_chaser echoed the top question' },
-  { kind: 'echo',     text: '+2 echoes for question #2' },
+  { kind: 'echo',     text: '+2 Echoes for question #2' },
   { kind: 'echo',     text: 'midnight_listener echoed a question' },
-  { kind: 'echo',     text: '+3 echoes in the last 30s' },
+  { kind: 'echo',     text: '+3 Echoes in the last 30s' },
   { kind: 'question', text: 'superfan_sadie asked a question' },
   { kind: 'question', text: 'record_collector asked a follow-up' },
   { kind: 'move',     text: 'Question moved up the feed' },
@@ -291,7 +291,7 @@ function Avatar({ name, color, size = 'sm' }: { name: string; color: string; siz
 
 function TagPill({ label }: { label: string }) {
   return (
-    <span className="text-[11px] text-white/45 bg-white/5 border border-white/10 px-2 py-0.5 rounded-full whitespace-nowrap">
+    <span className="text-[11px] text-white/75 bg-white/5 border border-white/10 px-2 py-0.5 rounded-full whitespace-nowrap">
       {label}
     </span>
   );
@@ -327,7 +327,7 @@ function TopQuestionCard({
           <div className="flex flex-wrap gap-1.5 mb-4">
             {q.tags.map(t => <TagPill key={t} label={t} />)}
           </div>
-          <div className="flex items-center gap-2 text-xs text-white/40">
+          <div className="flex items-center gap-2 text-xs text-white/70">
             <Avatar name={q.author} color={q.authorColor} size="xs" />
             <span className="font-medium text-white/60">{q.author}</span>
             <span>·</span>
@@ -352,13 +352,13 @@ function TopQuestionCard({
                 q.echoed
                   ? 'border-brand-amber/50 bg-brand-amber/10 text-brand-amber'
                   : noCredits
-                  ? 'border-brand-border/30 text-white/20 cursor-not-allowed'
-                  : 'border-brand-border text-white/50 hover:border-brand-orange/60 hover:bg-brand-orange/10 hover:text-brand-orange'
+                  ? 'border-brand-border/30 text-white/50 cursor-not-allowed'
+                  : 'border-brand-border text-white/80 hover:border-brand-orange/60 hover:bg-brand-orange/10 hover:text-brand-orange'
               }`}
             >
               <span className="text-xl font-black leading-none">↑</span>
               <span className="text-2xl font-black leading-none">{q.echoes}</span>
-              <span className="text-[10px] font-semibold tracking-wide opacity-60">echoes</span>
+              <span className="text-[10px] font-semibold tracking-wide opacity-60">Echoes</span>
             </button>
           </div>
 
@@ -373,13 +373,13 @@ function TopQuestionCard({
                   {s[0].toUpperCase()}
                 </div>
               ))}
-              <div className="w-5 h-5 rounded-full border-2 border-brand-bg bg-brand-border text-white/40 text-[8px] flex items-center justify-center font-semibold">
+              <div className="w-5 h-5 rounded-full border-2 border-brand-bg bg-brand-border text-white/70 text-[8px] flex items-center justify-center font-semibold">
                 +38
               </div>
             </div>
           )}
 
-          <button className="text-[11px] text-white/30 hover:text-white/60 transition-colors">
+          <button className="text-[11px] text-white/60 hover:text-white/60 transition-colors">
             ↗ Share
           </button>
         </div>
@@ -419,7 +419,7 @@ function QuestionCard({
             onClick={onEcho}
             disabled={q.echoed || !!noCredits}
             className={`flex flex-col items-center gap-0.5 w-full py-2 rounded-xl transition-all active:scale-95 ${
-              q.echoed ? 'text-brand-amber' : noCredits ? 'text-white/20 cursor-not-allowed' : 'text-white/35 hover:text-brand-orange'
+              q.echoed ? 'text-brand-amber' : noCredits ? 'text-white/50 cursor-not-allowed' : 'text-white/65 hover:text-brand-orange'
             }`}
           >
             <span className="text-lg font-black leading-none">↑</span>
@@ -434,11 +434,11 @@ function QuestionCard({
           {q.tags.map(t => <TagPill key={t} label={t} />)}
         </div>
         <div className="flex items-center justify-between gap-2 flex-wrap">
-          <div className="flex items-center gap-1.5 text-xs text-white/35">
+          <div className="flex items-center gap-1.5 text-xs text-white/65">
             <Avatar name={q.author} color={q.authorColor} size="xs" />
             <span>{q.author}</span>
           </div>
-          <div className="flex items-center gap-2.5 text-xs text-white/30 shrink-0 flex-wrap">
+          <div className="flex items-center gap-2.5 text-xs text-white/60 shrink-0 flex-wrap">
             {q.answered && (
               <span className="text-[11px] font-bold text-green-400 bg-green-500/10 border border-green-500/25 px-2 py-0.5 rounded-full">
                 ✓ ANSWERED
@@ -450,7 +450,7 @@ function QuestionCard({
               <div className="flex gap-1.5">
                 <button
                   onClick={onPin}
-                  className="px-2 py-0.5 rounded border border-brand-border text-white/35 hover:border-brand-orange/40 hover:text-brand-orange transition-all"
+                  className="px-2 py-0.5 rounded border border-brand-border text-white/65 hover:border-brand-orange/40 hover:text-brand-orange transition-all"
                 >
                   Pin
                 </button>
@@ -459,7 +459,7 @@ function QuestionCard({
                   className={`px-2 py-0.5 rounded border transition-all ${
                     q.answered
                       ? 'border-green-500/40 text-green-400 hover:border-red-500/40 hover:text-red-400'
-                      : 'border-brand-border text-white/35 hover:border-green-500/40 hover:text-green-400'
+                      : 'border-brand-border text-white/65 hover:border-green-500/40 hover:text-green-400'
                   }`}
                 >
                   {q.answered ? 'Reopen' : 'Answered'}
@@ -477,7 +477,7 @@ function QuestionCard({
 
 function SessionPageInner() {
   const params = useSearchParams();
-  const titleParam  = params.get('title') ?? 'AI in Product Development';
+  const titleParam  = params.get('title') ?? 'Sable & The Echo — Album Release AMA';
   const isHostParam = params.get('host') === 'true';
   const creditsParam = Number(params.get('credits') ?? 3);
 
@@ -649,7 +649,7 @@ function SessionPageInner() {
           <div className="px-4 sm:px-6 py-3 flex items-center gap-2 sm:gap-3">
             <Link
               href="/demo"
-              className="text-white/35 hover:text-white/70 transition-colors text-sm font-medium flex items-center gap-1 shrink-0"
+              className="text-white/65 hover:text-white/70 transition-colors text-sm font-medium flex items-center gap-1 shrink-0"
             >
               <span className="sm:hidden">←</span>
               <span className="hidden sm:inline">← Discover</span>
@@ -668,7 +668,7 @@ function SessionPageInner() {
             </div>
 
             <div className="flex items-center gap-3 ml-auto shrink-0">
-              <div className="hidden md:flex items-center gap-4 text-sm text-white/50">
+              <div className="hidden md:flex items-center gap-4 text-sm text-white/80">
                 <span>
                   <span className="text-brand-amber font-bold">{attending}</span>
                   <span className="ml-1">attendees</span>
@@ -679,7 +679,7 @@ function SessionPageInner() {
                 <button
                   onClick={() => setView('audience')}
                   className={`px-3 sm:px-4 py-1.5 font-semibold transition-all ${
-                    view === 'audience' ? 'bg-brand-orange text-brand-bg' : 'text-white/50 hover:text-white'
+                    view === 'audience' ? 'bg-brand-orange text-brand-bg' : 'text-white/80 hover:text-white'
                   }`}
                 >
                   Audience
@@ -687,7 +687,7 @@ function SessionPageInner() {
                 <button
                   onClick={() => setView('host')}
                   className={`px-3 sm:px-4 py-1.5 font-semibold transition-all ${
-                    view === 'host' ? 'bg-brand-orange text-brand-bg' : 'text-white/50 hover:text-white'
+                    view === 'host' ? 'bg-brand-orange text-brand-bg' : 'text-white/80 hover:text-white'
                   }`}
                 >
                   🎤 Host
@@ -704,18 +704,18 @@ function SessionPageInner() {
           <aside className="hidden lg:flex flex-col w-52 xl:w-56 border-r border-brand-border shrink-0 overflow-y-auto">
             <div className="p-4 flex flex-col gap-5 h-full">
               <div>
-                <p className="text-[10px] font-bold text-white/25 uppercase tracking-widest mb-3">📋 Event</p>
+                <p className="text-[10px] font-bold text-white/55 uppercase tracking-widest mb-3">📋 Session</p>
                 <h2 className="font-display font-bold text-[15px] leading-snug mb-1">{titleParam}</h2>
-                <p className="text-xs text-white/40 mb-1">Design &amp; Engineering All Hands</p>
-                <p className="text-xs text-white/35">
+                <p className="text-xs text-white/70 mb-1">Live now on GuestSpeak</p>
+                <p className="text-xs text-white/65">
                   Hosted by <span className="text-brand-amber font-semibold">Shawn G.</span>
                 </p>
               </div>
 
-              <div className="flex flex-col gap-2 text-xs text-white/40">
-                <span className="flex items-center gap-2">📅 May 24, 2025</span>
-                <span className="flex items-center gap-2">⏱ 45 mins remaining</span>
-                <span className="flex items-center gap-2">📍 Virtual Event</span>
+              <div className="flex flex-col gap-2 text-xs text-white/70">
+                <span className="flex items-center gap-2">📅 Tonight · started 15 min ago</span>
+                <span className="flex items-center gap-2">⏱ 45 min remaining</span>
+                <span className="flex items-center gap-2">📍 Streaming live</span>
               </div>
 
               <div className="border-t border-brand-border/40 pt-4 flex flex-col gap-3">
@@ -725,7 +725,7 @@ function SessionPageInner() {
                   { label: 'Answered',          value: answeredCnt },
                 ].map(s => (
                   <div key={s.label} className="flex items-center justify-between">
-                    <span className="text-xs text-white/35">{s.label}</span>
+                    <span className="text-xs text-white/65">{s.label}</span>
                     <span className="text-lg font-bold">{s.value}</span>
                   </div>
                 ))}
@@ -734,9 +734,9 @@ function SessionPageInner() {
               <div className="mt-auto border-t border-brand-border/40 pt-4">
                 <div className="rounded-xl bg-brand-purple/15 border border-brand-purple/25 p-3.5 text-center">
                   <p className="text-xs font-bold text-white/60 mb-1">Join the conversation</p>
-                  <p className="text-[11px] text-white/30 mb-3">Ask a question or echo your favorites!</p>
+                  <p className="text-[11px] text-white/60 mb-3">Ask your own question, or Echo the ones you love.</p>
                   <div className="bg-brand-bg rounded-lg px-3 py-2 mb-3">
-                    <p className="text-[10px] text-white/25 mb-0.5">Join code</p>
+                    <p className="text-[10px] text-white/55 mb-0.5">Join code</p>
                     <p className="text-base font-bold text-brand-amber tracking-[0.2em]">GS-7XK</p>
                   </div>
                   <p className="text-xs text-brand-orange font-semibold">guestspeak.app</p>
@@ -760,7 +760,7 @@ function SessionPageInner() {
                   className={`px-4 py-3 text-sm font-semibold border-b-2 -mb-px transition-all whitespace-nowrap ${
                     sort === t.id
                       ? 'border-brand-orange text-white'
-                      : 'border-transparent text-white/35 hover:text-white/70'
+                      : 'border-transparent text-white/65 hover:text-white/70'
                   }`}
                 >
                   {t.label}
@@ -791,7 +791,7 @@ function SessionPageInner() {
               )}
 
               {sort === 'answered' && answeredList.length === 0 && (
-                <div className="text-center py-16 text-white/25 text-sm">No answered questions yet</div>
+                <div className="text-center py-16 text-white/55 text-sm">Nothing answered yet — the host is just warming up</div>
               )}
 
               {listQs.map(q => (
@@ -813,7 +813,7 @@ function SessionPageInner() {
           {/* Right Sidebar */}
           <aside className="hidden xl:flex flex-col w-[272px] border-l border-brand-border shrink-0 overflow-y-auto min-h-0">
             <div className="p-4 border-b border-brand-border/40 shrink-0">
-              <p className="text-[10px] font-bold text-white/25 uppercase tracking-widest mb-3">📊 Live Activity</p>
+              <p className="text-[10px] font-bold text-white/55 uppercase tracking-widest mb-3">📊 Live Activity</p>
               <div className="flex flex-col gap-2.5 overflow-hidden">
                 {activity.slice(0, 5).map(a => {
                   const s = ACTIVITY_STYLES[a.kind];
@@ -826,8 +826,8 @@ function SessionPageInner() {
                         {s.icon}
                       </div>
                       <div className="flex-1 min-w-0 leading-relaxed">
-                        <span className="text-white/55">{a.text}</span>
-                        <span className="text-white/20 ml-1">· {a.time}</span>
+                        <span className="text-white/85">{a.text}</span>
+                        <span className="text-white/50 ml-1">· {a.time}</span>
                       </div>
                     </div>
                   );
@@ -837,23 +837,23 @@ function SessionPageInner() {
 
             <div className="p-4">
               <div className="flex items-center justify-between mb-3">
-                <p className="text-[10px] font-bold text-white/25 uppercase tracking-widest">🏆 Top Participants</p>
-                <p className="text-[10px] text-white/20">echoes received</p>
+                <p className="text-[10px] font-bold text-white/55 uppercase tracking-widest">🏆 Top Participants</p>
+                <p className="text-[10px] text-white/50">Echoes received</p>
               </div>
               <div className="flex flex-col gap-3">
                 {leaderboard.map((p, i) => (
                   <div key={p.name} className="flex items-center gap-2.5">
-                    <span className={`text-xs font-bold w-4 text-center shrink-0 ${i === 0 ? 'text-brand-amber' : 'text-white/25'}`}>
+                    <span className={`text-xs font-bold w-4 text-center shrink-0 ${i === 0 ? 'text-brand-amber' : 'text-white/55'}`}>
                       {i + 1}
                     </span>
                     <Avatar name={p.name} color={p.color} size="xs" />
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-semibold text-white/70 truncate">{p.name}</p>
-                      <p className="text-[11px] text-white/30">{p.echoes} echoes received</p>
+                      <p className="text-[11px] text-white/60">{p.echoes} Echoes received</p>
                     </div>
                     <div
                       className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
-                        i === 0 ? 'bg-brand-amber/20 text-brand-amber' : 'bg-white/5 text-white/35'
+                        i === 0 ? 'bg-brand-amber/20 text-brand-amber' : 'bg-white/5 text-white/65'
                       }`}
                     >
                       {p.echoes}
@@ -862,7 +862,7 @@ function SessionPageInner() {
                 ))}
               </div>
               <button className="mt-4 text-xs text-brand-orange/70 hover:text-brand-orange transition-colors flex items-center gap-1">
-                See full leaderboard <span className="text-white/25">›</span>
+                See full leaderboard <span className="text-white/55">›</span>
               </button>
             </div>
           </aside>
@@ -880,7 +880,7 @@ function SessionPageInner() {
                 {similar.map(q => (
                   <div key={q.id} className="flex items-center gap-3">
                     <span className="text-brand-orange/60 text-xs font-bold shrink-0">↑ {q.echoes}</span>
-                    <p className="flex-1 text-xs text-white/55 line-clamp-1">{q.text}</p>
+                    <p className="flex-1 text-xs text-white/85 line-clamp-1">{q.text}</p>
                     <button
                       onClick={() => { echo(q.id); setDraft(''); }}
                       disabled={q.echoed || credits === 0}
@@ -906,19 +906,19 @@ function SessionPageInner() {
                       }`}
                     />
                   ))}
-                  <span className="text-[10px] text-white/30 ml-0.5">
-                    {credits} echo{credits !== 1 ? 's' : ''} left
+                  <span className="text-[10px] text-white/60 ml-0.5">
+                    {credits} credit{credits !== 1 ? 's' : ''} left
                   </span>
                 </div>
               </div>
 
               {submitted ? (
                 <div className="flex-1 py-2 text-center text-sm text-green-400 font-semibold animate-fade-up">
-                  ✓ Question submitted — others can echo it now
+                  ✓ Question submitted — the room can Echo it now
                 </div>
               ) : credits === 0 ? (
-                <div className="flex-1 py-2 text-center text-sm text-white/25">
-                  You&apos;ve used all your questions for this session
+                <div className="flex-1 py-2 text-center text-sm text-white/55">
+                  You&apos;re out of credits for this session — sit back and watch the Echoes roll in
                 </div>
               ) : (
                 <form onSubmit={submit} className="flex-1 flex items-center gap-2">
@@ -926,13 +926,13 @@ function SessionPageInner() {
                     <input
                       id="ask-input"
                       className="input text-sm !py-2.5 w-full pr-14"
-                      placeholder="Ask a question..."
+                      placeholder="What do you want to ask?"
                       value={draft}
                       onChange={e => setDraft(e.target.value.slice(0, 300))}
                     />
                     {draft.length > 0 && (
                       <span className={`absolute right-3 top-1/2 -translate-y-1/2 text-[11px] tabular-nums pointer-events-none ${
-                        draft.length >= 280 ? 'text-red-400' : 'text-white/25'
+                        draft.length >= 280 ? 'text-red-400' : 'text-white/55'
                       }`}>
                         {300 - draft.length}
                       </span>
@@ -944,7 +944,7 @@ function SessionPageInner() {
                     className={`hidden sm:block shrink-0 text-xs font-semibold px-3 py-2 rounded-lg border transition-all ${
                       isAnon
                         ? 'border-brand-purple/60 text-brand-purple-light bg-brand-purple/10'
-                        : 'border-brand-border text-white/35 hover:border-white/20'
+                        : 'border-brand-border text-white/65 hover:border-white/20'
                     }`}
                   >
                     {isAnon ? '🙈 Anon' : 'Anonymous'}
@@ -955,7 +955,7 @@ function SessionPageInner() {
                     className={`shrink-0 flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-bold transition-all ${
                       draft.trim()
                         ? 'bg-orange-gradient text-white shadow-orange-glow hover:brightness-110 active:scale-95'
-                        : 'bg-brand-card border border-brand-border text-white/20 cursor-default'
+                        : 'bg-brand-card border border-brand-border text-white/50 cursor-default'
                     }`}
                   >
                     <span className="sm:hidden">↑ Ask</span>
@@ -967,7 +967,7 @@ function SessionPageInner() {
           ) : (
             <div className="px-4 sm:px-6 py-3 flex items-center gap-3 text-sm">
               <span className="font-semibold text-brand-amber">🎤 Host view</span>
-              <span className="text-white/30 hidden sm:inline">
+              <span className="text-white/60 hidden sm:inline">
                 — Pin questions, mark answered, manage the feed
               </span>
             </div>

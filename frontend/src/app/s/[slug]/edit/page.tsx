@@ -154,14 +154,14 @@ export default function EditSessionPage({ params }: { params: { slug: string } }
   return (
     <div className="min-h-screen bg-brand-bg">
       <AppNav right={
-        <Link href={`/s/${params.slug}`} className="text-sm text-purple-200/50 hover:text-white transition-colors">
+        <Link href={`/s/${params.slug}`} className="text-sm text-purple-200/75 hover:text-white transition-colors">
           ← Back to session
         </Link>
       } />
 
       <main className="max-w-2xl mx-auto px-4 py-10">
         <h1 className="text-2xl font-extrabold text-white mb-1">Edit session</h1>
-        <p className="text-purple-200/50 text-sm mb-8">Changes take effect immediately.</p>
+        <p className="text-purple-200/75 text-sm mb-8">Changes take effect immediately.</p>
 
         <form onSubmit={handleSubmit} className="space-y-6">
 
@@ -211,7 +211,7 @@ export default function EditSessionPage({ params }: { params: { slug: string } }
                   />
                   <div>
                     <p className="text-white text-sm font-semibold">{opt.label}</p>
-                    <p className="text-purple-200/50 text-xs mt-0.5">{opt.desc}</p>
+                    <p className="text-purple-200/75 text-xs mt-0.5">{opt.desc}</p>
                   </div>
                 </label>
               ))}
@@ -326,7 +326,7 @@ export default function EditSessionPage({ params }: { params: { slug: string } }
                 </div>
                 <div>
                   <span className="text-sm text-white">Require approval for questions</span>
-                  <p className="text-xs text-purple-200/40 mt-0.5">Questions are hidden until you approve them</p>
+                  <p className="text-xs text-purple-200/70 mt-0.5">Questions are hidden until you approve them</p>
                 </div>
               </label>
             </div>
@@ -371,7 +371,7 @@ function FormField({ label, hint, children }: { label: string; hint?: string; ch
     <div>
       <label className="block text-sm font-semibold text-white mb-1.5">{label}</label>
       {children}
-      {hint && <p className="text-xs text-purple-200/40 mt-1.5">{hint}</p>}
+      {hint && <p className="text-xs text-purple-200/70 mt-1.5">{hint}</p>}
     </div>
   );
 }

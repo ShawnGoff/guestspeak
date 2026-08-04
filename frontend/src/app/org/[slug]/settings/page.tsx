@@ -215,15 +215,15 @@ export default function OrgSettingsPage({ params }: { params: { slug: string } }
     <div className="min-h-screen bg-brand-bg">
       <AppNav right={
         <>
-          <Link href={`/org/${org.slug}`} className="text-sm text-purple-200/50 hover:text-white transition-colors">View page</Link>
-          <Link href="/dashboard" className="text-sm text-purple-200/50 hover:text-white transition-colors">Dashboard</Link>
+          <Link href={`/org/${org.slug}`} className="text-sm text-purple-200/75 hover:text-white transition-colors">View page</Link>
+          <Link href="/dashboard" className="text-sm text-purple-200/75 hover:text-white transition-colors">Dashboard</Link>
         </>
       } />
 
       <main className="max-w-2xl mx-auto px-4 py-10 space-y-6">
         <div>
           <h1 className="text-2xl font-extrabold text-white">{org.name}</h1>
-          <p className="text-purple-200/40 text-sm mt-0.5">Channel settings</p>
+          <p className="text-purple-200/70 text-sm mt-0.5">Channel settings</p>
         </div>
 
         {/* ── Profile ───────────────────────────────────────────────────── */}
@@ -241,7 +241,7 @@ export default function OrgSettingsPage({ params }: { params: { slug: string } }
                 <img src={avatarPreview} alt="Channel photo" className="w-full h-full object-cover" />
               ) : (
                 <div className="flex items-center justify-center h-full">
-                  <svg className="w-6 h-6 text-purple-200/30 group-hover:text-brand-purple transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                  <svg className="w-6 h-6 text-purple-200/60 group-hover:text-brand-purple transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
                   </svg>
                 </div>
@@ -256,7 +256,7 @@ export default function OrgSettingsPage({ params }: { params: { slug: string } }
             </button>
             <div>
               <p className="text-sm font-semibold text-white mb-0.5">Channel photo</p>
-              <p className="text-xs text-purple-200/40">JPEG, PNG, or WebP · max 5 MB</p>
+              <p className="text-xs text-purple-200/70">JPEG, PNG, or WebP · max 5 MB</p>
               <button type="button" onClick={() => fileRef.current?.click()} className="mt-2 text-xs text-brand-orange hover:text-brand-amber transition-colors">
                 {avatarPreview ? 'Change photo' : 'Upload photo'}
               </button>
@@ -329,7 +329,7 @@ export default function OrgSettingsPage({ params }: { params: { slug: string } }
                     className={`flex items-center gap-2 px-3 py-2 rounded-xl border cursor-pointer transition-colors text-sm ${
                       checked
                         ? 'border-brand-purple bg-brand-purple/10 text-white'
-                        : 'border-brand-border text-purple-200/50 hover:border-brand-border/80'
+                        : 'border-brand-border text-purple-200/75 hover:border-brand-border/80'
                     }`}
                   >
                     <input
@@ -367,7 +367,7 @@ export default function OrgSettingsPage({ params }: { params: { slug: string } }
 
           {/* Add member */}
           <div className="space-y-3">
-            <p className="text-xs text-purple-200/50 font-semibold">Add member</p>
+            <p className="text-xs text-purple-200/75 font-semibold">Add member</p>
             <div className="flex gap-2">
               <div className="relative flex-1">
                 <input
@@ -401,7 +401,7 @@ export default function OrgSettingsPage({ params }: { params: { slug: string } }
                 <option value="admin">Admin</option>
               </select>
             </div>
-            <p className="text-xs text-purple-200/30">
+            <p className="text-xs text-purple-200/60">
               Admins can manage all sessions and members. Members are listed under the channel but have no special access.
             </p>
           </div>
@@ -412,7 +412,7 @@ export default function OrgSettingsPage({ params }: { params: { slug: string } }
               <div key={m.user_id} className="flex items-center justify-between py-2 border-b border-brand-border/20 last:border-0">
                 <div>
                   <span className="text-sm text-white font-medium">@{m.username}</span>
-                  <span className="ml-2 text-xs text-purple-200/40">{m.email}</span>
+                  <span className="ml-2 text-xs text-purple-200/70">{m.email}</span>
                 </div>
                 <div className="flex items-center gap-3">
                   <RoleBadge role={m.role} />
@@ -433,7 +433,7 @@ export default function OrgSettingsPage({ params }: { params: { slug: string } }
         {/* ── Public page ──────────────────────────────────────────────── */}
         <div className="card p-6 space-y-3">
           <h2 className="text-xs font-bold text-brand-orange uppercase tracking-widest">Public page</h2>
-          <p className="text-sm text-purple-200/50">
+          <p className="text-sm text-purple-200/75">
             Your public channel page is at{' '}
             <Link href={`/org/${org.slug}`} className="text-brand-orange hover:underline">
               /org/{org.slug}
@@ -449,7 +449,7 @@ export default function OrgSettingsPage({ params }: { params: { slug: string } }
             <div className="flex items-center justify-between gap-4">
               <div>
                 <p className="text-sm font-medium text-white">Delete this channel</p>
-                <p className="text-xs text-purple-200/40 mt-0.5">
+                <p className="text-xs text-purple-200/70 mt-0.5">
                   Permanently removes the channel. Past sessions become personal sessions.
                 </p>
               </div>
@@ -474,7 +474,7 @@ function OrgField({ label, hint, children }: { label: string; hint?: string; chi
     <div>
       <label className="block text-sm font-semibold text-white mb-1.5">{label}</label>
       {children}
-      {hint && <p className="text-xs text-purple-200/40 mt-1.5">{hint}</p>}
+      {hint && <p className="text-xs text-purple-200/70 mt-1.5">{hint}</p>}
     </div>
   );
 }
@@ -483,8 +483,8 @@ function RoleBadge({ role }: { role: string }) {
   const styles = {
     owner: 'bg-brand-orange/20 text-brand-orange',
     admin: 'bg-brand-purple/20 text-brand-amber',
-    member: 'bg-brand-border/20 text-purple-200/50',
-  }[role] ?? 'bg-brand-border/20 text-purple-200/50';
+    member: 'bg-brand-border/20 text-purple-200/75',
+  }[role] ?? 'bg-brand-border/20 text-purple-200/75';
 
   return (
     <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${styles}`}>
@@ -509,7 +509,7 @@ function NotFound() {
       <div className="text-center card p-8 max-w-sm">
         <p className="text-4xl mb-3">🔒</p>
         <h2 className="text-white font-bold text-lg mb-2">Not found</h2>
-        <p className="text-purple-200/50 text-sm mb-6">This channel doesn't exist or you don't have access.</p>
+        <p className="text-purple-200/75 text-sm mb-6">This channel doesn't exist or you don't have access.</p>
         <Link href="/dashboard" className="btn-primary">Go to dashboard</Link>
       </div>
     </div>

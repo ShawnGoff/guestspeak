@@ -147,7 +147,7 @@ export default function NotificationBell() {
         onClick={handleOpen}
         title="Notifications"
         className={`relative transition-colors p-1 ${
-          open ? 'text-brand-amber' : 'text-purple-200/40 hover:text-white'
+          open ? 'text-brand-amber' : 'text-purple-200/70 hover:text-white'
         }`}
       >
         <BellIcon />
@@ -171,7 +171,7 @@ export default function NotificationBell() {
             {unreadCount > 0 && (
               <button
                 onClick={markAllRead}
-                className="text-xs text-purple-200/40 hover:text-brand-orange transition-colors"
+                className="text-xs text-purple-200/70 hover:text-brand-orange transition-colors"
               >
                 Mark all read
               </button>
@@ -189,8 +189,8 @@ export default function NotificationBell() {
             ) : notifications.length === 0 ? (
               <div className="py-12 text-center">
                 <p className="text-2xl mb-2">🔔</p>
-                <p className="text-sm text-purple-200/40">No notifications yet.</p>
-                <p className="text-xs text-purple-200/25 mt-1">
+                <p className="text-sm text-purple-200/70">No notifications yet.</p>
+                <p className="text-xs text-purple-200/55 mt-1">
                   Follow channels to get notified when they go live.
                 </p>
               </div>
@@ -208,10 +208,10 @@ export default function NotificationBell() {
                   >
                     <span className="text-base flex-shrink-0 mt-0.5">{icon}</span>
                     <div className="flex-1 min-w-0">
-                      <p className={`text-xs leading-snug ${isUnread ? 'text-white font-medium' : 'text-purple-200/60'}`}>
+                      <p className={`text-xs leading-snug ${isUnread ? 'text-white font-medium' : 'text-purple-200/85'}`}>
                         {text}
                       </p>
-                      <p className="text-[10px] text-purple-200/30 mt-1">{timeAgo(n.created_at)}</p>
+                      <p className="text-[10px] text-purple-200/60 mt-1">{timeAgo(n.created_at)}</p>
                     </div>
                     {isUnread && (
                       <span className="w-1.5 h-1.5 rounded-full bg-brand-orange flex-shrink-0 mt-1.5" />

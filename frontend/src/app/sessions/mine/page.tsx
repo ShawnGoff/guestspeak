@@ -83,7 +83,7 @@ export default function MySessionsPage() {
         <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-2xl font-extrabold text-white">My Sessions</h1>
-            <p className="text-purple-200/40 text-sm mt-0.5">All sessions you've hosted.</p>
+            <p className="text-purple-200/70 text-sm mt-0.5">All sessions you've hosted.</p>
           </div>
           <Link href="/create" className="btn-primary text-sm py-2 px-4">+ New session</Link>
         </div>
@@ -95,7 +95,7 @@ export default function MySessionsPage() {
               key={f.value}
               onClick={() => setFilter(f.value)}
               className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
-                filter === f.value ? 'bg-brand-purple text-white' : 'text-purple-200/50 hover:text-white'
+                filter === f.value ? 'bg-brand-purple text-white' : 'text-purple-200/75 hover:text-white'
               }`}
             >
               {f.label}
@@ -157,9 +157,9 @@ function SessionRow({ session: s, onCopy, copiedCode, onDelete, isDeleting }: {
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 mb-1 flex-wrap">
           <StatusBadge status={s.status} />
-          {s.org_name && <span className="text-xs text-purple-200/40">{s.org_name}</span>}
+          {s.org_name && <span className="text-xs text-purple-200/70">{s.org_name}</span>}
           {s.visibility !== 'public' && (
-            <span className="text-xs px-2 py-0.5 rounded-full border border-brand-border/50 text-purple-200/30">
+            <span className="text-xs px-2 py-0.5 rounded-full border border-brand-border/50 text-purple-200/60">
               {s.visibility}
             </span>
           )}
@@ -167,7 +167,7 @@ function SessionRow({ session: s, onCopy, copiedCode, onDelete, isDeleting }: {
         <Link href={`/s/${s.slug}`} className="font-bold text-white hover:text-brand-amber transition-colors line-clamp-1">
           {s.title}
         </Link>
-        <div className="flex items-center gap-4 mt-1 text-xs text-purple-200/40">
+        <div className="flex items-center gap-4 mt-1 text-xs text-purple-200/70">
           <span>{s.participant_count} joined</span>
           <span>{s.question_count} questions</span>
           {s.starts_at && s.status !== 'live' && (
@@ -204,7 +204,7 @@ function SessionRow({ session: s, onCopy, copiedCode, onDelete, isDeleting }: {
             onClick={() => onDelete(s.id, s.title)}
             disabled={isDeleting}
             title="Delete session"
-            className="text-purple-200/30 hover:text-red-400 transition-colors disabled:opacity-40 p-1.5"
+            className="text-purple-200/60 hover:text-red-400 transition-colors disabled:opacity-40 p-1.5"
           >
             {isDeleting ? <span className="text-xs">…</span> : <TrashIcon />}
           </button>
@@ -226,7 +226,7 @@ function StatusBadge({ status }: { status: MySession['status'] }) {
     <span className="px-2 py-0.5 rounded-full bg-brand-orange/20 text-brand-orange text-xs font-semibold">Upcoming</span>
   );
   return (
-    <span className="px-2 py-0.5 rounded-full bg-brand-border/30 text-purple-200/40 text-xs font-semibold">Archived</span>
+    <span className="px-2 py-0.5 rounded-full bg-brand-border/30 text-purple-200/70 text-xs font-semibold">Archived</span>
   );
 }
 

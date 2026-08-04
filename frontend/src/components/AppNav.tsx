@@ -44,7 +44,7 @@ function UserMenu({ user }: { user: AuthUser }) {
       <button
         onClick={() => setOpen(v => !v)}
         title={`@${user.username}`}
-        className={`transition-colors p-1 ${open ? 'text-brand-amber' : 'text-purple-200/40 hover:text-white'}`}
+        className={`transition-colors p-1 ${open ? 'text-brand-amber' : 'text-purple-200/70 hover:text-white'}`}
       >
         <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <circle cx="12" cy="8" r="4" />
@@ -54,13 +54,13 @@ function UserMenu({ user }: { user: AuthUser }) {
 
       {open && (
         <div className="absolute right-0 top-full mt-2 w-44 bg-brand-card border border-brand-border rounded-xl shadow-2xl overflow-hidden z-50 py-1">
-          <p className="px-4 py-2 text-xs text-purple-200/40 border-b border-brand-border/50 truncate">
+          <p className="px-4 py-2 text-xs text-purple-200/70 border-b border-brand-border/50 truncate">
             @{user.username}
           </p>
           <Link
             href="/settings"
             onClick={() => setOpen(false)}
-            className="flex items-center gap-2 px-4 py-2.5 text-sm text-purple-200/70 hover:text-white hover:bg-brand-border/20 transition-colors"
+            className="flex items-center gap-2 px-4 py-2.5 text-sm text-purple-200/90 hover:text-white hover:bg-brand-border/20 transition-colors"
           >
             Settings
           </Link>
@@ -101,7 +101,7 @@ export default function AppNav({
             className={`text-sm font-medium transition-colors ${
               pathname === '/discover'
                 ? 'text-brand-amber'
-                : 'text-purple-200/50 hover:text-white'
+                : 'text-purple-200/75 hover:text-white'
             }`}
           >
             Discover

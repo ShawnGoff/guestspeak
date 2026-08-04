@@ -37,8 +37,8 @@ export default function LoginPage() {
 
   return (
     <AuthShell
-      title="Host or join a session"
-      subtitle="Create a free account or sign in to get started."
+      title="Take the mic"
+      subtitle="Sign in or create a free account — you only need one to host or moderate."
       footer={<>Just here to ask questions? <Link href="/" className="text-brand-orange hover:text-brand-amber">Continue as guest</Link></>}
     >
       {/* Primary CTA for new users */}
@@ -51,7 +51,7 @@ export default function LoginPage() {
           <div className="w-full border-t border-brand-border" />
         </div>
         <div className="relative flex justify-center">
-          <span className="bg-brand-card px-3 text-xs text-purple-200/40">already have an account?</span>
+          <span className="bg-brand-card px-3 text-xs text-purple-200/70">already have one? sign in</span>
         </div>
       </div>
 
@@ -59,7 +59,7 @@ export default function LoginPage() {
         <Field label="Email or username" type="text" value={email} onChange={setEmail} placeholder="you@example.com or @handle" />
         <div>
           <div className="flex items-center justify-between mb-1.5">
-            <label className="block text-xs font-semibold text-purple-200/60">Password</label>
+            <label className="block text-xs font-semibold text-purple-200/85">Password</label>
             <Link href="/forgot-password" className="text-xs text-brand-orange hover:text-brand-amber transition-colors">Forgot password?</Link>
           </div>
           <input
@@ -108,11 +108,11 @@ export function AuthShell({ title, subtitle, children, footer }: {
         {/* Card */}
         <div className="card p-7">
           <h1 className="text-xl font-bold text-white mb-1">{title}</h1>
-          <p className="text-purple-200/50 text-sm mb-6">{subtitle}</p>
+          <p className="text-purple-200/75 text-sm mb-6">{subtitle}</p>
           {children}
         </div>
 
-        <p className="text-center text-sm text-purple-200/40 mt-5">{footer}</p>
+        <p className="text-center text-sm text-purple-200/70 mt-5">{footer}</p>
       </div>
     </div>
   );
@@ -127,7 +127,7 @@ export function Field({ label, type, value, onChange, placeholder }: {
 }) {
   return (
     <div>
-      <label className="block text-xs font-semibold text-purple-200/60 mb-1.5">{label}</label>
+      <label className="block text-xs font-semibold text-purple-200/85 mb-1.5">{label}</label>
       <input
         type={type}
         value={value}

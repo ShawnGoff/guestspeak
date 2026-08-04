@@ -19,8 +19,8 @@ export default function RegisterPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    if (password !== confirm) { setError('Passwords do not match'); return; }
-    if (password.length < 8)  { setError('Password must be at least 8 characters'); return; }
+    if (password !== confirm) { setError('Those passwords don\'t match — give it another try.'); return; }
+    if (password.length < 8)  { setError('Passwords need at least 8 characters.'); return; }
     setLoading(true);
     try {
       const res = await api.post<{ token: string; user: any }>('/auth/register', {
@@ -38,7 +38,7 @@ export default function RegisterPage() {
   return (
     <AuthShell
       title="Create your account"
-      subtitle="Free forever. Only needed to host or moderate."
+      subtitle="Free, forever — and only needed if you're hosting or moderating."
       footer={<>Already have one? <Link href="/login" className="text-brand-orange hover:text-brand-amber">Sign in</Link></>}
     >
       <form onSubmit={handleSubmit} className="space-y-4">
@@ -54,8 +54,8 @@ export default function RegisterPage() {
         </button>
       </form>
 
-      <p className="text-center text-xs text-purple-200/30 mt-5">
-        No account needed to join a session as a guest.
+      <p className="text-center text-xs text-purple-200/60 mt-5">
+        Just joining a session? You don&apos;t need an account for that.
       </p>
     </AuthShell>
   );

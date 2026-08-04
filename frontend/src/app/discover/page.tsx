@@ -31,7 +31,7 @@ export default function DiscoverPage() {
       const session = await api.get<{ slug: string }>(`/sessions/code/${joinCode.trim().toUpperCase()}`);
       router.push(`/s/${session.slug}`);
     } catch {
-      setJoinError('No session found with that code.');
+      setJoinError('That code didn\'t match a session — double-check it and try again.');
       setJoining(false);
     }
   }
@@ -171,14 +171,14 @@ export default function DiscoverPage() {
         {/* Header */}
         <div className="mb-6">
           <h1 className="text-3xl font-extrabold text-white mb-1">Discover</h1>
-          <p className="text-purple-200/50 text-sm">Find live Q&amp;As and channels near you.</p>
+          <p className="text-purple-200/75 text-sm">Find live sessions and channels near you.</p>
         </div>
 
         {/* Join by code */}
         <div className="card p-4 mb-4">
           <form onSubmit={handleJoin} className="flex gap-2">
             <div className="flex-1 relative">
-              <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-purple-200/30 pointer-events-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-purple-200/60 pointer-events-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
               </svg>
               <input
@@ -206,7 +206,7 @@ export default function DiscoverPage() {
           <form onSubmit={handleCitySearch} className="flex flex-col sm:flex-row gap-2">
             {/* Channel / show name */}
             <div className="relative flex-1">
-              <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-purple-200/30 pointer-events-none" />
+              <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-purple-200/60 pointer-events-none" />
               <input
                 value={nameQuery}
                 onChange={e => handleNameChange(e.target.value)}
@@ -217,7 +217,7 @@ export default function DiscoverPage() {
 
             {/* City */}
             <div className="relative flex-1">
-              <LocationIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-purple-200/30 pointer-events-none" />
+              <LocationIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-purple-200/60 pointer-events-none" />
               <input
                 value={locationStatus === 'granted' ? '' : cityInput}
                 onChange={e => handleCityInputChange(e.target.value)}
@@ -243,7 +243,7 @@ export default function DiscoverPage() {
               className={`flex items-center gap-1.5 text-sm font-medium px-4 py-2.5 rounded-xl border flex-shrink-0 transition-colors ${
                 locationStatus === 'granted'    ? 'border-emerald-700/50 bg-emerald-900/20 text-emerald-400 cursor-default' :
                 locationStatus === 'denied'     ? 'border-red-700/50 bg-red-900/20 text-red-400 cursor-default' :
-                locationStatus === 'requesting' ? 'border-brand-border text-purple-200/40 cursor-wait' :
+                locationStatus === 'requesting' ? 'border-brand-border text-purple-200/70 cursor-wait' :
                 'border-brand-border text-brand-orange hover:border-brand-purple hover:text-brand-amber'
               }`}
             >
@@ -254,7 +254,7 @@ export default function DiscoverPage() {
 
           {/* Category chips — filter channels */}
           <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t border-brand-border/40">
-            <span className="text-xs text-purple-200/30 self-center mr-1">Filter channels:</span>
+            <span className="text-xs text-purple-200/60 self-center mr-1">Filter channels:</span>
             {ORG_CATEGORIES.map(cat => (
               <button
                 key={cat}
@@ -262,7 +262,7 @@ export default function DiscoverPage() {
                 className={`px-3 py-1 rounded-full text-xs font-semibold transition-colors ${
                   activeCategory === cat
                     ? 'bg-brand-orange text-white'
-                    : 'bg-brand-bg border border-brand-border text-purple-200/50 hover:border-brand-purple'
+                    : 'bg-brand-bg border border-brand-border text-purple-200/75 hover:border-brand-purple'
                 }`}
               >
                 {cat}
@@ -288,7 +288,7 @@ export default function DiscoverPage() {
             <Section
               title="Live Now"
               badge={<LiveBadge />}
-              empty="No sessions live right now. Check back soon."
+              empty="Nothing live at the moment — check back soon, or start your own."
             >
               {(data?.live_now ?? []).map(s => (
                 <SessionCard key={s.id} session={s} showDistance={false} />
@@ -298,7 +298,7 @@ export default function DiscoverPage() {
             {/* Nearby / Upcoming */}
             <Section
               title={citySearch ? `Near "${citySearch}"` : locationStatus === 'granted' ? 'Nearby' : 'Upcoming'}
-              empty="No upcoming sessions found. Try a different city."
+              empty="No upcoming sessions here yet — try a different city."
               className="mt-10"
             >
               {(data?.nearby ?? []).map(s => (
@@ -310,7 +310,7 @@ export default function DiscoverPage() {
             <section className="mt-14">
               <div className="flex items-center gap-2 mb-4">
                 <h2 className="text-lg font-bold text-white">Channels</h2>
-                <span className="text-xs text-purple-200/40">Shows, stations, podcasts &amp; more</span>
+                <span className="text-xs text-purple-200/70">Shows, stations, podcasts &amp; more</span>
               </div>
 
               {channelsLoading && (
@@ -319,8 +319,8 @@ export default function DiscoverPage() {
                 </div>
               )}
               {!channelsLoading && channels !== null && channels.length === 0 && (
-                <p className="text-purple-200/40 text-sm text-center py-6 border border-dashed border-brand-border/30 rounded-2xl">
-                  No channels found. Try a different search.
+                <p className="text-purple-200/70 text-sm text-center py-6 border border-dashed border-brand-border/30 rounded-2xl">
+                  No channels matched — try a different search.
                 </p>
               )}
               {!channelsLoading && channels !== null && channels.length > 0 && (
@@ -352,7 +352,7 @@ function Section({ title, badge, children, empty, className }: {
         {badge}
       </div>
       {children.length === 0 ? (
-        <p className="text-purple-200/40 text-sm py-6 text-center border border-dashed border-brand-border/30 rounded-2xl">
+        <p className="text-purple-200/70 text-sm py-6 text-center border border-dashed border-brand-border/30 rounded-2xl">
           {empty}
         </p>
       ) : (
@@ -425,10 +425,10 @@ function SessionCard({ session, showDistance }: { session: Session & { distance_
       </div>
 
       {session.description && (
-        <p className="text-purple-200/50 text-xs leading-relaxed line-clamp-2">{session.description}</p>
+        <p className="text-purple-200/75 text-xs leading-relaxed line-clamp-2">{session.description}</p>
       )}
 
-      <div className="flex items-center justify-between text-xs text-purple-200/40 mt-auto pt-1">
+      <div className="flex items-center justify-between text-xs text-purple-200/70 mt-auto pt-1">
         <span>{session.host_username}</span>
         <div className="flex items-center gap-3">
           {showDistance && session.distance_km !== undefined && (
@@ -461,7 +461,7 @@ function ChannelCard({ org }: { org: OrgSearchResult }) {
         {org.avatar_url ? (
           <img src={resolveAsset(org.avatar_url)} alt={org.name} className="w-full h-full object-cover" />
         ) : (
-          <span className="text-lg font-bold text-purple-200/30">
+          <span className="text-lg font-bold text-purple-200/60">
             {org.name.charAt(0).toUpperCase()}
           </span>
         )}
@@ -483,10 +483,10 @@ function ChannelCard({ org }: { org: OrgSearchResult }) {
         )}
 
         {org.description && (
-          <p className="text-purple-200/40 text-xs mt-1.5 line-clamp-1">{org.description}</p>
+          <p className="text-purple-200/70 text-xs mt-1.5 line-clamp-1">{org.description}</p>
         )}
 
-        <div className="flex items-center gap-3 mt-1.5 text-xs text-purple-200/30">
+        <div className="flex items-center gap-3 mt-1.5 text-xs text-purple-200/60">
           {org.city && (
             <span className="flex items-center gap-1">
               <LocationIcon className="w-3 h-3" />
