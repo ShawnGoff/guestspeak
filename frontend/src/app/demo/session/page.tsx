@@ -39,63 +39,63 @@ type Participant = {
 
 const BASE_TS = Date.now();
 
-const SEED_TECH: Q[] = [
+const SEED_MUSIC: Q[] = [
   {
     id: 1,
-    text: 'How do you decide between fine-tuning, RAG, and prompt engineering for a given feature?',
-    echoes: 92, echoed: false, answered: false, pinned: true,
-    author: 'curious_dev_91', authorColor: '#7C3AED',
-    ago: '2m ago', tags: ['Architecture', 'RAG', 'Fine-tuning'], comments: 12,
+    text: "What's the story behind the title track — it feels way more personal than anything you've released before?",
+    echoes: 129, echoed: false, answered: false, pinned: true,
+    author: 'superfan_sadie', authorColor: '#7C3AED',
+    ago: '2m ago', tags: ['Songwriting', 'Album'], comments: 14,
     ts: BASE_TS - 120000,
-    supporters: ['design_thinker_77', 'luma_builds', 'syntax_seeker', 'metric_mind_33'],
+    supporters: ['record_collector', 'backstage_beats', 'melody_chaser', 'vinyl_vibes'],
   },
   {
     id: 2,
-    text: "What's your evaluation pipeline for catching regressions when you update a prompt?",
-    echoes: 48, echoed: false, answered: false, pinned: false,
-    author: 'design_thinker_77', authorColor: '#059669',
-    ago: '4m ago', tags: ['Evals', 'Testing', 'Prompt Eng'], comments: 12,
+    text: "Which collab on this record surprised you the most — and how did it come together?",
+    echoes: 87, echoed: false, answered: false, pinned: false,
+    author: 'record_collector', authorColor: '#059669',
+    ago: '4m ago', tags: ['Collabs', 'Process'], comments: 9,
     ts: BASE_TS - 240000,
   },
   {
     id: 3,
-    text: 'How are you handling rate limits and fallback logic when the AI provider goes down?',
-    echoes: 36, echoed: false, answered: false, pinned: false,
-    author: 'luma_builds', authorColor: '#DC2626',
-    ago: '5m ago', tags: ['Reliability', 'Infra'], comments: 8,
-    ts: BASE_TS - 300000,
+    text: "There's a lyric in track 4 that feels like it's about a specific moment. Are you ever nervous about how specific you get?",
+    echoes: 65, echoed: false, answered: false, pinned: false,
+    author: 'anon', authorColor: '#DC2626',
+    ago: '6m ago', tags: ['Lyrics', 'Vulnerability'], comments: 11,
+    ts: BASE_TS - 360000,
   },
   {
     id: 4,
-    text: 'What does your AI observability stack look like — are you logging completions in prod?',
-    echoes: 29, echoed: false, answered: false, pinned: false,
-    author: 'syntax_seeker', authorColor: '#D97706',
-    ago: '7m ago', tags: ['Observability', 'Logging', 'Prod'], comments: 6,
-    ts: BASE_TS - 420000,
+    text: "How do you decide what makes the final cut vs what stays in the vault?",
+    echoes: 44, echoed: false, answered: false, pinned: false,
+    author: 'backstage_beats', authorColor: '#D97706',
+    ago: '8m ago', tags: ['A&R', 'Editing'], comments: 6,
+    ts: BASE_TS - 480000,
   },
   {
     id: 5,
-    text: 'How do you keep inference costs predictable as usage scales — any caching strategies?',
-    echoes: 115, echoed: false, answered: true, pinned: false,
-    author: 'metric_mind_33', authorColor: '#2563EB',
-    ago: '9m ago', tags: ['Cost', 'Caching', 'Scale'], comments: 4,
-    ts: BASE_TS - 540000,
+    text: "Which song from this album are you most excited to finally play live?",
+    echoes: 108, echoed: false, answered: true, pinned: false,
+    author: 'melody_chaser', authorColor: '#2563EB',
+    ago: '10m ago', tags: ['Tour', 'Live'], comments: 5,
+    ts: BASE_TS - 600000,
   },
   {
     id: 6,
-    text: 'Will the platform support bring-your-own-model for enterprise customers?',
-    echoes: 8, echoed: false, answered: true, pinned: false,
-    author: 'token_engineer', authorColor: '#7C3AED',
-    ago: '12m ago', tags: ['Enterprise', 'Roadmap'], comments: 3,
-    ts: BASE_TS - 720000,
+    text: "Do you write to a beat or melody first, or does it change every time?",
+    echoes: 31, echoed: false, answered: false, pinned: false,
+    author: 'vinyl_vibes', authorColor: '#0891B2',
+    ago: '13m ago', tags: ['Process', 'Writing'], comments: 4,
+    ts: BASE_TS - 780000,
   },
   {
     id: 7,
-    text: 'How do you prevent prompt injection when end users can influence the system prompt?',
-    echoes: 3, echoed: false, answered: false, pinned: false,
-    author: 'credit_curious', authorColor: '#DC2626',
-    ago: '14m ago', tags: ['Security', 'Prompt Injection'], comments: 2,
-    ts: BASE_TS - 840000,
+    text: "Will the vault tracks ever see the light of day — or are some locked forever?",
+    echoes: 19, echoed: false, answered: true, pinned: false,
+    author: 'midnight_listener', authorColor: '#7C3AED',
+    ago: '15m ago', tags: ['Vault', 'Unreleased'], comments: 3,
+    ts: BASE_TS - 900000,
   },
 ];
 
@@ -207,7 +207,7 @@ function getSeed(title: string): Q[] {
   const t = title.toLowerCase();
   if (t.includes('coach') || t.includes('nba') || t.includes('playoff') || t.includes('pulse')) return SEED_NBA;
   if (t.includes('startup') || t.includes('demo day') || t.includes('pitch') || t.includes('founder')) return SEED_STARTUP;
-  return SEED_TECH;
+  return SEED_MUSIC;
 }
 
 function getAutoQ(title: string): Pick<Q, 'text' | 'tags'> {
@@ -216,25 +216,25 @@ function getAutoQ(title: string): Pick<Q, 'text' | 'tags'> {
     return { text: 'Which young player on your roster has surprised you the most this season?', tags: ['Roster', 'Development'] };
   if (t.includes('startup') || t.includes('demo day') || t.includes('pitch') || t.includes('founder'))
     return { text: "What's the one metric you obsess over above all others right now?", tags: ['Metrics', 'Focus'] };
-  return { text: 'How do you keep the team aligned when priorities shift quickly?', tags: ['Team', 'Strategy'] };
+  return { text: 'Is there a song that almost didn\'t make the album that you\'re now really glad is on it?', tags: ['Songwriting', 'Album'] };
 }
 
 const INIT_ACTIVITY: ActivityItem[] = [
   { id: 1, kind: 'host',     text: 'Host is answering a question',           time: 'just now' },
   { id: 2, kind: 'echo',     text: '+3 echoes for the top question',         time: '6s ago' },
-  { id: 3, kind: 'question', text: 'luma_builds asked a question',           time: '11s ago' },
-  { id: 4, kind: 'echo',     text: 'design_thinker_77 echoed a question',    time: '18s ago' },
+  { id: 3, kind: 'question', text: 'backstage_beats asked a question',       time: '11s ago' },
+  { id: 4, kind: 'echo',     text: 'record_collector echoed a question',     time: '18s ago' },
   { id: 5, kind: 'move',     text: 'Question moved up the feed',             time: '25s ago' },
 ];
 
 const ACTIVITY_POOL: Pick<ActivityItem, 'kind' | 'text'>[] = [
-  { kind: 'echo',     text: 'syntax_seeker echoed a question' },
-  { kind: 'echo',     text: 'metric_mind_33 echoed the top question' },
+  { kind: 'echo',     text: 'vinyl_vibes echoed a question' },
+  { kind: 'echo',     text: 'melody_chaser echoed the top question' },
   { kind: 'echo',     text: '+2 echoes for question #2' },
-  { kind: 'echo',     text: 'token_engineer echoed a question' },
+  { kind: 'echo',     text: 'midnight_listener echoed a question' },
   { kind: 'echo',     text: '+3 echoes in the last 30s' },
-  { kind: 'question', text: 'new_arrival_52 asked a question' },
-  { kind: 'question', text: 'curious_dev_91 asked a follow-up' },
+  { kind: 'question', text: 'superfan_sadie asked a question' },
+  { kind: 'question', text: 'record_collector asked a follow-up' },
   { kind: 'move',     text: 'Question moved up the feed' },
   { kind: 'move',     text: 'A question climbed to #2' },
   { kind: 'host',     text: 'Host pinned a new question' },
@@ -244,15 +244,27 @@ const ACTIVITY_POOL: Pick<ActivityItem, 'kind' | 'text'>[] = [
 
 // Static color lookup for known seed authors (used for supporter avatars)
 const AUTHOR_COLORS: Record<string, string> = {
-  'design_thinker_77': '#059669',
-  'curious_dev_91':    '#7C3AED',
-  'luma_builds':       '#DC2626',
-  'syntax_seeker':     '#D97706',
-  'metric_mind_33':    '#2563EB',
-  'token_engineer':    '#7C3AED',
-  'credit_curious':    '#DC2626',
-  'new_arrival_52':    '#0891B2',
-  'stellar_wave_88':   '#0891B2',
+  'superfan_sadie':    '#7C3AED',
+  'record_collector':  '#059669',
+  'backstage_beats':   '#DC2626',
+  'melody_chaser':     '#D97706',
+  'vinyl_vibes':       '#2563EB',
+  'midnight_listener': '#7C3AED',
+  'anon':              '#6B7280',
+  // NBA
+  'courtside_kai':     '#DC2626',
+  'hoop_dreams_4':     '#059669',
+  'lakeshow_liv':      '#7C3AED',
+  'the_stat_line':     '#D97706',
+  'bench_mob_77':      '#2563EB',
+  'paint_and_pick':    '#0891B2',
+  // Startup
+  'venture_vince':     '#7C3AED',
+  'founding_vibes':    '#059669',
+  'seed_round_sue':    '#DC2626',
+  'angel_alicia':      '#D97706',
+  'cap_table_cal':     '#2563EB',
+  'operator_opal':     '#0891B2',
 };
 
 const ACTIVITY_STYLES: Record<ActivityItem['kind'], { bg: string; color: string; icon: string }> = {
