@@ -171,9 +171,8 @@ export async function getOrg(req: Request, res: Response, next: NextFunction) {
          COALESCE(SUM(q.vote_count), 0)::int AS total_echoes
        FROM questions q
        JOIN sessions s ON s.id = q.session_id
-       JOIN session_participants sp ON sp.id = q.participant_id
-       JOIN users u ON u.id = sp.user_id
-       WHERE s.org_id = $1 AND q.status != 'hidden' AND sp.user_id IS NOT NULL
+       JOIN users u ON u.id = q.author_id
+       WHERE s.org_id = $1 AND q.status != 'hidden' AND q.author_id IS NOT NULL
        GROUP BY u.id, u.username
        ORDER BY total_echoes DESC, question_count DESC
        LIMIT 5`,
@@ -183,13 +182,12 @@ export async function getOrg(req: Request, res: Response, next: NextFunction) {
     // Top 3 question highlights: highest-voted questions from closed sessions
     const highlightsResult = await pool.query(
       `SELECT
-         q.id, q.text, q.vote_count, q.answered_at IS NOT NULL AS is_answered,
+         q.id, q.body AS text, q.vote_count, (q.status = 'answered') AS is_answered,
          s.title AS session_title, s.slug AS session_slug,
          COALESCE(u.username, 'Anonymous') AS author_username
        FROM questions q
        JOIN sessions s ON s.id = q.session_id
-       JOIN session_participants sp ON sp.id = q.participant_id
-       LEFT JOIN users u ON u.id = sp.user_id
+       LEFT JOIN users u ON u.id = q.author_id
        WHERE s.org_id = $1
          AND q.status != 'hidden'
          AND q.vote_count > 0
