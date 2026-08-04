@@ -8,8 +8,10 @@ import { AppError } from '../middleware/errorHandler';
 const CreateOrgSchema = z.object({
   name: z.string().min(1).max(255),
   description: z.string().optional(),
-  avatar_url: z.string().url().optional(),
-  website: z.string().url().optional(),
+  // avatar_url is a relative path from our own upload system — not user-entered, no URL format required
+  avatar_url: z.string().optional(),
+  // website is user-entered; strip empty strings before validating
+  website: z.preprocess(v => (v === '' ? undefined : v), z.string().url().optional()),
   city:    z.string().max(100).optional(),
   region:  z.string().max(100).optional(),
   country: z.string().max(100).optional(),
