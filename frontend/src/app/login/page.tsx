@@ -84,8 +84,6 @@ export default function LoginPage() {
 
 // ─── Register page ────────────────────────────────────────────────────────────
 
-export function RegisterPage() { return null; } // exported below in register/page.tsx
-
 // ─── Shared components ────────────────────────────────────────────────────────
 
 export function AuthShell({ title, subtitle, children, footer }: {

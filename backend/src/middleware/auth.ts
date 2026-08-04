@@ -1,10 +1,13 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
+import { pool } from '../db/pool';
 
 export interface JwtPayload {
   userId: string;
   isGuest: boolean;
   guestToken?: string;
+  /** token_version at sign time — used to invalidate tokens on password change */
+  v?: number;
 }
 
 declare global {
@@ -22,14 +25,29 @@ const JWT_SECRET = process.env.JWT_SECRET!;
  * Attaches decoded payload to req.user.
  * Returns 401 if missing or invalid.
  */
-export function requireAuth(req: Request, res: Response, next: NextFunction) {
-  const token = extractToken(req);
+export async function requireAuth(req: Request, res: Response, next: NextFunction) {
+  const token = extractToken(req, false);
   if (!token) {
     res.status(401).json({ error: 'Authentication required' });
     return;
   }
   try {
-    req.user = jwt.verify(token, JWT_SECRET) as JwtPayload;
+    const payload = jwt.verify(token, JWT_SECRET) as JwtPayload;
+
+    // For registered users with a versioned token, verify the version hasn't been rotated
+    if (!payload.isGuest && payload.v !== undefined) {
+      const result = await pool.query(
+        'SELECT token_version FROM users WHERE id = $1',
+        [payload.userId],
+      );
+      const row = result.rows[0];
+      if (!row || row.token_version !== payload.v) {
+        res.status(401).json({ error: 'Session expired. Please sign in again.' });
+        return;
+      }
+    }
+
+    req.user = payload;
     next();
   } catch {
     res.status(401).json({ error: 'Invalid or expired token' });
