@@ -27,6 +27,7 @@ export default function CreateSessionPage() {
   const [country, setCountry]           = useState('');
   const [lat, setLat]                   = useState<number | undefined>();
   const [lng, setLng]                   = useState<number | undefined>();
+  const [startNow, setStartNow]         = useState(false);
   const [startDate, setStartDate]       = useState('');
   const [startTime, setStartTime]       = useState('');
   const [isOnline, setIsOnline]           = useState(false);
@@ -54,12 +55,12 @@ export default function CreateSessionPage() {
     e.preventDefault();
     setError(null);
     if (!title.trim()) { setError('Your session needs a title.'); return; }
-    if (!startDate || !startTime) { setError('Pick a date and time for your session.'); return; }
+    if (!startNow && (!startDate || !startTime)) { setError('Pick a date and time, or toggle "Go live now".'); return; }
     setLoading(true);
 
     try {
       // Calculate submission cutoff
-      const startsAt = startDate && startTime ? `${startDate}T${startTime}:00` : undefined;
+      const startsAt = startNow ? new Date().toISOString() : (startDate && startTime ? `${startDate}T${startTime}:00` : undefined);
 
       let submission_cutoff_at: string | undefined;
       if (cutoffEnabled && startsAt) {
@@ -269,7 +270,7 @@ export default function CreateSessionPage() {
           <Section title="Credits per person">
             <FormField
               label={`${credits} credit${credits !== 1 ? 's' : ''} — each question or Echo costs 1`}
-              hint="Everyone starts with this many. Guests can earn up to 2 more over time; signed-in attendees keep earning throughout the session."
+              hint="Starting credits per attendee (1–6). Everyone earns +1 credit every 10 minutes — guests cap out after 2 bonus credits; signed-in users keep earning up to the session cap."
             >
               <div className="flex items-center gap-4">
                 <input
@@ -296,26 +297,36 @@ export default function CreateSessionPage() {
 
           {/* Timing + Location */}
           <Section title="Timing & location">
-            <div className="grid sm:grid-cols-2 gap-4">
-              <FormField label="Date">
-                <input
-                  type="date"
-                  value={startDate}
-                  onChange={e => setStartDate(e.target.value)}
-                  className="input"
-                  required
-                />
-              </FormField>
-              <FormField label="Time">
-                <input
-                  type="time"
-                  value={startTime}
-                  onChange={e => setStartTime(e.target.value)}
-                  className="input"
-                  required
-                />
-              </FormField>
-            </div>
+            <label className="flex items-center gap-3 cursor-pointer">
+              <div
+                onClick={() => setStartNow(v => !v)}
+                className={`w-10 h-6 rounded-full transition-colors relative flex-shrink-0 ${startNow ? 'bg-brand-orange' : 'bg-brand-purple/40'}`}
+              >
+                <div className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform ${startNow ? 'translate-x-5' : 'translate-x-1'}`} />
+              </div>
+              <span className="text-sm text-white">Go live now</span>
+            </label>
+
+            {!startNow && (
+              <div className="grid sm:grid-cols-2 gap-4">
+                <FormField label="Date">
+                  <input
+                    type="date"
+                    value={startDate}
+                    onChange={e => setStartDate(e.target.value)}
+                    className="input"
+                  />
+                </FormField>
+                <FormField label="Time">
+                  <input
+                    type="time"
+                    value={startTime}
+                    onChange={e => setStartTime(e.target.value)}
+                    className="input"
+                  />
+                </FormField>
+              </div>
+            )}
 
             <div className="mt-4">
               <label className="flex items-center gap-3 cursor-pointer group">
@@ -468,6 +479,6 @@ const VISIBILITY_OPTIONS = [
   {
     value: 'private',
     label: 'Private',
-    desc: 'Invite-only. Coming soon.',
+    desc: 'Invite-only. Attendees must be signed in and approved by you before they can join.',
   },
 ];

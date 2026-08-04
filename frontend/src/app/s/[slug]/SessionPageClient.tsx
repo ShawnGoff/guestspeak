@@ -762,7 +762,8 @@ export default function SessionPageClient({ params }: SessionPageProps) {
 
         {/* ── Right sidebar (desktop only) ────────────────────────────────── */}
         <aside className="hidden xl:flex flex-col w-64 border-l border-brand-border shrink-0 sticky top-[57px] h-[calc(100vh-57px)] overflow-y-auto">
-          <div className="p-5">
+          {/* Top Questions */}
+          <div className="p-5 border-b border-brand-border/40">
             <p className="text-[10px] font-bold text-purple-200/75 uppercase tracking-widest mb-4">Top Questions</p>
             <div className="flex flex-col gap-3">
               {questions
@@ -785,6 +786,50 @@ export default function SessionPageClient({ params }: SessionPageProps) {
               )}
             </div>
           </div>
+
+          {/* Top Participants */}
+          {(() => {
+            const map = new Map<string, number>();
+            questions.forEach(q => {
+              if (q.post_anonymously || !q.author_username) return;
+              map.set(q.author_username, (map.get(q.author_username) ?? 0) + q.vote_count);
+            });
+            const top = [...map.entries()]
+              .map(([name, echoes]) => ({ name, echoes }))
+              .sort((a, b) => b.echoes - a.echoes)
+              .slice(0, 5);
+            if (!top.length) return null;
+            return (
+              <div className="p-5">
+                <div className="flex items-center justify-between mb-4">
+                  <p className="text-[10px] font-bold text-purple-200/75 uppercase tracking-widest">Top Participants</p>
+                  <p className="text-[10px] text-purple-200/50">Echoes received</p>
+                </div>
+                <div className="flex flex-col gap-3">
+                  {top.map((p, i) => (
+                    <div key={p.name} className="flex items-center gap-2.5">
+                      <span className={`text-xs font-bold w-4 text-center shrink-0 ${i === 0 ? 'text-brand-amber' : 'text-purple-200/55'}`}>
+                        {i + 1}
+                      </span>
+                      <div
+                        className="w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold text-white shrink-0"
+                        style={{ backgroundColor: `hsl(${(p.name.charCodeAt(0) * 37) % 360} 60% 45%)` }}
+                      >
+                        {p.name[0].toUpperCase()}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-semibold text-purple-200/70 truncate">{p.name}</p>
+                        <p className="text-[11px] text-purple-200/50">{p.echoes} echoes received</p>
+                      </div>
+                      <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${i === 0 ? 'bg-brand-amber/20 text-brand-amber' : 'bg-white/5 text-purple-200/65'}`}>
+                        {p.echoes}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
         </aside>
       </div>
 

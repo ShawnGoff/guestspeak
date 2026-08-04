@@ -12,21 +12,13 @@ type Q = {
   echoes: number;
   echoed: boolean;
   answered: boolean;
-  pinned: boolean;
+  starred: boolean;
   author: string;
   authorColor: string;
   ago: string;
-  tags: string[];
-  comments: number;
   ts: number;
+  host_reply?: string;
   supporters?: string[];
-};
-
-type ActivityItem = {
-  id: number;
-  text: string;
-  time: string;
-  kind: 'echo' | 'question' | 'answer' | 'move' | 'host';
 };
 
 type Participant = {
@@ -43,59 +35,54 @@ const SEED_MUSIC: Q[] = [
   {
     id: 1,
     text: "What's the story behind the title track — it feels way more personal than anything you've released before?",
-    echoes: 129, echoed: false, answered: false, pinned: true,
+    echoes: 129, echoed: false, answered: false, starred: true,
     author: 'superfan_sadie', authorColor: '#7C3AED',
-    ago: '2m ago', tags: ['Songwriting', 'Album'], comments: 14,
-    ts: BASE_TS - 120000,
+    ago: '2m ago', ts: BASE_TS - 120000,
     supporters: ['record_collector', 'backstage_beats', 'melody_chaser', 'vinyl_vibes'],
   },
   {
     id: 2,
     text: "Which collab on this record surprised you the most — and how did it come together?",
-    echoes: 87, echoed: false, answered: false, pinned: false,
+    echoes: 87, echoed: false, answered: false, starred: false,
     author: 'record_collector', authorColor: '#059669',
-    ago: '4m ago', tags: ['Collabs', 'Process'], comments: 9,
-    ts: BASE_TS - 240000,
+    ago: '4m ago', ts: BASE_TS - 240000,
   },
   {
     id: 3,
     text: "There's a lyric in track 4 that feels like it's about a specific moment. Are you ever nervous about how specific you get?",
-    echoes: 65, echoed: false, answered: false, pinned: false,
+    echoes: 65, echoed: false, answered: false, starred: false,
     author: 'anon', authorColor: '#DC2626',
-    ago: '6m ago', tags: ['Lyrics', 'Vulnerability'], comments: 11,
-    ts: BASE_TS - 360000,
+    ago: '6m ago', ts: BASE_TS - 360000,
   },
   {
     id: 4,
     text: "How do you decide what makes the final cut vs what stays in the vault?",
-    echoes: 44, echoed: false, answered: false, pinned: false,
+    echoes: 44, echoed: false, answered: false, starred: false,
     author: 'backstage_beats', authorColor: '#D97706',
-    ago: '8m ago', tags: ['Tracklist', 'Editing'], comments: 6,
-    ts: BASE_TS - 480000,
+    ago: '8m ago', ts: BASE_TS - 480000,
   },
   {
     id: 5,
     text: "Which song from this album are you most excited to finally play live?",
-    echoes: 108, echoed: false, answered: true, pinned: false,
+    echoes: 108, echoed: false, answered: true, starred: false,
     author: 'melody_chaser', authorColor: '#2563EB',
-    ago: '10m ago', tags: ['Tour', 'Live'], comments: 5,
-    ts: BASE_TS - 600000,
+    ago: '10m ago', ts: BASE_TS - 600000,
+    host_reply: "Honestly? “Signal Fire” — we've never played it live and I can't wait to see how the room reacts.",
   },
   {
     id: 6,
     text: "Do you write to a beat or melody first, or does it change every time?",
-    echoes: 31, echoed: false, answered: false, pinned: false,
+    echoes: 31, echoed: false, answered: false, starred: false,
     author: 'vinyl_vibes', authorColor: '#0891B2',
-    ago: '13m ago', tags: ['Process', 'Writing'], comments: 4,
-    ts: BASE_TS - 780000,
+    ago: '13m ago', ts: BASE_TS - 780000,
   },
   {
     id: 7,
     text: "Will the vault tracks ever see the light of day — or are some locked forever?",
-    echoes: 19, echoed: false, answered: true, pinned: false,
+    echoes: 19, echoed: false, answered: true, starred: false,
     author: 'midnight_listener', authorColor: '#7C3AED',
-    ago: '15m ago', tags: ['Vault', 'Unreleased'], comments: 3,
-    ts: BASE_TS - 900000,
+    ago: '15m ago', ts: BASE_TS - 900000,
+    host_reply: "Some will. There's one from the Raven sessions I've been sitting on for three years — this might finally be its moment.",
   },
 ];
 
@@ -103,51 +90,46 @@ const SEED_NBA: Q[] = [
   {
     id: 1,
     text: 'What adjustments did you make at halftime that turned the game around tonight?',
-    echoes: 87, echoed: false, answered: false, pinned: true,
+    echoes: 87, echoed: false, answered: false, starred: true,
     author: 'courtside_kai', authorColor: '#DC2626',
-    ago: '2m ago', tags: ['Strategy', 'Adjustments'], comments: 9,
-    ts: BASE_TS - 120000,
+    ago: '2m ago', ts: BASE_TS - 120000,
     supporters: ['hoop_dreams_4', 'lakeshow_liv', 'the_stat_line', 'bench_mob_77'],
   },
   {
     id: 2,
     text: "How do you manage player minutes when the schedule gets brutal — 4 games in 6 nights?",
-    echoes: 54, echoed: false, answered: false, pinned: false,
+    echoes: 54, echoed: false, answered: false, starred: false,
     author: 'hoop_dreams_4', authorColor: '#059669',
-    ago: '4m ago', tags: ['Load Management', 'Rotation'], comments: 7,
-    ts: BASE_TS - 240000,
+    ago: '4m ago', ts: BASE_TS - 240000,
   },
   {
     id: 3,
     text: "What's your philosophy on developing young talent vs. playing to win right now?",
-    echoes: 41, echoed: false, answered: false, pinned: false,
+    echoes: 41, echoed: false, answered: false, starred: false,
     author: 'lakeshow_liv', authorColor: '#7C3AED',
-    ago: '5m ago', tags: ['Development', 'Culture'], comments: 11,
-    ts: BASE_TS - 300000,
+    ago: '5m ago', ts: BASE_TS - 300000,
   },
   {
     id: 4,
     text: "How involved are you in trade deadline conversations with the front office?",
-    echoes: 33, echoed: false, answered: false, pinned: false,
+    echoes: 33, echoed: false, answered: false, starred: false,
     author: 'the_stat_line', authorColor: '#D97706',
-    ago: '8m ago', tags: ['Front Office', 'Trades'], comments: 5,
-    ts: BASE_TS - 480000,
+    ago: '8m ago', ts: BASE_TS - 480000,
   },
   {
     id: 5,
     text: "What does your film room process look like — how far ahead do you prep for opponents?",
-    echoes: 98, echoed: false, answered: true, pinned: false,
+    echoes: 98, echoed: false, answered: true, starred: false,
     author: 'bench_mob_77', authorColor: '#2563EB',
-    ago: '10m ago', tags: ['Film', 'Preparation'], comments: 4,
-    ts: BASE_TS - 600000,
+    ago: '10m ago', ts: BASE_TS - 600000,
+    host_reply: "We usually start the opponent's tendencies two days out. By game day I want every guy knowing the pick-and-roll coverage cold.",
   },
   {
     id: 6,
     text: "How do you keep veteran players bought in when their roles change late in their careers?",
-    echoes: 19, echoed: false, answered: false, pinned: false,
+    echoes: 19, echoed: false, answered: false, starred: false,
     author: 'paint_and_pick', authorColor: '#0891B2',
-    ago: '13m ago', tags: ['Leadership', 'Veterans'], comments: 3,
-    ts: BASE_TS - 780000,
+    ago: '13m ago', ts: BASE_TS - 780000,
   },
 ];
 
@@ -155,51 +137,46 @@ const SEED_STARTUP: Q[] = [
   {
     id: 1,
     text: "What's your biggest differentiator and why hasn't a larger player built this already?",
-    echoes: 74, echoed: false, answered: false, pinned: true,
+    echoes: 74, echoed: false, answered: false, starred: true,
     author: 'venture_vince', authorColor: '#7C3AED',
-    ago: '2m ago', tags: ['Competitive Moat', 'Strategy'], comments: 8,
-    ts: BASE_TS - 120000,
+    ago: '2m ago', ts: BASE_TS - 120000,
     supporters: ['founding_vibes', 'seed_round_sue', 'angel_alicia', 'cap_table_cal'],
   },
   {
     id: 2,
     text: "How did you validate demand before writing a single line of code?",
-    echoes: 61, echoed: false, answered: false, pinned: false,
+    echoes: 61, echoed: false, answered: false, starred: false,
     author: 'founding_vibes', authorColor: '#059669',
-    ago: '3m ago', tags: ['Validation', 'PMF'], comments: 10,
-    ts: BASE_TS - 180000,
+    ago: '3m ago', ts: BASE_TS - 180000,
   },
   {
     id: 3,
     text: "What does your path to profitability look like and what's your runway right now?",
-    echoes: 39, echoed: false, answered: false, pinned: false,
+    echoes: 39, echoed: false, answered: false, starred: false,
     author: 'seed_round_sue', authorColor: '#DC2626',
-    ago: '6m ago', tags: ['Financials', 'Runway'], comments: 6,
-    ts: BASE_TS - 360000,
+    ago: '6m ago', ts: BASE_TS - 360000,
   },
   {
     id: 4,
     text: "Are you going enterprise or consumer first — and why?",
-    echoes: 28, echoed: false, answered: false, pinned: false,
+    echoes: 28, echoed: false, answered: false, starred: false,
     author: 'angel_alicia', authorColor: '#D97706',
-    ago: '8m ago', tags: ['GTM', 'Sales'], comments: 4,
-    ts: BASE_TS - 480000,
+    ago: '8m ago', ts: BASE_TS - 480000,
   },
   {
     id: 5,
     text: "What's your fundraising plan after today — Seed extension or straight to Series A?",
-    echoes: 103, echoed: false, answered: true, pinned: false,
+    echoes: 103, echoed: false, answered: true, starred: false,
     author: 'cap_table_cal', authorColor: '#2563EB',
-    ago: '11m ago', tags: ['Fundraising', 'Strategy'], comments: 3,
-    ts: BASE_TS - 660000,
+    ago: '11m ago', ts: BASE_TS - 660000,
+    host_reply: "We're heads-down on a seed extension right now — want to hit two more proof points before we go out for A.",
   },
   {
     id: 6,
     text: "How are you thinking about hiring — when do you bring on your first non-technical role?",
-    echoes: 12, echoed: false, answered: false, pinned: false,
+    echoes: 12, echoed: false, answered: false, starred: false,
     author: 'operator_opal', authorColor: '#0891B2',
-    ago: '14m ago', tags: ['Team', 'Hiring'], comments: 2,
-    ts: BASE_TS - 840000,
+    ago: '14m ago', ts: BASE_TS - 840000,
   },
 ];
 
@@ -210,37 +187,15 @@ function getSeed(title: string): Q[] {
   return SEED_MUSIC;
 }
 
-function getAutoQ(title: string): Pick<Q, 'text' | 'tags'> {
+function getAutoQ(title: string): string {
   const t = title.toLowerCase();
   if (t.includes('coach') || t.includes('nba') || t.includes('playoff') || t.includes('pulse'))
-    return { text: 'Which young player on your roster has surprised you the most this season?', tags: ['Roster', 'Development'] };
+    return 'Which young player on your roster has surprised you the most this season?';
   if (t.includes('startup') || t.includes('demo day') || t.includes('pitch') || t.includes('founder'))
-    return { text: "What's the one metric you obsess over above all others right now?", tags: ['Metrics', 'Focus'] };
-  return { text: 'Is there a song that almost didn\'t make the album that you\'re now really glad is on it?', tags: ['Songwriting', 'Album'] };
+    return "What's the one metric you obsess over above all others right now?";
+  return "Is there a song that almost didn't make the album that you're now really glad is on it?";
 }
 
-const INIT_ACTIVITY: ActivityItem[] = [
-  { id: 1, kind: 'host',     text: 'Host is answering a question',           time: 'just now' },
-  { id: 2, kind: 'echo',     text: '+3 Echoes for the top question',         time: '6s ago' },
-  { id: 3, kind: 'question', text: 'backstage_beats asked a question',       time: '11s ago' },
-  { id: 4, kind: 'echo',     text: 'record_collector echoed a question',     time: '18s ago' },
-  { id: 5, kind: 'move',     text: 'Question moved up the feed',             time: '25s ago' },
-];
-
-const ACTIVITY_POOL: Pick<ActivityItem, 'kind' | 'text'>[] = [
-  { kind: 'echo',     text: 'vinyl_vibes echoed a question' },
-  { kind: 'echo',     text: 'melody_chaser echoed the top question' },
-  { kind: 'echo',     text: '+2 Echoes for question #2' },
-  { kind: 'echo',     text: 'midnight_listener echoed a question' },
-  { kind: 'echo',     text: '+3 Echoes in the last 30s' },
-  { kind: 'question', text: 'superfan_sadie asked a question' },
-  { kind: 'question', text: 'record_collector asked a follow-up' },
-  { kind: 'move',     text: 'Question moved up the feed' },
-  { kind: 'move',     text: 'A question climbed to #2' },
-  { kind: 'host',     text: 'Host pinned a new question' },
-  { kind: 'host',     text: 'Host marked a question answered' },
-  { kind: 'answer',   text: 'Host is responding live' },
-];
 
 // Static color lookup for known seed authors (used for supporter avatars)
 const AUTHOR_COLORS: Record<string, string> = {
@@ -267,14 +222,6 @@ const AUTHOR_COLORS: Record<string, string> = {
   'operator_opal':     '#0891B2',
 };
 
-const ACTIVITY_STYLES: Record<ActivityItem['kind'], { bg: string; color: string; icon: string }> = {
-  echo:     { bg: 'rgba(245,146,30,0.15)',  color: '#F5921E', icon: '↑' },
-  question: { bg: 'rgba(124,58,237,0.15)',  color: '#A78BFA', icon: '?' },
-  answer:   { bg: 'rgba(16,185,129,0.15)',  color: '#34D399', icon: '✓' },
-  move:     { bg: 'rgba(16,185,129,0.15)',  color: '#34D399', icon: '↑' },
-  host:     { bg: 'rgba(245,146,30,0.15)',  color: '#F5921E', icon: '🎤' },
-};
-
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 function Avatar({ name, color, size = 'sm' }: { name: string; color: string; size?: 'xs' | 'sm' }) {
@@ -289,21 +236,13 @@ function Avatar({ name, color, size = 'sm' }: { name: string; color: string; siz
   );
 }
 
-function TagPill({ label }: { label: string }) {
-  return (
-    <span className="text-[11px] text-white/75 bg-white/5 border border-white/10 px-2 py-0.5 rounded-full whitespace-nowrap">
-      {label}
-    </span>
-  );
-}
-
 // ─── Question Cards ───────────────────────────────────────────────────────────
 
 function TopQuestionCard({
-  q, view, isNew, showFlash, noCredits, onEcho, onPin, onAnswer,
+  q, view, isNew, showFlash, noCredits, onEcho, onStar, onAnswer,
 }: {
   q: Q; view: 'audience' | 'host'; isNew?: boolean; showFlash?: boolean; noCredits?: boolean;
-  onEcho(): void; onPin(): void; onAnswer(): void;
+  onEcho(): void; onStar(): void; onAnswer(): void;
 }) {
   return (
     <div className={`rounded-2xl border border-brand-orange/60 bg-brand-card p-5 shadow-orange-glow ${isNew ? 'animate-fade-up' : ''}`}>
@@ -311,11 +250,11 @@ function TopQuestionCard({
         <span className="text-xs font-bold text-brand-orange tracking-wide">🔥 TOP QUESTION</span>
         {view === 'host' && (
           <div className="ml-auto flex gap-2">
-            <button onClick={onPin} className="text-xs px-2.5 py-1 rounded-lg border border-brand-orange/40 text-brand-orange hover:bg-brand-orange/10 transition-all">
-              {q.pinned ? 'Unpin' : 'Pin'}
+            <button onClick={onStar} className={`text-xs px-2.5 py-1 rounded-lg border transition-all ${q.starred ? 'border-yellow-500/40 text-yellow-400 bg-yellow-500/10' : 'border-brand-border/60 text-white/70 hover:border-yellow-500/40 hover:text-yellow-400'}`}>
+              ★ {q.starred ? 'Starred' : 'Star'}
             </button>
-            <button onClick={onAnswer} className="text-xs px-2.5 py-1 rounded-lg border border-green-500/40 text-green-400 hover:bg-green-500/10 transition-all">
-              {q.answered ? 'Reopen' : 'Mark answered'}
+            <button onClick={onAnswer} className={`text-xs px-2.5 py-1 rounded-lg border transition-all ${q.answered ? 'border-emerald-500/40 text-emerald-400 bg-emerald-500/10' : 'border-brand-border/60 text-white/70 hover:border-green-500/40 hover:text-green-400'}`}>
+              {q.answered ? '✓ Answered' : '✓ Mark answered'}
             </button>
           </div>
         )}
@@ -324,15 +263,20 @@ function TopQuestionCard({
       <div className="flex gap-4 sm:gap-6">
         <div className="flex-1 min-w-0">
           <p className="text-base sm:text-lg font-bold leading-snug mb-3">{q.text}</p>
-          <div className="flex flex-wrap gap-1.5 mb-4">
-            {q.tags.map(t => <TagPill key={t} label={t} />)}
-          </div>
-          <div className="flex items-center gap-2 text-xs text-white/70">
+          <div className="flex items-center gap-2 text-xs text-white/70 flex-wrap">
+            {q.starred && <span className="text-yellow-400 font-semibold">★ Starred</span>}
+            {q.answered && <span className="text-emerald-400 font-semibold">✓ Answered</span>}
             <Avatar name={q.author} color={q.authorColor} size="xs" />
             <span className="font-medium text-white/60">{q.author}</span>
             <span>·</span>
             <span>{q.ago}</span>
           </div>
+          {q.host_reply && (
+            <div className="mt-3 pl-3 border-l-2 border-brand-orange/40">
+              <p className="text-xs text-brand-orange/70 font-semibold mb-1">Host reply</p>
+              <p className="text-sm text-white/80">{q.host_reply}</p>
+            </div>
+          )}
         </div>
 
         <div className="shrink-0 flex flex-col items-center gap-3 min-w-[72px]">
@@ -378,10 +322,6 @@ function TopQuestionCard({
               </div>
             </div>
           )}
-
-          <button className="text-[11px] text-white/60 hover:text-white/60 transition-colors">
-            ↗ Share
-          </button>
         </div>
       </div>
     </div>
@@ -389,15 +329,17 @@ function TopQuestionCard({
 }
 
 function QuestionCard({
-  q, view, isNew, showFlash, noCredits, onEcho, onPin, onAnswer,
+  q, view, isNew, showFlash, noCredits, onEcho, onStar, onAnswer,
 }: {
   q: Q; view: 'audience' | 'host'; isNew?: boolean; showFlash?: boolean; noCredits?: boolean;
-  onEcho(): void; onPin(): void; onAnswer(): void;
+  onEcho(): void; onStar(): void; onAnswer(): void;
 }) {
   return (
     <div
       className={`flex gap-3 rounded-2xl border bg-brand-card p-4 transition-all duration-200 ${
-        q.answered ? 'border-brand-border/40 opacity-55' : 'border-brand-border hover:border-brand-border/80'
+        q.starred    ? 'border-yellow-500/40 bg-yellow-500/5' :
+        q.answered   ? 'border-emerald-500/30 bg-emerald-500/5 opacity-70' :
+                       'border-brand-border hover:border-brand-border/80'
       } ${isNew ? 'animate-fade-up' : ''}`}
     >
       <div className="shrink-0 flex flex-col items-center w-10 relative">
@@ -410,7 +352,7 @@ function QuestionCard({
           </span>
         )}
         {q.answered ? (
-          <div className="flex flex-col items-center gap-0.5 text-green-400 pt-1">
+          <div className="flex flex-col items-center gap-0.5 text-emerald-400 pt-1">
             <span className="text-lg font-bold leading-none">✓</span>
             <span className="text-sm font-bold">{q.echoes}</span>
           </div>
@@ -430,39 +372,44 @@ function QuestionCard({
 
       <div className="flex-1 min-w-0">
         <p className="text-sm sm:text-[15px] leading-relaxed mb-2">{q.text}</p>
-        <div className="flex flex-wrap gap-1.5 mb-2.5">
-          {q.tags.map(t => <TagPill key={t} label={t} />)}
-        </div>
+
+        {q.host_reply && (
+          <div className="mb-2 pl-3 border-l-2 border-brand-orange/40">
+            <p className="text-xs text-brand-orange/70 font-semibold mb-0.5">Host reply</p>
+            <p className="text-xs text-white/80">{q.host_reply}</p>
+          </div>
+        )}
+
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <div className="flex items-center gap-1.5 text-xs text-white/65">
             <Avatar name={q.author} color={q.authorColor} size="xs" />
             <span>{q.author}</span>
           </div>
-          <div className="flex items-center gap-2.5 text-xs text-white/60 shrink-0 flex-wrap">
-            {q.answered && (
-              <span className="text-[11px] font-bold text-green-400 bg-green-500/10 border border-green-500/25 px-2 py-0.5 rounded-full">
-                ✓ ANSWERED
-              </span>
-            )}
+          <div className="flex items-center gap-2 text-xs text-white/60 shrink-0 flex-wrap">
+            {q.starred  && <span className="text-yellow-400 font-semibold">★ Starred</span>}
+            {q.answered && <span className="text-[11px] font-semibold text-emerald-400">✓ Answered</span>}
             <span>{q.ago}</span>
-            <span>💬 {q.comments}</span>
             {view === 'host' && (
               <div className="flex gap-1.5">
                 <button
-                  onClick={onPin}
-                  className="px-2 py-0.5 rounded border border-brand-border text-white/65 hover:border-brand-orange/40 hover:text-brand-orange transition-all"
+                  onClick={onStar}
+                  className={`px-2 py-0.5 rounded border transition-all ${
+                    q.starred
+                      ? 'border-yellow-500/40 text-yellow-400'
+                      : 'border-brand-border text-white/65 hover:border-yellow-500/40 hover:text-yellow-400'
+                  }`}
                 >
-                  Pin
+                  ★ {q.starred ? 'Starred' : 'Star'}
                 </button>
                 <button
                   onClick={onAnswer}
                   className={`px-2 py-0.5 rounded border transition-all ${
                     q.answered
-                      ? 'border-green-500/40 text-green-400 hover:border-red-500/40 hover:text-red-400'
-                      : 'border-brand-border text-white/65 hover:border-green-500/40 hover:text-green-400'
+                      ? 'border-emerald-500/40 text-emerald-400 hover:border-red-500/40 hover:text-red-400'
+                      : 'border-brand-border text-white/65 hover:border-emerald-500/40 hover:text-emerald-400'
                   }`}
                 >
-                  {q.answered ? 'Reopen' : 'Answered'}
+                  {q.answered ? 'Reopen' : '✓ Answered'}
                 </button>
               </div>
             )}
@@ -479,17 +426,16 @@ function SessionPageInner() {
   const params = useSearchParams();
   const titleParam  = params.get('title') ?? 'Sable & The Echo — Album Release AMA';
   const isHostParam = params.get('host') === 'true';
-  const creditsParam = Number(params.get('credits') ?? 3);
+  const creditsParam = Number(params.get('credits') ?? 6);
 
   const [qs, setQs]             = useState<Q[]>(() => getSeed(titleParam));
-  const [sort, setSort]         = useState<'top' | 'rising' | 'newest' | 'answered'>('top');
+  const [sort, setSort]         = useState<'top' | 'recent' | 'answered' | 'starred'>('top');
   const [view, setView]         = useState<'audience' | 'host'>(isHostParam ? 'host' : 'audience');
   const [draft, setDraft]       = useState('');
   const [isAnon, setIsAnon]     = useState(false);
   const [anonCounter, setAnonCounter] = useState(0);
   const [credits, setCredits]   = useState(creditsParam);
   const [submitted, setSubmitted] = useState(false);
-  const [activity, setActivity] = useState<ActivityItem[]>(INIT_ACTIVITY);
   const [attending, setAttending] = useState(143);
   const [newCount, setNewCount] = useState(7);
   const [newIds, setNewIds]     = useState<Set<number>>(new Set());
@@ -517,32 +463,16 @@ function SessionPageInner() {
   }, []);
 
   useEffect(() => {
-    const t = setInterval(() => {
-      const evt = ACTIVITY_POOL[Math.floor(Math.random() * ACTIVITY_POOL.length)];
-      setActivity(prev => [
-        { id: Date.now(), kind: evt.kind, text: evt.text, time: 'just now' },
-        ...prev.slice(0, 4),
-      ]);
-    }, 3200);
-    return () => clearInterval(t);
-  }, []);
-
-  useEffect(() => {
     const t = setTimeout(() => {
-      const autoQ = getAutoQ(titleParam);
       const newQ: Q = {
         id: 99,
-        text: autoQ.text,
-        echoes: 0, echoed: false, answered: false, pinned: false,
+        text: getAutoQ(titleParam),
+        echoes: 0, echoed: false, answered: false, starred: false,
         author: 'new_arrival_52', authorColor: '#0891B2',
-        ago: 'just now', tags: autoQ.tags, comments: 0, ts: Date.now(),
+        ago: 'just now', ts: Date.now(),
       };
       setQs(prev => prev.some(x => x.id === 99) ? prev : [...prev, newQ]);
       setNewIds(prev => new Set([...prev, 99]));
-      setActivity(prev => [
-        { id: Date.now(), kind: 'question', text: 'new_arrival_52 asked a question', time: 'just now' },
-        ...prev.slice(0, 4),
-      ]);
     }, 9000);
     return () => clearTimeout(t);
   }, []);
@@ -563,23 +493,19 @@ function SessionPageInner() {
     const anonLabel = isAnon ? `Anon${anonCounter + 1}` : null;
     if (isAnon) setAnonCounter(c => c + 1);
     setQs(prev => [...prev, {
-      id, text, echoes: 0, echoed: false, answered: false, pinned: false,
+      id, text, echoes: 0, echoed: false, answered: false, starred: false,
       author: anonLabel ?? guestName, authorColor: isAnon ? '#6B7280' : '#0891B2',
-      ago: 'just now', tags: [], comments: 0, ts: Date.now(),
+      ago: 'just now', ts: Date.now(),
     }]);
     setNewIds(prev => new Set([...prev, id]));
     setDraft('');
     setCredits(c => c - 1);
     setSubmitted(true);
     setTimeout(() => setSubmitted(false), 3000);
-    setActivity(prev => [
-      { id: Date.now(), kind: 'question', text: `${anonLabel ?? guestName} asked a question`, time: 'just now' },
-      ...prev.slice(0, 4),
-    ]);
   }
 
-  function togglePin(id: number) {
-    setQs(prev => prev.map(q => q.id === id ? { ...q, pinned: !q.pinned } : { ...q, pinned: false }));
+  function toggleStar(id: number) {
+    setQs(prev => prev.map(q => q.id === id ? { ...q, starred: !q.starred } : q));
   }
 
   function toggleAnswer(id: number) {
@@ -587,16 +513,19 @@ function SessionPageInner() {
   }
 
   const allSorted = [...qs].sort((a, b) => {
-    if (sort === 'newest')  return b.ts - a.ts;
-    if (sort === 'rising')  return (b.echoes / ((BASE_TS - b.ts) / 60000 + 2)) - (a.echoes / ((BASE_TS - a.ts) / 60000 + 2));
+    if (sort === 'recent')  return b.ts - a.ts;
+    if (sort === 'starred') return (b.starred ? 1 : 0) - (a.starred ? 1 : 0) || b.echoes - a.echoes;
     return b.echoes - a.echoes;
   });
 
   const unanswered   = allSorted.filter(q => !q.answered);
   const answeredList = allSorted.filter(q => q.answered);
+  const starredList  = allSorted.filter(q => q.starred);
   const featuredQ    = sort === 'top' ? (unanswered[0] ?? null) : null;
   const listQs       = sort === 'answered'
     ? answeredList
+    : sort === 'starred'
+    ? starredList
     : sort === 'top'
       ? [...unanswered.slice(1), ...answeredList]
       : [...unanswered, ...answeredList];
@@ -605,11 +534,11 @@ function SessionPageInner() {
   const awaitingAns = qs.filter(q => !q.answered).length;
   const answeredCnt = qs.filter(q => q.answered).length;
 
-  // ── Leaderboard: echoes received per author ───────────────────────────────
-  const leaderboard = useMemo((): Participant[] => {
+  // ── Top Participants: echoes received per author ──────────────────────────
+  const topParticipants = useMemo((): Participant[] => {
     const map = new Map<string, { color: string; echoes: number }>();
     qs.forEach(q => {
-      if (q.author === 'anonymous') return;
+      if (q.author === 'anon') return;
       const prev = map.get(q.author);
       map.set(q.author, {
         color: q.authorColor,
@@ -750,9 +679,9 @@ function SessionPageInner() {
             <div className="flex items-center border-b border-brand-border sticky top-[57px] lg:top-0 bg-brand-bg z-10 px-3 sm:px-5 overflow-x-auto gap-0">
               {[
                 { id: 'top',      label: '🔥 Top' },
-                { id: 'rising',   label: '📈 Rising' },
-                { id: 'newest',   label: '🕐 Newest' },
+                { id: 'recent',   label: '🕐 Recent' },
                 { id: 'answered', label: '✓ Answered' },
+                { id: 'starred',  label: '★ Starred' },
               ].map(t => (
                 <button
                   key={t.id}
@@ -785,7 +714,7 @@ function SessionPageInner() {
                   showFlash={!!echoFlash[featuredQ.id]}
                   noCredits={credits === 0 && view === 'audience'}
                   onEcho={() => echo(featuredQ.id)}
-                  onPin={() => togglePin(featuredQ.id)}
+                  onStar={() => toggleStar(featuredQ.id)}
                   onAnswer={() => toggleAnswer(featuredQ.id)}
                 />
               )}
@@ -803,7 +732,7 @@ function SessionPageInner() {
                   showFlash={!!echoFlash[q.id]}
                   noCredits={credits === 0 && view === 'audience'}
                   onEcho={() => echo(q.id)}
-                  onPin={() => togglePin(q.id)}
+                  onStar={() => toggleStar(q.id)}
                   onAnswer={() => toggleAnswer(q.id)}
                 />
               ))}
@@ -811,37 +740,37 @@ function SessionPageInner() {
           </main>
 
           {/* Right Sidebar */}
-          <aside className="hidden xl:flex flex-col w-[272px] border-l border-brand-border shrink-0 overflow-y-auto min-h-0">
-            <div className="p-4 border-b border-brand-border/40 shrink-0">
-              <p className="text-[10px] font-bold text-white/55 uppercase tracking-widest mb-3">📊 Live Activity</p>
-              <div className="flex flex-col gap-2.5 overflow-hidden">
-                {activity.slice(0, 5).map(a => {
-                  const s = ACTIVITY_STYLES[a.kind];
-                  return (
-                    <div key={a.id} className="flex items-start gap-2.5 text-xs">
-                      <div
-                        className="w-5 h-5 rounded-full flex items-center justify-center shrink-0 mt-0.5 text-[10px] font-bold"
-                        style={{ background: s.bg, color: s.color }}
-                      >
-                        {s.icon}
-                      </div>
-                      <div className="flex-1 min-w-0 leading-relaxed">
-                        <span className="text-white/85">{a.text}</span>
-                        <span className="text-white/50 ml-1">· {a.time}</span>
+          <aside className="hidden xl:flex flex-col w-64 border-l border-brand-border shrink-0 overflow-y-auto min-h-0">
+            {/* Top Questions */}
+            <div className="p-4 border-b border-brand-border/40">
+              <p className="text-[10px] font-bold text-white/55 uppercase tracking-widest mb-3">Top Questions</p>
+              <div className="flex flex-col gap-3">
+                {[...qs]
+                  .filter(q => !q.answered)
+                  .sort((a, b) => b.echoes - a.echoes)
+                  .slice(0, 5)
+                  .map((q, i) => (
+                    <div key={q.id} className="flex items-start gap-2.5">
+                      <span className={`text-xs font-bold w-4 shrink-0 mt-0.5 ${i === 0 ? 'text-brand-amber' : 'text-white/55'}`}>
+                        {i + 1}
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs text-white/80 leading-relaxed line-clamp-2">{q.text}</p>
+                        <p className="text-[11px] text-brand-orange mt-0.5">{q.echoes} echoes</p>
                       </div>
                     </div>
-                  );
-                })}
+                  ))}
               </div>
             </div>
 
+            {/* Top Participants */}
             <div className="p-4">
               <div className="flex items-center justify-between mb-3">
-                <p className="text-[10px] font-bold text-white/55 uppercase tracking-widest">🏆 Top Participants</p>
+                <p className="text-[10px] font-bold text-white/55 uppercase tracking-widest">Top Participants</p>
                 <p className="text-[10px] text-white/50">Echoes received</p>
               </div>
               <div className="flex flex-col gap-3">
-                {leaderboard.map((p, i) => (
+                {topParticipants.map((p, i) => (
                   <div key={p.name} className="flex items-center gap-2.5">
                     <span className={`text-xs font-bold w-4 text-center shrink-0 ${i === 0 ? 'text-brand-amber' : 'text-white/55'}`}>
                       {i + 1}
@@ -849,21 +778,14 @@ function SessionPageInner() {
                     <Avatar name={p.name} color={p.color} size="xs" />
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-semibold text-white/70 truncate">{p.name}</p>
-                      <p className="text-[11px] text-white/60">{p.echoes} Echoes received</p>
+                      <p className="text-[11px] text-white/60">{p.echoes} echoes received</p>
                     </div>
-                    <div
-                      className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
-                        i === 0 ? 'bg-brand-amber/20 text-brand-amber' : 'bg-white/5 text-white/65'
-                      }`}
-                    >
+                    <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${i === 0 ? 'bg-brand-amber/20 text-brand-amber' : 'bg-white/5 text-white/65'}`}>
                       {p.echoes}
                     </div>
                   </div>
                 ))}
               </div>
-              <button className="mt-4 text-xs text-brand-orange/70 hover:text-brand-orange transition-colors flex items-center gap-1">
-                See full leaderboard <span className="text-white/55">›</span>
-              </button>
             </div>
           </aside>
         </div>
@@ -898,7 +820,7 @@ function SessionPageInner() {
               <div className="hidden sm:block shrink-0">
                 <p className="text-xs font-bold text-white/60 mb-1.5">Ask a question</p>
                 <div className="flex items-center gap-1.5">
-                  {Array.from({ length: 5 }).map((_, i) => (
+                  {Array.from({ length: creditsParam }).map((_, i) => (
                     <div
                       key={i}
                       className={`w-2 h-2 rounded-full transition-colors ${

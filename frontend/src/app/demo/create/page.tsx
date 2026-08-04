@@ -9,7 +9,7 @@ export default function DemoCreatePage() {
   const [title, setTitle]           = useState('');
   const [desc, setDesc]             = useState('');
   const [visibility, setVisibility] = useState<'public' | 'unlisted'>('public');
-  const [credits, setCredits]       = useState(3);
+  const [credits, setCredits]       = useState(6);
   const [startNow, setStartNow]     = useState(true);
   const [launching, setLaunching]   = useState(false);
 
@@ -154,7 +154,7 @@ export default function DemoCreatePage() {
               <div className="flex items-center justify-between mb-4">
                 <span className="text-3xl font-black text-white">{credits}</span>
                 <div className="flex gap-1.5">
-                  {[1, 2, 3, 4, 5].map(n => (
+                  {[1, 2, 3, 4, 5, 6].map(n => (
                     <button
                       key={n}
                       type="button"
@@ -172,7 +172,7 @@ export default function DemoCreatePage() {
               </div>
               <div className="flex justify-between text-xs text-white/60">
                 <span>1 = curated, focused</span>
-                <span>5 = open, high volume</span>
+                <span>6 = open, high volume</span>
               </div>
             </div>
           </div>
