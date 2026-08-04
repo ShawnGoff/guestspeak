@@ -116,14 +116,20 @@ function MockQAWidget() {
             <div className="overflow-hidden min-w-0 flex-1">
               <style>{`
                 @keyframes gs-ticker {
-                  0%, 20%  { transform: translateX(0px); }
-                  75%, 90% { transform: translateX(-96px); }
-                  100%     { transform: translateX(0px); }
+                  0%   { transform: translateX(0); }
+                  100% { transform: translateX(-50%); }
                 }
-                .gs-ticker { animation: gs-ticker 7s ease-in-out infinite; display: inline-block; white-space: nowrap; }
+                .gs-ticker-wrap {
+                  animation: gs-ticker 14s linear infinite;
+                  display: inline-block;
+                  white-space: nowrap;
+                }
               `}</style>
-              <span className="gs-ticker text-white text-sm font-semibold">
+              <span className="gs-ticker-wrap text-white text-sm font-semibold">
                 Sable &amp; The Echo — Album Release AMA
+                <span className="mx-10 opacity-30">·</span>
+                Sable &amp; The Echo — Album Release AMA
+                <span className="mx-10 opacity-30">·</span>
               </span>
             </div>
           </div>
@@ -141,7 +147,7 @@ function MockQAWidget() {
               className={`flex gap-3 px-4 py-3.5 transition-colors ${i === 0 ? 'bg-brand-orange/5' : ''}`}
             >
               {/* Echo column */}
-              <div className="flex flex-col items-center gap-1 pt-0.5 shrink-0">
+              <div className="relative flex flex-col items-center gap-1 pt-0.5 shrink-0">
                 <div
                   className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold transition-all duration-300 ${
                     i === 0
@@ -158,6 +164,16 @@ function MockQAWidget() {
                 >
                   {echoes[i]}
                 </span>
+                {/* +1 echo badge floats up from the count */}
+                {flash === i && (
+                  <div
+                    key={`flash-${i}-${echoes[i]}`}
+                    className="absolute -top-1 left-1/2 -translate-x-1/2 bg-brand-orange text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-lg pointer-events-none whitespace-nowrap z-10"
+                    style={{ animation: 'floatBadge 0.7s ease-out forwards' }}
+                  >
+                    +1 echo
+                  </div>
+                )}
               </div>
 
               {/* Content */}
@@ -190,21 +206,10 @@ function MockQAWidget() {
         </div>
       </div>
 
-      {/* Floating echo notification */}
-      {flash !== null && (
-        <div
-          key={`flash-${flash}-${echoes[flash]}`}
-          className="absolute -right-3 top-1/3 bg-brand-orange text-white text-[10px] font-bold px-2 py-1 rounded-full shadow-lg pointer-events-none"
-          style={{ animation: 'floatBadge 0.7s ease-out forwards' }}
-        >
-          +1 echo
-        </div>
-      )}
-
       <style>{`
         @keyframes floatBadge {
-          0% { opacity: 1; transform: translateY(0) scale(1); }
-          100% { opacity: 0; transform: translateY(-24px) scale(0.9); }
+          0%   { opacity: 1; transform: translateY(0) scale(1) translateX(-50%); }
+          100% { opacity: 0; transform: translateY(-20px) scale(0.85) translateX(-50%); }
         }
       `}</style>
     </div>
