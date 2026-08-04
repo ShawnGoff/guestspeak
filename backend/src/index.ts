@@ -23,8 +23,12 @@ app.use(cors({
 app.use(express.json({ limit: '50kb' }));
 app.use('/api', apiLimiter);
 
-// Serve uploaded files
-app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+// Serve uploaded files — both paths for compatibility
+// /api/uploads is preferred (always routed correctly through any proxy)
+// /uploads kept for backwards compat with existing stored URLs
+const UPLOADS_STATIC = express.static(path.join(__dirname, '../uploads'));
+app.use('/api/uploads', UPLOADS_STATIC);
+app.use('/uploads',     UPLOADS_STATIC);
 
 // Health check
 app.get('/health', (_req, res) => res.json({ status: 'ok' }));

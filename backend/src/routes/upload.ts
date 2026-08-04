@@ -31,7 +31,7 @@ const upload = multer({
 // POST /api/upload — returns { url: '/uploads/<filename>' }
 router.post('/', requireRegistered, upload.single('file'), (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
-  res.json({ url: `/uploads/${req.file.filename}` });
+  res.json({ url: `/api/uploads/${req.file.filename}` });
 });
 
 export default router;
