@@ -113,7 +113,19 @@ function MockQAWidget() {
         <div className="px-4 py-3 bg-brand-bg/60 border-b border-brand-border/60 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2 min-w-0">
             <span className="badge-live shrink-0">LIVE</span>
-            <span className="text-white text-sm font-semibold truncate">Sable &amp; The Echo — Album Release AMA</span>
+            <div className="overflow-hidden min-w-0 flex-1">
+              <style>{`
+                @keyframes gs-ticker {
+                  0%, 20%  { transform: translateX(0px); }
+                  75%, 90% { transform: translateX(-96px); }
+                  100%     { transform: translateX(0px); }
+                }
+                .gs-ticker { animation: gs-ticker 7s ease-in-out infinite; display: inline-block; white-space: nowrap; }
+              `}</style>
+              <span className="gs-ticker text-white text-sm font-semibold">
+                Sable &amp; The Echo — Album Release AMA
+              </span>
+            </div>
           </div>
           <div className="flex items-center gap-1.5 shrink-0 text-purple-200/40 text-xs">
             <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
