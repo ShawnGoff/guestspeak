@@ -148,10 +148,64 @@ export async function getOrg(req: Request, res: Response, next: NextFunction) {
       caller_role = memberResult.rows[0]?.role ?? 'none';
     }
 
+    // Aggregate channel stats across all sessions
+    const statsResult = await pool.query(
+      `SELECT
+         COUNT(DISTINCT s.id)::int          AS total_sessions,
+         COUNT(DISTINCT sp.id)::int         AS total_participants,
+         COUNT(DISTINCT q.id)::int          AS total_questions,
+         COALESCE(SUM(q.vote_count), 0)::int AS total_echoes
+       FROM sessions s
+       LEFT JOIN session_participants sp ON sp.session_id = s.id
+       LEFT JOIN questions q ON q.session_id = s.id AND q.status != 'hidden'
+       WHERE s.org_id = $1`,
+      [org.id],
+    );
+
+    // Top 5 contributors: registered users with most-echoed questions in this channel
+    const contributorsResult = await pool.query(
+      `SELECT
+         u.id AS user_id,
+         u.username,
+         COUNT(DISTINCT q.id)::int           AS question_count,
+         COALESCE(SUM(q.vote_count), 0)::int AS total_echoes
+       FROM questions q
+       JOIN sessions s ON s.id = q.session_id
+       JOIN session_participants sp ON sp.id = q.participant_id
+       JOIN users u ON u.id = sp.user_id
+       WHERE s.org_id = $1 AND q.status != 'hidden' AND sp.user_id IS NOT NULL
+       GROUP BY u.id, u.username
+       ORDER BY total_echoes DESC, question_count DESC
+       LIMIT 5`,
+      [org.id],
+    );
+
+    // Top 3 question highlights: highest-voted questions from closed sessions
+    const highlightsResult = await pool.query(
+      `SELECT
+         q.id, q.text, q.vote_count, q.answered_at IS NOT NULL AS is_answered,
+         s.title AS session_title, s.slug AS session_slug,
+         COALESCE(u.username, 'Anonymous') AS author_username
+       FROM questions q
+       JOIN sessions s ON s.id = q.session_id
+       JOIN session_participants sp ON sp.id = q.participant_id
+       LEFT JOIN users u ON u.id = sp.user_id
+       WHERE s.org_id = $1
+         AND q.status != 'hidden'
+         AND q.vote_count > 0
+         AND s.status = 'closed'
+       ORDER BY q.vote_count DESC
+       LIMIT 3`,
+      [org.id],
+    );
+
     res.json({
       org: { ...org, caller_role },
       sessions: sessionsResult.rows,
       past_sessions: pastSessionsResult.rows,
+      stats: statsResult.rows[0] ?? { total_sessions: 0, total_participants: 0, total_questions: 0, total_echoes: 0 },
+      top_contributors: contributorsResult.rows,
+      question_highlights: highlightsResult.rows,
     });
   } catch (err) {
     next(err);
