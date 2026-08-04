@@ -17,6 +17,7 @@ const LIVE_SESSIONS = [
     code: 'PLZ-4ME',
     host: 'pulse_radio',
     hostColor: '#DC2626',
+    isHost: true,
   },
   {
     id: 2,
@@ -28,6 +29,7 @@ const LIVE_SESSIONS = [
     code: 'FF-9QR',
     host: 'founders_sf',
     hostColor: '#059669',
+    isHost: false,
   },
 ];
 
@@ -109,9 +111,15 @@ function LiveCard({ session }: { session: typeof LIVE_SESSIONS[0] }) {
             <span className="text-white/50 font-bold">{session.questions}</span> questions
           </span>
         </div>
-        <span className="text-sm font-bold text-brand-orange group-hover:text-brand-amber transition-colors flex items-center gap-1">
-          Join as audience <span>→</span>
-        </span>
+        {session.isHost ? (
+          <span className="text-sm font-bold text-brand-purple group-hover:text-purple-300 transition-colors flex items-center gap-1">
+            Manage session <span>→</span>
+          </span>
+        ) : (
+          <span className="text-sm font-bold text-brand-orange group-hover:text-brand-amber transition-colors flex items-center gap-1">
+            Join as audience <span>→</span>
+          </span>
+        )}
       </div>
     </Link>
   );
