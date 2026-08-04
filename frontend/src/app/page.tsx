@@ -43,9 +43,9 @@ function Logo() {
 // ─── Mock Q&A Widget ─────────────────────────────────────────────────────────
 
 const MOCK_QUESTIONS = [
-  { text: "What's one thing you wish you'd known before building your first AI product?", author: "Jordan M.", ago: "2m", top: true },
-  { text: "How do you keep your team focused when the tools are changing this fast?", author: "Priya K.", ago: "4m", top: false },
-  { text: "What does good human-AI collaboration actually look like day to day?", author: "anon", ago: "6m", top: false },
+  { text: "What's the story behind the title track — it feels way more personal than anything you've released before?", author: "Sadie M.", ago: "2m", top: true },
+  { text: "Which collab on this record surprised you the most — and how did it come together?", author: "Priya K.", ago: "4m", top: false },
+  { text: "Will the vault tracks ever see the light of day, or are some locked forever?", author: "anon", ago: "6m", top: false },
 ];
 
 function MockQAWidget() {
@@ -75,7 +75,7 @@ function MockQAWidget() {
   }, []);
 
   // Simulate typing in the ask field
-  const DEMO_TEXT = 'How is your team getting the most out of AI tools?';
+  const DEMO_TEXT = 'Is there a song that almost didn\'t make the album?';
   useEffect(() => {
     let i = 0;
     let typing = true;
@@ -113,7 +113,7 @@ function MockQAWidget() {
         <div className="px-4 py-3 bg-brand-bg/60 border-b border-brand-border/60 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2 min-w-0">
             <span className="badge-live shrink-0">LIVE</span>
-            <span className="text-white text-sm font-semibold truncate">AI &amp; The Future of Work</span>
+            <span className="text-white text-sm font-semibold truncate">Sable &amp; The Echo — Album Release AMA</span>
           </div>
           <div className="flex items-center gap-1.5 shrink-0 text-purple-200/40 text-xs">
             <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />

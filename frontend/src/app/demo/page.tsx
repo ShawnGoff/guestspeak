@@ -112,8 +112,8 @@ function LiveCard({ session }: { session: typeof LIVE_SESSIONS[0] }) {
           </span>
         </div>
         {session.isHost ? (
-          <span className="text-sm font-bold text-brand-purple group-hover:text-purple-300 transition-colors flex items-center gap-1">
-            Manage session <span>→</span>
+          <span className="text-sm font-bold text-brand-orange group-hover:text-brand-amber transition-colors flex items-center gap-1">
+            Join as host <span>→</span>
           </span>
         ) : (
           <span className="text-sm font-bold text-brand-orange group-hover:text-brand-amber transition-colors flex items-center gap-1">
