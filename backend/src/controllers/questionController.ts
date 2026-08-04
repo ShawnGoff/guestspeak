@@ -5,6 +5,7 @@ import { AppError } from '../middleware/errorHandler';
 import { broadcast } from '../sse/broadcaster';
 import { resolveCallerRole, requireHostOrOrgAdmin } from '../db/permissions';
 import { filterText } from '../lib/wordFilter';
+import { createNotificationsForUsers } from './notificationController';
 import { fetchPublicQuestion, toPublicQuestion } from '../lib/questionHelpers';
 type SortOption = 'echoes' | 'recent' | 'answered' | 'starred';
 
@@ -488,11 +489,15 @@ export async function addHostReply(req: Request, res: Response, next: NextFuncti
     const callerId = req.user!.userId;
 
     const qResult = await pool.query(
-      `SELECT q.session_id FROM questions q WHERE q.id = $1`,
+      `SELECT q.session_id, q.author_id, q.host_reply,
+              s.title AS session_title, s.slug AS session_slug
+       FROM questions q
+       JOIN sessions s ON s.id = q.session_id
+       WHERE q.id = $1`,
       [id],
     );
     if (!qResult.rows[0]) throw new AppError(404, 'Question not found');
-    const { session_id } = qResult.rows[0];
+    const { session_id, author_id, host_reply: existingReply, session_title, session_slug } = qResult.rows[0];
 
     await requireHostOrOrgAdmin(session_id, callerId);
 
@@ -506,6 +511,16 @@ export async function addHostReply(req: Request, res: Response, next: NextFuncti
     const publicQuestion = await fetchPublicQuestion(id, session_id);
     broadcast(session_id, { type: 'question:updated', data: publicQuestion });
     res.json(publicQuestion);
+
+    // Notify the question author (registered users only, first reply only, not replying to yourself)
+    if (author_id && author_id !== callerId && !existingReply) {
+      createNotificationsForUsers([author_id], 'question:replied', {
+        session_id,
+        session_slug,
+        session_title,
+        question_id: id,
+      }).catch(() => {});
+    }
   } catch (err) {
     next(err);
   }
