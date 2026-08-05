@@ -42,8 +42,9 @@ const PERM_LABELS: { key: keyof typeof DEFAULT_PERMS; label: string }[] = [
   { key: 'can_approve',       label: 'Approve questions' },
 ];
 
-export default function ModeratorPanel({ sessionId, onClose }: {
+export default function ModeratorPanel({ sessionId, hostId, onClose }: {
   sessionId: string;
+  hostId: string;
   onClose: () => void;
 }) {
   const [mods, setMods]         = useState<Mod[]>([]);
@@ -81,9 +82,9 @@ export default function ModeratorPanel({ sessionId, onClose }: {
     searchTimer.current = setTimeout(async () => {
       try {
         const rows = await api.get<UserResult[]>(`/auth/users/search?q=${encodeURIComponent(query)}`);
-        // Filter out already-added mods
+        // Filter out already-added mods and the host (can't mod themselves)
         const modIds = new Set(mods.map(m => m.user_id));
-        setResults(rows.filter(r => !modIds.has(r.id)));
+        setResults(rows.filter(r => !modIds.has(r.id) && r.id !== hostId));
       } catch {}
     }, 300);
   }

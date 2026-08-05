@@ -174,6 +174,19 @@ export async function muteParticipant(req: Request, res: Response, next: NextFun
     if (role === 'participant' || role === 'none') throw new AppError(403, 'Insufficient permissions');
     if (role === 'moderator' && !permissions.can_mute) throw new AppError(403, 'Insufficient permissions');
 
+    // Guard: don't allow muting the host
+    const targetCheck = await pool.query(
+      `SELECT sp.user_id, s.host_id
+       FROM session_participants sp
+       JOIN sessions s ON s.id = sp.session_id
+       WHERE sp.id = $1 AND sp.session_id = $2`,
+      [participantId, sessionId],
+    );
+    if (!targetCheck.rows[0]) throw new AppError(404, 'Participant not found');
+    if (targetCheck.rows[0].user_id && targetCheck.rows[0].user_id === targetCheck.rows[0].host_id) {
+      throw new AppError(400, 'Cannot mute the session host');
+    }
+
     const result = await pool.query(
       `UPDATE session_participants
        SET is_muted = $1, muted_at = $2, muted_by = $3
@@ -206,13 +219,20 @@ export async function removeParticipant(req: Request, res: Response, next: NextF
     if (role === 'participant' || role === 'none') throw new AppError(403, 'Insufficient permissions');
     if (role === 'moderator' && !permissions.can_remove) throw new AppError(403, 'Insufficient permissions');
 
-    // Fetch the participant to get their user_id / guest_token
+    // Fetch the participant; also grab host_id so we can protect the host
     const pResult = await pool.query(
-      `SELECT user_id, guest_token FROM session_participants WHERE id = $1 AND session_id = $2`,
+      `SELECT sp.user_id, sp.guest_token, s.host_id
+       FROM session_participants sp
+       JOIN sessions s ON s.id = sp.session_id
+       WHERE sp.id = $1 AND sp.session_id = $2`,
       [participantId, sessionId],
     );
     if (!pResult.rows[0]) throw new AppError(404, 'Participant not found');
-    const { user_id, guest_token } = pResult.rows[0];
+    const { user_id, guest_token, host_id } = pResult.rows[0];
+
+    if (user_id && user_id === host_id) {
+      throw new AppError(400, 'Cannot remove the session host');
+    }
 
     // Record the ban so they cannot rejoin
     await pool.query(

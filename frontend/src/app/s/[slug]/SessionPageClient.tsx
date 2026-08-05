@@ -420,18 +420,27 @@ export default function SessionPageClient({ params }: SessionPageProps) {
 
   async function handleExport() {
     if (!session) return;
-    const token = localStorage.getItem('aa_token');
-    const res = await fetch(`${API_BASE}/api/sessions/${session.id}/export`, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-    });
-    if (!res.ok) { setError('Export failed'); return; }
-    const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = res.headers.get('content-disposition')?.split('filename="')[1]?.replace('"', '') ?? 'qa.csv';
-    a.click();
-    URL.revokeObjectURL(url);
+    try {
+      const token = localStorage.getItem('aa_token');
+      const res = await fetch(`${API_BASE}/api/sessions/${session.id}/export`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) {
+        const msg = await res.text().catch(() => '');
+        setError(`Export failed (${res.status})${msg ? `: ${msg}` : ''}`);
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const disposition = res.headers.get('content-disposition') ?? '';
+      a.download = disposition.split('filename="')[1]?.replace('"', '') || 'qa.csv';
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err: any) {
+      setError(`Export failed: ${err.message ?? 'Network error'}`);
+    }
   }
 
   async function submitReply() {
@@ -955,7 +964,7 @@ export default function SessionPageClient({ params }: SessionPageProps) {
 
       {/* Moderator panel */}
       {showModPanel && session && (
-        <ModeratorPanel sessionId={session.id} onClose={() => setShowModPanel(false)} />
+        <ModeratorPanel sessionId={session.id} hostId={session.host_id} onClose={() => setShowModPanel(false)} />
       )}
 
       {/* Reply modal */}
@@ -1321,7 +1330,7 @@ function FeaturedQuestionCard({ question, isEchoed, isMine, creditsLeft, onEcho,
           {hostView && (
             <div className="mt-4 pt-3 border-t border-brand-border/30 space-y-2">
               <div className="flex items-center gap-2">
-                <button onClick={onSpotlight} className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-2.5 rounded-lg border transition-colors min-h-[44px] ${isSpotlighted ? 'bg-amber-500/20 border-amber-400/50 text-amber-300' : 'border-brand-border/60 text-purple-200/90 hover:border-amber-400/40 hover:text-amber-300'}`}>🎙 {isSpotlighted ? 'Now Answering' : 'Spotlight'}</button>
+                <button onClick={onSpotlight} className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-2.5 rounded-lg border transition-colors min-h-[44px] ${isSpotlighted ? 'bg-amber-500/20 border-amber-400/50 text-amber-300' : 'border-brand-border/60 text-purple-200/90 hover:border-amber-400/40 hover:text-amber-300'}`}>🎙 Now Answering</button>
                 <button onClick={onStar} className={`text-xs font-bold px-3 py-2.5 rounded-lg border transition-colors min-h-[44px] ${question.status === 'starred' ? 'bg-yellow-500/15 border-yellow-500/40 text-yellow-400' : 'border-brand-border/60 text-purple-200/85 hover:text-yellow-400'}`}>★ Star</button>
                 <button onClick={onAnswered} className={`text-xs font-semibold px-3 py-2.5 rounded-lg border transition-colors min-h-[44px] ${question.status === 'answered' ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-400' : 'border-brand-border/60 text-purple-200/85 hover:text-emerald-400'}`}>{question.status === 'answered' ? '✓ Answered' : '✓ Answered'}</button>
               </div>
@@ -1431,14 +1440,14 @@ function QuestionCard({ question, isEchoed, isMine, creditsLeft, onEcho,
                 {/* Spotlight — hero action */}
                 <button
                   onClick={onSpotlight}
-                  title={isSpotlighted ? 'Remove from spotlight' : 'Spotlight — mark as Now Answering'}
+                  title={isSpotlighted ? 'Clear Now Answering' : 'Mark as Now Answering'}
                   className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-2.5 rounded-lg border transition-colors min-h-[44px] ${
                     isSpotlighted
                       ? 'bg-amber-500/20 border-amber-400/50 text-amber-300'
                       : 'border-brand-border/60 text-purple-200/90 hover:border-amber-400/40 hover:text-amber-300 hover:bg-amber-500/10'
                   }`}
                 >
-                  🎙 {isSpotlighted ? 'Now Answering' : 'Spotlight'}
+                  🎙 Now Answering
                 </button>
 
                 {/* Star */}

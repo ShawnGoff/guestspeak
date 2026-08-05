@@ -130,17 +130,22 @@ export async function createQuestion(req: Request, res: Response, next: NextFunc
       throw new AppError(403, 'Question submission has closed for this session');
     }
 
-    // Verify the user has joined (participant row must exist)
-    await verifyParticipant(session_id, userId, guestToken);
+    // Hosts own the session — they bypass join/ban/mute/burst checks entirely
+    const isHostLevel = userId === host_id;
 
-    // Reject if the participant is muted or session-banned (pass IP for platform ban check)
-    await rejectIfMutedOrBanned(session_id, userId, guestToken, req.ip ?? null);
+    // Verify the user has joined (participant row must exist) — hosts bypass
+    if (!isHostLevel) {
+      await verifyParticipant(session_id, userId, guestToken);
+    }
+
+    // Reject if the participant is muted or session-banned — hosts bypass
+    if (!isHostLevel) {
+      await rejectIfMutedOrBanned(session_id, userId, guestToken, req.ip ?? null);
+    }
 
     // Burst limit: 2 questions fire freely; if both land within BURST_WINDOW seconds
     // of each other, a BURST_COOLDOWN cooldown kicks in before the next one.
     // Questions spaced more than BURST_WINDOW seconds apart never trigger the cooldown.
-    // Hosts/org-level callers bypass this entirely.
-    const isHostLevel = userId === host_id;
     if (!isHostLevel) {
       const BURST_LIMIT    = 2;
       const BURST_WINDOW   = 10; // seconds — rapid-fire detection window
@@ -260,7 +265,11 @@ export async function updateQuestionStatus(req: Request, res: Response, next: Ne
     }
 
     await pool.query(
-      `UPDATE questions SET status = $1, updated_at = NOW() WHERE id = $2`,
+      `UPDATE questions
+       SET status = $1,
+           is_spotlighted = CASE WHEN $1 = 'answered' THEN false ELSE is_spotlighted END,
+           updated_at = NOW()
+       WHERE id = $2`,
       [status, id],
     );
 
