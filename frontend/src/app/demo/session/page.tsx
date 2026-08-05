@@ -675,8 +675,10 @@ function SessionPageInner() {
           </aside>
 
           {/* Center Feed */}
-          <main className="flex-1 min-w-0 lg:overflow-y-auto flex flex-col">
-            <div className="flex items-center border-b border-brand-border sticky top-[57px] lg:top-0 bg-brand-bg z-10 px-3 sm:px-5 overflow-x-auto gap-0">
+          <div className="flex-1 min-w-0 flex flex-col lg:min-h-0">
+
+            {/* Sort tabs — always visible, never scrolls away */}
+            <div className="shrink-0 flex items-center border-b border-brand-border bg-brand-bg z-10 overflow-x-auto gap-0">
               {[
                 { id: 'top',      label: '🔥 Top' },
                 { id: 'recent',   label: '🕐 Recent' },
@@ -689,7 +691,7 @@ function SessionPageInner() {
                   className={`px-4 py-3 text-sm font-semibold border-b-2 -mb-px transition-all whitespace-nowrap ${
                     sort === t.id
                       ? 'border-brand-orange text-white'
-                      : 'border-transparent text-white/65 hover:text-white/70'
+                      : 'border-transparent text-white/75 hover:text-white'
                   }`}
                 >
                   {t.label}
@@ -698,13 +700,14 @@ function SessionPageInner() {
               {view === 'audience' && (
                 <button
                   onClick={() => document.getElementById('ask-input')?.focus()}
-                  className="ml-auto hidden sm:flex items-center gap-1.5 bg-orange-gradient text-white font-bold text-xs sm:text-sm px-3 sm:px-4 py-1.5 rounded-lg shadow-orange-glow hover:brightness-110 transition-all my-2 shrink-0"
+                  className="ml-auto hidden sm:flex items-center gap-1.5 bg-orange-gradient text-white font-bold text-xs sm:text-sm px-3 sm:px-4 py-1.5 rounded-lg shadow-orange-glow hover:brightness-110 transition-all my-2 mx-3 shrink-0"
                 >
                   ✏️ Ask a question
                 </button>
               )}
             </div>
 
+            <main className="flex-1 lg:overflow-y-auto">
             <div className="p-4 sm:p-5 flex flex-col gap-3 pb-28 lg:pb-6">
               {featuredQ && (
                 <TopQuestionCard
@@ -737,7 +740,8 @@ function SessionPageInner() {
                 />
               ))}
             </div>
-          </main>
+            </main>
+          </div>
 
           {/* Right Sidebar */}
           <aside className="hidden xl:flex flex-col w-64 border-l border-brand-border shrink-0 overflow-y-auto min-h-0">

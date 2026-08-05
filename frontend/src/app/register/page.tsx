@@ -55,7 +55,10 @@ export default function RegisterPage() {
       </form>
 
       <p className="text-center text-xs text-purple-200/60 mt-5">
-        Just joining a session? You don&apos;t need an account for that.
+        Just joining a session? You don&apos;t need an account for that.{' '}
+        <Link href="/discover" className="text-brand-orange hover:underline font-medium">
+          Browse sessions →
+        </Link>
       </p>
     </AuthShell>
   );

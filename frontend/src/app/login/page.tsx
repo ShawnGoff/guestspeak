@@ -39,7 +39,7 @@ export default function LoginPage() {
     <AuthShell
       title="Take the mic"
       subtitle="Sign in or create a free account — you only need one to host or moderate."
-      footer={<>Just here to ask questions? <Link href="/" className="text-brand-orange hover:text-brand-amber">Continue as guest</Link></>}
+      footer={<>Just joining a session? <Link href="/discover" className="text-brand-orange hover:text-brand-amber">Browse sessions →</Link></>}
     >
       {/* Primary CTA for new users */}
       <Link href={registerHref} className="btn-primary w-full py-3 text-sm text-center block mb-4">
