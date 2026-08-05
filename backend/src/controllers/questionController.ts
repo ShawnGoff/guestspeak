@@ -193,8 +193,24 @@ export async function createQuestion(req: Request, res: Response, next: NextFunc
       }
     }
 
-    // Deduct 1 credit (atomic — prevents double-spend)
-    await spendCredit(session_id, userId, guestToken);
+    // Deduct 1 credit — anon posts draw from a separate anon_credits pool (no replenishment),
+    // regular posts draw from credits_remaining as normal.
+    if (postAnonymously) {
+      const col = userId ? 'user_id' : 'guest_token';
+      const val = userId ?? guestToken;
+      const anonResult = await pool.query(
+        `UPDATE session_participants
+         SET anon_credits = anon_credits - 1
+         WHERE session_id = $1 AND ${col} = $2 AND anon_credits > 0
+         RETURNING anon_credits`,
+        [session_id, val],
+      );
+      if (anonResult.rowCount === 0) {
+        throw new AppError(402, 'Anonymous posting limit reached — post with your name to continue');
+      }
+    } else {
+      await spendCredit(session_id, userId, guestToken);
+    }
 
     // Apply word filter — stored body is always clean
     const cleanBody = await filterText(body);

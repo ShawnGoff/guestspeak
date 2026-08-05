@@ -474,25 +474,29 @@ export async function joinSession(req: Request, res: Response, next: NextFunctio
     // (DO UPDATE leaves ip_address unchanged).
     let credits_remaining: number;
 
+    let anon_credits: number = 2;
+
     if (userId) {
       const result = await pool.query(
         `INSERT INTO session_participants (session_id, user_id, credits_remaining, ip_address)
          VALUES ($1, $2, $3, $4)
          ON CONFLICT (session_id, user_id) DO UPDATE SET session_id = EXCLUDED.session_id
-         RETURNING credits_remaining`,
+         RETURNING credits_remaining, anon_credits`,
         [id, userId, credits, ipAddress],
       );
       credits_remaining = result.rows[0].credits_remaining;
+      anon_credits      = result.rows[0].anon_credits;
     } else {
       const result = await pool.query(
         `INSERT INTO session_participants (session_id, guest_token, credits_remaining, guest_username, ip_address)
          VALUES ($1, $2, $3, $4, $5)
          ON CONFLICT (session_id, guest_token) DO UPDATE
            SET guest_username = EXCLUDED.guest_username
-         RETURNING credits_remaining`,
+         RETURNING credits_remaining, anon_credits`,
         [id, guestToken, credits, guest_username, ipAddress],
       );
       credits_remaining = result.rows[0].credits_remaining;
+      anon_credits      = result.rows[0].anon_credits;
     }
 
     // Broadcast updated participant count to everyone watching the session
@@ -502,7 +506,7 @@ export async function joinSession(req: Request, res: Response, next: NextFunctio
     );
     broadcast(id, { type: 'participant:count', data: { count: countResult.rows[0].count } });
 
-    res.json({ joined: true, credits_remaining });
+    res.json({ joined: true, credits_remaining, anon_credits });
   } catch (err) {
     next(err);
   }

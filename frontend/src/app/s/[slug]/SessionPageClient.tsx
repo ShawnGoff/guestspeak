@@ -52,6 +52,7 @@ export default function SessionPageClient({ params }: SessionPageProps) {
   const [showUsernamePicker, setShowUsernamePicker] = useState(false);
   const [isRegistered, setIsRegistered]             = useState(false);
   const [postAnonymously, setPostAnonymously]       = useState(false);
+  const [anonCredits, setAnonCredits]               = useState(2);
 
   // Credit regen countdown (seconds until next credit)
   // CREDIT_CAP: dot display — always the host's setting.
@@ -105,8 +106,9 @@ export default function SessionPageClient({ params }: SessionPageProps) {
         if (isRegistered) {
           // Registered user — silent auto-join
           try {
-            const joined = await api.post<{ credits_remaining: number }>(`/sessions/${s.id}/join`, {});
+            const joined = await api.post<{ credits_remaining: number; anon_credits: number }>(`/sessions/${s.id}/join`, {});
             setCredits(joined.credits_remaining);
+            setAnonCredits(joined.anon_credits ?? 2);
           } catch (err: any) {
             if (err?.status !== 410 && err?.status !== 403) setCredits(0);
           }
@@ -117,10 +119,11 @@ export default function SessionPageClient({ params }: SessionPageProps) {
               const { token } = await api.post<{ token: string }>('/auth/guest', {});
               localStorage.setItem('aa_token', token);
             }
-            const joined = await api.post<{ credits_remaining: number }>(`/sessions/${s.id}/join`, {
+            const joined = await api.post<{ credits_remaining: number; anon_credits: number }>(`/sessions/${s.id}/join`, {
               guest_username: savedGuestName,
             });
             setCredits(joined.credits_remaining);
+            setAnonCredits(joined.anon_credits ?? 2);
           } catch (err: any) {
             // Name conflict after re-issue: show picker so they can choose another
             if (err?.status === 409) {
@@ -313,7 +316,7 @@ export default function SessionPageClient({ params }: SessionPageProps) {
 
   async function submitQuestion() {
     if (!session || !body.trim()) return;
-    if (!isMod && credits < 1) return;
+    if (!isMod && (postAnonymously ? anonCredits < 1 : credits < 1)) return;
     if (burstCooldown > 0) return;
     setSubmitting(true); setError(null);
     try {
@@ -323,7 +326,11 @@ export default function SessionPageClient({ params }: SessionPageProps) {
         ...(postAnonymously && { post_anonymously: true }),
       });
       setBody(''); setSimilarQuestions([]);
-      setCredits(c => c - 1);
+      if (postAnonymously) {
+        setAnonCredits(c => c - 1);
+      } else {
+        setCredits(c => c - 1);
+      }
       setMyQuestionIds(prev => new Set([...prev, q.id]));
     } catch (err: any) {
       // 429 burst limit — parse seconds from message and start local countdown
@@ -360,9 +367,18 @@ export default function SessionPageClient({ params }: SessionPageProps) {
   // ── Mod actions ───────────────────────────────────────────────────────────
 
   async function setQuestionStatus(questionId: string, status: string) {
+    // Optimistic update — don't wait for SSE round-trip
+    setQuestions(prev => prev.map(q =>
+      q.id === questionId
+        ? { ...q, status: status as any, is_spotlighted: status === 'answered' ? false : (q as any).is_spotlighted }
+        : q
+    ));
     try {
       await api.patch(`/questions/${questionId}/status`, { status });
-    } catch (err: any) { setError(err.message); }
+    } catch (err: any) {
+      setError(err.message);
+      // Revert on failure — SSE will resync from the server's next broadcast
+    }
   }
 
   async function approveQuestion(questionId: string) {
@@ -490,7 +506,8 @@ export default function SessionPageClient({ params }: SessionPageProps) {
     setReopeningSession(true);
     try {
       const updated = await api.post<typeof session>(`/sessions/${session.id}/reopen`, {});
-      setSession(updated);
+      // Preserve caller_role/mod_permissions — reopen endpoint returns a plain Session
+      setSession(prev => ({ ...updated, caller_role: prev?.caller_role, mod_permissions: prev?.mod_permissions }));
     } catch (err: any) {
       setError(err.message ?? 'Failed to reopen session');
     } finally {
@@ -889,6 +906,7 @@ export default function SessionPageClient({ params }: SessionPageProps) {
           body={body}
           setBody={(v) => { setBody(v); fetchSimilar(v); }}
           credits={credits}
+          anonCredits={anonCredits}
           submitting={submitting}
           similarQuestions={similarQuestions}
           onSubmit={submitQuestion}
@@ -1336,10 +1354,10 @@ function FeaturedQuestionCard({ question, isEchoed, isMine, creditsLeft, onEcho,
               </div>
               <div className="flex items-center gap-1.5 flex-wrap">
                 <ModButton onClick={onPin} title={question.is_pinned ? 'Unpin' : 'Pin'} active={!!question.is_pinned}>{question.is_pinned ? 'Unpin' : 'Pin'}</ModButton>
-                <ModButton onClick={onHide} title="Hide" danger={question.status !== 'hidden'} active={question.status === 'hidden'}>{question.status === 'hidden' ? 'Unhide' : 'Hide'}</ModButton>
+                <ModButton onClick={onHide} title="Hide question" danger={question.status !== 'hidden'} active={question.status === 'hidden'}>{question.status === 'hidden' ? 'Unhide' : 'Hide'}</ModButton>
                 <ModButton onClick={onReply} title="Reply">Reply</ModButton>
-                {onMute && <ModButton onClick={onMute} title="Mute" active={!!question.author_is_muted} danger={!question.author_is_muted}>{question.author_is_muted ? 'Unmute' : 'Mute'}</ModButton>}
-                {onRemove && <ModButton onClick={() => { if (confirm('Remove?')) onRemove!(); }} title="Remove" danger>Remove</ModButton>}
+                {onMute && <ModButton onClick={onMute} title={question.author_is_muted ? 'Unmute user' : 'Mute user'} active={!!question.author_is_muted} danger={!question.author_is_muted}>{question.author_is_muted ? 'Unmute User' : 'Mute User'}</ModButton>}
+                {onRemove && <ModButton onClick={() => { if (confirm('Remove this person from the session?')) onRemove!(); }} title="Remove user" danger>Remove User</ModButton>}
               </div>
             </div>
           )}
@@ -1482,17 +1500,17 @@ function QuestionCard({ question, isEchoed, isMine, creditsLeft, onEcho,
                 <ModButton onClick={onPin} title={isPinned ? 'Unpin' : 'Pin to top'} active={isPinned}>
                   {isPinned ? 'Unpin' : 'Pin'}
                 </ModButton>
-                <ModButton onClick={onHide} title={question.status === 'hidden' ? 'Unhide' : 'Hide'} danger={question.status !== 'hidden'} active={question.status === 'hidden'}>
+                <ModButton onClick={onHide} title={question.status === 'hidden' ? 'Unhide question' : 'Hide question'} danger={question.status !== 'hidden'} active={question.status === 'hidden'}>
                   {question.status === 'hidden' ? 'Unhide' : 'Hide'}
                 </ModButton>
                 <ModButton onClick={onReply} title="Add host reply">Reply</ModButton>
                 {onMute && (
-                  <ModButton onClick={onMute} title={question.author_is_muted ? 'Unmute' : 'Mute'} active={!!question.author_is_muted} danger={!question.author_is_muted}>
-                    {question.author_is_muted ? 'Unmute' : 'Mute'}
+                  <ModButton onClick={onMute} title={question.author_is_muted ? 'Unmute user' : 'Mute user'} active={!!question.author_is_muted} danger={!question.author_is_muted}>
+                    {question.author_is_muted ? 'Unmute User' : 'Mute User'}
                   </ModButton>
                 )}
                 {onRemove && (
-                  <ModButton onClick={() => { if (confirm('Remove this person from the session?')) onRemove!(); }} title="Remove from session" danger>Remove</ModButton>
+                  <ModButton onClick={() => { if (confirm('Remove this person from the session?')) onRemove!(); }} title="Remove user from session" danger>Remove User</ModButton>
                 )}
               </div>
             </div>
@@ -1589,9 +1607,9 @@ function ReplyModal({ question, reply, loading, onChange, onSubmit, onClose }: {
 
 // ─── Submit bar ───────────────────────────────────────────────────────────────
 
-function SubmitBar({ body, setBody, credits, submitting, similarQuestions, onSubmit, onEchoSimilar, sessionStatus, isRegistered, postAnonymously, onToggleAnon, isMod, burstCooldown }: {
+function SubmitBar({ body, setBody, credits, anonCredits, submitting, similarQuestions, onSubmit, onEchoSimilar, sessionStatus, isRegistered, postAnonymously, onToggleAnon, isMod, burstCooldown }: {
   body: string; setBody: (v: string) => void;
-  credits: number; submitting: boolean;
+  credits: number; anonCredits: number; submitting: boolean;
   similarQuestions: Question[];
   onSubmit: () => void; onEchoSimilar: (id: string) => void;
   sessionStatus: string;
@@ -1603,7 +1621,8 @@ function SubmitBar({ body, setBody, credits, submitting, similarQuestions, onSub
 }) {
   const MAX = 300;
   const remaining = MAX - body.length;
-  const canSubmit = body.trim().length > 0 && (isMod || credits > 0) && !submitting && sessionStatus !== 'closed' && !burstCooldown;
+  const effectiveCredits = postAnonymously ? anonCredits : credits;
+  const canSubmit = body.trim().length > 0 && (isMod || effectiveCredits > 0) && !submitting && sessionStatus !== 'closed' && !burstCooldown;
 
   return (
     <div className="fixed bottom-0 inset-x-0 z-40 bg-brand-card border-t border-brand-border shadow-2xl pb-[env(safe-area-inset-bottom)]">
@@ -1635,8 +1654,8 @@ function SubmitBar({ body, setBody, credits, submitting, similarQuestions, onSub
             value={body}
             onChange={e => setBody(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); onSubmit(); } }}
-            placeholder={isMod || credits > 0 ? 'Ask a question…' : 'No credits remaining'}
-            disabled={!isMod && credits < 1}
+            placeholder={isMod || effectiveCredits > 0 ? 'Ask a question…' : postAnonymously ? 'Anonymous limit reached — post with your name to continue' : 'No credits remaining'}
+            disabled={!isMod && effectiveCredits < 1}
             maxLength={300}
             rows={2}
             className="w-full bg-brand-bg border border-brand-border rounded-xl px-4 py-3 pr-12
@@ -1667,7 +1686,7 @@ function SubmitBar({ body, setBody, credits, submitting, similarQuestions, onSub
                 <line x1="9" y1="9" x2="9.01" y2="9" strokeWidth="3" />
                 <line x1="15" y1="9" x2="15.01" y2="9" strokeWidth="3" />
               </svg>
-              {postAnonymously ? 'Anon on' : 'Anon off'}
+              {postAnonymously ? `Anon on (${anonCredits} left)` : 'Anon off'}
             </button>
           )}
           <button onClick={onSubmit} disabled={!canSubmit} className="btn-primary px-4 py-3 disabled:opacity-40 disabled:cursor-not-allowed min-w-[64px] text-center">
