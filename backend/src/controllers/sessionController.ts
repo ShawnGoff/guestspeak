@@ -530,32 +530,34 @@ export async function heartbeat(req: Request, res: Response, next: NextFunction)
 
     let credits_remaining: number;
     let regen_exhausted = false;
+    let next_credit_secs: number = CREDIT_REGEN_MINUTES * 60;
 
     if (userId) {
       // Registered users: ceiling-based regen up to USER_CREDIT_CAP
-      const result = await pool.query(
+      await pool.query(
         `UPDATE session_participants
          SET credits_remaining = LEAST(credits_remaining + 1, $1),
              last_credit_at    = NOW()
          WHERE session_id = $2
            AND user_id    = $3
            AND credits_remaining < $1
-           AND (last_credit_at IS NULL OR last_credit_at < NOW() - INTERVAL '${CREDIT_REGEN_MINUTES} minutes')
-         RETURNING credits_remaining`,
+           AND (last_credit_at IS NULL OR last_credit_at < NOW() - INTERVAL '${CREDIT_REGEN_MINUTES} minutes')`,
         [USER_CREDIT_CAP, id, userId],
       );
-      if (!result.rows[0]) {
-        const cur = await pool.query(
-          `SELECT credits_remaining FROM session_participants WHERE session_id = $1 AND user_id = $2`,
-          [id, userId],
-        );
-        credits_remaining = cur.rows[0]?.credits_remaining ?? 0;
-      } else {
-        credits_remaining = result.rows[0].credits_remaining;
-      }
+      const cur = await pool.query(
+        `SELECT credits_remaining,
+                GREATEST(0, EXTRACT(EPOCH FROM (
+                  COALESCE(last_credit_at, NOW() - INTERVAL '${CREDIT_REGEN_MINUTES} minutes')
+                  + INTERVAL '${CREDIT_REGEN_MINUTES} minutes' - NOW()
+                ))::int AS next_credit_secs
+         FROM session_participants WHERE session_id = $1 AND user_id = $2`,
+        [id, userId],
+      );
+      credits_remaining = cur.rows[0]?.credits_remaining ?? 0;
+      next_credit_secs  = cur.rows[0]?.next_credit_secs ?? next_credit_secs;
     } else {
       // Guests: lifetime cap of GUEST_REGEN_LIMIT regen credits — after that, sign up to get more
-      const result = await pool.query(
+      await pool.query(
         `UPDATE session_participants
          SET credits_remaining = credits_remaining + 1,
              last_credit_at    = NOW(),
@@ -563,24 +565,24 @@ export async function heartbeat(req: Request, res: Response, next: NextFunction)
          WHERE session_id  = $2
            AND guest_token = $3
            AND regen_count < $1
-           AND (last_credit_at IS NULL OR last_credit_at < NOW() - INTERVAL '${CREDIT_REGEN_MINUTES} minutes')
-         RETURNING credits_remaining, regen_count`,
+           AND (last_credit_at IS NULL OR last_credit_at < NOW() - INTERVAL '${CREDIT_REGEN_MINUTES} minutes')`,
         [GUEST_REGEN_LIMIT, id, guestToken],
       );
-      if (!result.rows[0]) {
-        const cur = await pool.query(
-          `SELECT credits_remaining, regen_count FROM session_participants WHERE session_id = $1 AND guest_token = $2`,
-          [id, guestToken],
-        );
-        credits_remaining = cur.rows[0]?.credits_remaining ?? 0;
-        regen_exhausted   = (cur.rows[0]?.regen_count ?? 0) >= GUEST_REGEN_LIMIT;
-      } else {
-        credits_remaining = result.rows[0].credits_remaining;
-        regen_exhausted   = result.rows[0].regen_count >= GUEST_REGEN_LIMIT;
-      }
+      const cur = await pool.query(
+        `SELECT credits_remaining, regen_count,
+                GREATEST(0, EXTRACT(EPOCH FROM (
+                  COALESCE(last_credit_at, NOW() - INTERVAL '${CREDIT_REGEN_MINUTES} minutes')
+                  + INTERVAL '${CREDIT_REGEN_MINUTES} minutes' - NOW()
+                ))::int AS next_credit_secs
+         FROM session_participants WHERE session_id = $1 AND guest_token = $2`,
+        [id, guestToken],
+      );
+      credits_remaining = cur.rows[0]?.credits_remaining ?? 0;
+      regen_exhausted   = (cur.rows[0]?.regen_count ?? 0) >= GUEST_REGEN_LIMIT;
+      next_credit_secs  = cur.rows[0]?.next_credit_secs ?? next_credit_secs;
     }
 
-    res.json({ credits_remaining, regen_exhausted });
+    res.json({ credits_remaining, regen_exhausted, next_credit_secs });
   } catch (err) {
     next(err);
   }

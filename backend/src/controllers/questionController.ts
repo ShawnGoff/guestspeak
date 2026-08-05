@@ -136,6 +136,58 @@ export async function createQuestion(req: Request, res: Response, next: NextFunc
     // Reject if the participant is muted or session-banned (pass IP for platform ban check)
     await rejectIfMutedOrBanned(session_id, userId, guestToken, req.ip ?? null);
 
+    // Burst limit: 2 questions fire freely; if both land within BURST_WINDOW seconds
+    // of each other, a BURST_COOLDOWN cooldown kicks in before the next one.
+    // Questions spaced more than BURST_WINDOW seconds apart never trigger the cooldown.
+    // Hosts/org-level callers bypass this entirely.
+    const isHostLevel = userId === host_id;
+    if (!isHostLevel) {
+      const BURST_LIMIT    = 2;
+      const BURST_WINDOW   = 10; // seconds — rapid-fire detection window
+      const BURST_COOLDOWN = 30; // seconds — cooldown after hitting the limit
+      const participantWhere = userId
+        ? 'session_id = $1 AND user_id = $2'
+        : 'session_id = $1 AND guest_token = $2';
+      const participantParam = userId ?? guestToken;
+
+      // Atomic update — allowed when:
+      //   a) first question ever, OR
+      //   b) cooldown expired (last question > BURST_COOLDOWN seconds ago), OR
+      //   c) burst window expired (last question > BURST_WINDOW seconds ago — resets burst), OR
+      //   d) within burst window but haven't hit the limit yet
+      const burstResult = await pool.query(
+        `UPDATE session_participants
+         SET last_question_at = NOW(),
+             question_burst = CASE
+               WHEN last_question_at IS NULL
+                 OR last_question_at < NOW() - INTERVAL '${BURST_COOLDOWN} seconds'
+                 OR last_question_at < NOW() - INTERVAL '${BURST_WINDOW} seconds'
+               THEN 1
+               ELSE question_burst + 1
+             END
+         WHERE ${participantWhere}
+           AND (
+             last_question_at IS NULL
+             OR last_question_at < NOW() - INTERVAL '${BURST_COOLDOWN} seconds'
+             OR last_question_at < NOW() - INTERVAL '${BURST_WINDOW} seconds'
+             OR question_burst < ${BURST_LIMIT}
+           )
+         RETURNING question_burst`,
+        [session_id, participantParam],
+      );
+
+      if (!burstResult.rows[0]) {
+        // Blocked — compute remaining cooldown from last_question_at
+        const cooldownResult = await pool.query(
+          `SELECT GREATEST(0, ${BURST_COOLDOWN} - EXTRACT(EPOCH FROM (NOW() - last_question_at))::int) AS secs
+           FROM session_participants WHERE ${participantWhere}`,
+          [session_id, participantParam],
+        );
+        const secs = cooldownResult.rows[0]?.secs ?? BURST_COOLDOWN;
+        throw new AppError(429, `Slow down — you can ask again in ${secs}s`);
+      }
+    }
+
     // Deduct 1 credit (atomic — prevents double-spend)
     await spendCredit(session_id, userId, guestToken);
 

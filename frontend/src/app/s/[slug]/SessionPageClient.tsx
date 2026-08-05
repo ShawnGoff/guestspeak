@@ -65,6 +65,8 @@ export default function SessionPageClient({ params }: SessionPageProps) {
   const [showRegenModal, setShowRegenModal] = useState(false);
 
   const [showSignupPrompt, setShowSignupPrompt]   = useState(false);
+  const [burstCooldown, setBurstCooldown]         = useState(0); // seconds remaining in burst cooldown
+  const burstTimerRef = useRef<ReturnType<typeof setInterval>>();
 
   // Live UX
   const [showWelcome, setShowWelcome]             = useState(false);
@@ -248,40 +250,54 @@ export default function SessionPageClient({ params }: SessionPageProps) {
 
   // ── Credit regen heartbeat ────────────────────────────────────────────────
 
+  const sendHeartbeat = useCallback(() => {
+    if (!session) return;
+    api.post<{ credits_remaining: number; regen_exhausted?: boolean; next_credit_secs?: number }>(
+      `/sessions/${session.id}/heartbeat`, {}
+    ).then(r => {
+      setCredits(r.credits_remaining);
+      // Seed the timer from the server's authoritative value so refreshes don't reset the countdown
+      if (r.next_credit_secs !== undefined) setNextCreditSecs(r.next_credit_secs);
+      if (r.regen_exhausted) {
+        setRegenExhausted((prev: boolean) => {
+          if (!prev) setShowRegenModal(true);
+          return true;
+        });
+      }
+    }).catch(() => {});
+  }, [session?.id]);
+
+  // Fire once on load to sync the timer with the server's last_credit_at
   useEffect(() => {
     if (!session || session.status === 'closed') return;
-    // Hosts/mods skip the regen countdown
+    const callerRole = session.caller_role ?? 'none';
+    if (['host', 'org_owner', 'org_admin', 'moderator'].includes(callerRole)) return;
+    sendHeartbeat();
+  }, [session?.id]);
+
+  // Tick down every second; fire heartbeat when it hits zero
+  useEffect(() => {
+    if (!session || session.status === 'closed') return;
     const callerRole = session.caller_role ?? 'none';
     if (['host', 'org_owner', 'org_admin', 'moderator'].includes(callerRole)) return;
 
     const interval = setInterval(() => {
       setNextCreditSecs(prev => {
         if (prev <= 1) {
-          // Time's up — send heartbeat
-          api.post<{ credits_remaining: number; regen_exhausted?: boolean }>(`/sessions/${session.id}/heartbeat`, {})
-            .then(r => {
-              setCredits(r.credits_remaining);
-              if (r.regen_exhausted) {
-                setRegenExhausted((prev: boolean) => {
-                  if (!prev) setShowRegenModal(true); // only fire the modal on first exhaustion
-                  return true;
-                });
-              }
-            })
-            .catch(() => {});
-          return REGEN_SECS;
+          sendHeartbeat();
+          return REGEN_SECS; // fallback until server responds with accurate value
         }
         return prev - 1;
       });
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [session?.id, session?.status, session?.caller_role]);
+  }, [session?.id, session?.status, session?.caller_role, sendHeartbeat]);
 
   // ── Similar detection ─────────────────────────────────────────────────────
 
   const fetchSimilar = useCallback((q: string) => {
-    if (!session || q.trim().length < 10) { setSimilarQuestions([]); return; }
+    if (!session || q.trim().length < 4) { setSimilarQuestions([]); return; }
     clearTimeout(similarTimer.current);
     similarTimer.current = setTimeout(async () => {
       try {
@@ -298,6 +314,7 @@ export default function SessionPageClient({ params }: SessionPageProps) {
   async function submitQuestion() {
     if (!session || !body.trim()) return;
     if (!isMod && credits < 1) return;
+    if (burstCooldown > 0) return;
     setSubmitting(true); setError(null);
     try {
       const q = await api.post<Question>('/questions', {
@@ -309,7 +326,21 @@ export default function SessionPageClient({ params }: SessionPageProps) {
       setCredits(c => c - 1);
       setMyQuestionIds(prev => new Set([...prev, q.id]));
     } catch (err: any) {
-      setError(err.message);
+      // 429 burst limit — parse seconds from message and start local countdown
+      const secsMatch = err.message?.match(/(\d+)s/);
+      if (secsMatch) {
+        const secs = parseInt(secsMatch[1]);
+        setBurstCooldown(secs);
+        clearInterval(burstTimerRef.current);
+        burstTimerRef.current = setInterval(() => {
+          setBurstCooldown(prev => {
+            if (prev <= 1) { clearInterval(burstTimerRef.current); return 0; }
+            return prev - 1;
+          });
+        }, 1000);
+      } else {
+        setError(err.message);
+      }
     } finally {
       setSubmitting(false);
     }
@@ -554,9 +585,19 @@ export default function SessionPageClient({ params }: SessionPageProps) {
 
         {/* ── Left sidebar (desktop only) ─────────────────────────────────── */}
         <aside className="hidden lg:flex flex-col w-56 xl:w-64 border-r border-brand-border shrink-0 sticky top-[57px] h-[calc(100vh-57px)] overflow-y-auto">
+          {/* Nav links */}
+          <div className="px-4 py-3 border-b border-brand-border/40 flex items-center justify-between">
+            <Link href="/discover" className="text-xs text-purple-200/85 hover:text-white transition-colors flex items-center gap-1.5">
+              <span>←</span> Discover
+            </Link>
+            {isRegistered
+              ? <Link href="/dashboard" className="text-xs text-purple-200/85 hover:text-white transition-colors">Dashboard</Link>
+              : <Link href="/login" className="text-xs text-brand-orange/80 hover:text-brand-orange transition-colors">Sign in</Link>
+            }
+          </div>
           <div className="p-5 flex flex-col gap-5">
             <div>
-              <p className="text-[10px] font-bold text-purple-200/75 uppercase tracking-widest mb-3">Session</p>
+              <p className="text-[10px] font-bold text-purple-200/90 uppercase tracking-widest mb-3">Session</p>
               <h2 className="font-bold text-white text-sm leading-snug mb-1">{session.title}</h2>
               {session.host_username && (
                 <p className="text-xs text-purple-200/85">Hosted by <span className="text-brand-amber font-semibold">{session.host_username}</span></p>
@@ -622,20 +663,20 @@ export default function SessionPageClient({ params }: SessionPageProps) {
             <div className="card p-4 mb-6 flex flex-wrap gap-6 items-center">
               <div className="text-center">
                 <p className="text-2xl font-extrabold text-white">{(session as any).question_count ?? questions.length}</p>
-                <p className="text-xs text-purple-200/70 mt-0.5">Questions</p>
+                <p className="text-xs text-purple-200/85 mt-0.5">Questions</p>
               </div>
               <div className="text-center">
                 <p className="text-2xl font-extrabold text-white">{(session as any).participant_count ?? '—'}</p>
-                <p className="text-xs text-purple-200/70 mt-0.5">Participants</p>
+                <p className="text-xs text-purple-200/85 mt-0.5">Participants</p>
               </div>
               <div className="text-center">
                 <p className="text-2xl font-extrabold text-brand-amber">{(session as any).total_echoes ?? '—'}</p>
-                <p className="text-xs text-purple-200/70 mt-0.5">Total Echoes</p>
+                <p className="text-xs text-purple-200/85 mt-0.5">Total Echoes</p>
               </div>
               {session.ends_at && (
                 <div className="text-center">
                   <p className="text-sm font-semibold text-white">{new Date(session.ends_at).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}</p>
-                  <p className="text-xs text-purple-200/70 mt-0.5">Session date</p>
+                  <p className="text-xs text-purple-200/85 mt-0.5">Session date</p>
                 </div>
               )}
             </div>
@@ -661,7 +702,7 @@ export default function SessionPageClient({ params }: SessionPageProps) {
                 className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border transition-colors ${
                   pendingQuestions.length > 0
                     ? 'bg-amber-500/10 border-amber-500/30 text-amber-300'
-                    : 'bg-brand-card border-brand-border/50 text-purple-200/70'
+                    : 'bg-brand-card border-brand-border/50 text-purple-200/85'
                 }`}
               >
                 <div className="flex items-center gap-2">
@@ -679,12 +720,12 @@ export default function SessionPageClient({ params }: SessionPageProps) {
               {showPending && (
                 <div className="mt-2 space-y-2">
                   {pendingQuestions.length === 0 && (
-                    <p className="text-center text-xs text-purple-200/60 py-4">No questions waiting for approval.</p>
+                    <p className="text-center text-xs text-purple-200/75 py-4">No questions waiting for approval.</p>
                   )}
                   {pendingQuestions.map(q => (
                     <div key={q.id} className="card p-4 border-amber-500/20">
                       <p className="text-white text-sm leading-relaxed mb-1">{q.body}</p>
-                      {q.author_username && <p className="text-xs text-purple-200/60 mb-3">{q.author_username}</p>}
+                      {q.author_username && <p className="text-xs text-purple-200/75 mb-3">{q.author_username}</p>}
                       <div className="flex gap-2">
                         <button onClick={() => approveQuestion(q.id)} className="flex-1 text-sm py-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-semibold hover:bg-emerald-500/20 transition-colors min-h-[44px]">✓ Approve</button>
                         <button onClick={() => { if (confirm('Reject this question?')) rejectQuestion(q.id); }} className="flex-1 text-sm py-2.5 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 font-semibold hover:bg-red-500/20 transition-colors min-h-[44px]">✕ Reject</button>
@@ -722,7 +763,7 @@ export default function SessionPageClient({ params }: SessionPageProps) {
 
             {/* Remaining questions */}
             {listQuestions.length === 0 && !featuredQuestion && (
-              <div className="text-center py-16 text-purple-200/70">
+              <div className="text-center py-16 text-purple-200/85">
                 <p className="text-4xl mb-3">
                   {sort === 'starred' ? '★' : sort === 'answered' ? '✓' : '❓'}
                 </p>
@@ -764,7 +805,7 @@ export default function SessionPageClient({ params }: SessionPageProps) {
         <aside className="hidden xl:flex flex-col w-64 border-l border-brand-border shrink-0 sticky top-[57px] h-[calc(100vh-57px)] overflow-y-auto">
           {/* Top Questions */}
           <div className="p-5 border-b border-brand-border/40">
-            <p className="text-[10px] font-bold text-purple-200/75 uppercase tracking-widest mb-4">Top Questions</p>
+            <p className="text-[10px] font-bold text-purple-200/90 uppercase tracking-widest mb-4">Top Questions</p>
             <div className="flex flex-col gap-3">
               {questions
                 .filter(q => q.status !== 'hidden' && q.status !== 'answered')
@@ -782,7 +823,7 @@ export default function SessionPageClient({ params }: SessionPageProps) {
                   </div>
                 ))}
               {questions.filter(q => q.status !== 'hidden').length === 0 && (
-                <p className="text-xs text-purple-200/70 text-center py-4">No questions yet</p>
+                <p className="text-xs text-purple-200/85 text-center py-4">No questions yet</p>
               )}
             </div>
           </div>
@@ -802,8 +843,8 @@ export default function SessionPageClient({ params }: SessionPageProps) {
             return (
               <div className="p-5">
                 <div className="flex items-center justify-between mb-4">
-                  <p className="text-[10px] font-bold text-purple-200/75 uppercase tracking-widest">Top Participants</p>
-                  <p className="text-[10px] text-purple-200/50">Echoes received</p>
+                  <p className="text-[10px] font-bold text-purple-200/90 uppercase tracking-widest">Top Participants</p>
+                  <p className="text-[10px] text-purple-200/70">Echoes received</p>
                 </div>
                 <div className="flex flex-col gap-3">
                   {top.map((p, i) => (
@@ -818,8 +859,8 @@ export default function SessionPageClient({ params }: SessionPageProps) {
                         {p.name[0].toUpperCase()}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-xs font-semibold text-purple-200/70 truncate">{p.name}</p>
-                        <p className="text-[11px] text-purple-200/50">{p.echoes} echoes received</p>
+                        <p className="text-xs font-semibold text-purple-200/85 truncate">{p.name}</p>
+                        <p className="text-[11px] text-purple-200/70">{p.echoes} echoes received</p>
                       </div>
                       <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${i === 0 ? 'bg-brand-amber/20 text-brand-amber' : 'bg-white/5 text-purple-200/65'}`}>
                         {p.echoes}
@@ -848,6 +889,7 @@ export default function SessionPageClient({ params }: SessionPageProps) {
           postAnonymously={postAnonymously}
           onToggleAnon={() => setPostAnonymously(p => !p)}
           isMod={isMod}
+          burstCooldown={burstCooldown}
         />
       )}
 
@@ -952,7 +994,7 @@ function SessionHeader({ session, isLiveSoon, credits, isMod, hostView, particip
           <div className="flex items-center gap-2 mb-0.5">
             <StatusBadge status={session.status} isLiveSoon={isLiveSoon} />
             {session.status === 'live' && participantCount !== null && (
-              <span className="text-xs text-purple-200/70 flex items-center gap-1">
+              <span className="text-xs text-purple-200/85 flex items-center gap-1">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400/60" />
                 {participantCount}
               </span>
@@ -972,7 +1014,7 @@ function SessionHeader({ session, isLiveSoon, credits, isMod, hostView, particip
           </div>
           <h1 className="text-white font-bold text-base leading-tight truncate">{session.title}</h1>
           {session.host_username && (
-            <p className="text-purple-200/75 text-xs mt-0.5">hosted by {session.host_username}</p>
+            <p className="text-purple-200/90 text-xs mt-0.5">hosted by {session.host_username}</p>
           )}
         </div>
 
@@ -984,15 +1026,19 @@ function SessionHeader({ session, isLiveSoon, credits, isMod, hostView, particip
               className={`text-xs font-semibold px-2.5 py-1 rounded-lg border transition-colors ${
                 hostView
                   ? 'bg-brand-orange/20 border-brand-orange text-brand-orange'
-                  : 'border-brand-border text-purple-200/75 hover:border-brand-orange hover:text-brand-orange'
+                  : 'border-brand-border text-purple-200/90 hover:border-brand-orange hover:text-brand-orange'
               }`}
             >
               {hostView ? '★ Host view' : 'Host view'}
             </button>
           )}
-          {!isMod && (
-            <Link href="/" className="text-xs text-purple-200/60 hover:text-purple-200/85">Guest<span className="text-brand-orange/40">Speak</span></Link>
-          )}
+          <div className="flex items-center gap-3 lg:hidden">
+            <Link href="/discover" className="text-xs text-purple-200/85 hover:text-white transition-colors">← Discover</Link>
+            {isMod
+              ? null
+              : <Link href="/dashboard" className="text-xs text-purple-200/75 hover:text-white transition-colors">Dashboard</Link>
+            }
+          </div>
         </div>
       </div>
     </header>
@@ -1065,8 +1111,8 @@ function HostControlBar({ session, closing, reopening, deleting, onGoLive, onClo
           )}
           {session.status === 'closed' && (
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-xs font-semibold text-purple-200/70 uppercase tracking-wider">Session ended</span>
-              <button onClick={onExport} className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-brand-border text-purple-200/75 hover:text-white transition-colors">
+              <span className="text-xs font-semibold text-purple-200/85 uppercase tracking-wider">Session ended</span>
+              <button onClick={onExport} className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-brand-border text-purple-200/90 hover:text-white transition-colors">
                 <DownloadIcon /> Export CSV
               </button>
               <button onClick={onReopen} disabled={reopening} className="text-xs px-3 py-1.5 rounded-lg border border-emerald-600/50 text-emerald-400 hover:bg-emerald-900/20 transition-colors disabled:opacity-40">
@@ -1087,7 +1133,7 @@ function HostControlBar({ session, closing, reopening, deleting, onGoLive, onClo
                 copied ? 'border-emerald-500/50 text-emerald-400' : 'border-brand-border text-white hover:border-brand-purple'
               }`}
             >
-              <span className="text-purple-200/70 text-xs font-sans">Code</span>
+              <span className="text-purple-200/85 text-xs font-sans">Code</span>
               <span className="text-sm font-bold tracking-widest">{joinCode}</span>
               {copied ? <CheckIcon /> : <CopyIcon />}
             </button>
@@ -1098,7 +1144,7 @@ function HostControlBar({ session, closing, reopening, deleting, onGoLive, onClo
             <button
               onClick={() => setShowQR(v => !v)}
               title="Show QR code"
-              className={`p-2.5 rounded-lg border transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center ${showQR ? 'border-brand-purple text-brand-purple' : 'border-brand-border text-purple-200/70 hover:text-white hover:border-brand-border'}`}
+              className={`p-2.5 rounded-lg border transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center ${showQR ? 'border-brand-purple text-brand-purple' : 'border-brand-border text-purple-200/85 hover:text-white hover:border-brand-border'}`}
             >
               <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" />
@@ -1111,7 +1157,7 @@ function HostControlBar({ session, closing, reopening, deleting, onGoLive, onClo
           {/* Share */}
           {session.status !== 'closed' && (
             <button onClick={share} title="Share session link"
-              className={`p-2.5 rounded-lg border transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center ${shared ? 'border-emerald-500/50 text-emerald-400' : 'border-brand-border text-purple-200/70 hover:text-white hover:border-brand-border'}`}>
+              className={`p-2.5 rounded-lg border transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center ${shared ? 'border-emerald-500/50 text-emerald-400' : 'border-brand-border text-purple-200/85 hover:text-white hover:border-brand-border'}`}>
               {shared ? <CheckIcon /> : <ShareIcon />}
             </button>
           )}
@@ -1120,9 +1166,9 @@ function HostControlBar({ session, closing, reopening, deleting, onGoLive, onClo
         {/* Secondary row — owner-only admin actions */}
         {isOwner && (
           <div className="flex items-center gap-2 mt-2 pt-2 border-t border-brand-border/30 max-w-7xl">
-            <Link href={`/s/${session.slug}/edit`} className="text-xs text-purple-200/70 hover:text-purple-200/90 transition-colors">Edit session</Link>
+            <Link href={`/s/${session.slug}/edit`} className="text-xs text-purple-200/85 hover:text-purple-200/90 transition-colors">Edit session</Link>
             <span className="text-brand-border">·</span>
-            <button onClick={onManageMods} className="text-xs text-purple-200/70 hover:text-purple-200/90 transition-colors">Manage moderators</button>
+            <button onClick={onManageMods} className="text-xs text-purple-200/85 hover:text-purple-200/90 transition-colors">Manage moderators</button>
           </div>
         )}
       </div>
@@ -1133,7 +1179,7 @@ function HostControlBar({ session, closing, reopening, deleting, onGoLive, onClo
           <div className="bg-white rounded-2xl p-4 inline-block">
             <QRCode value={joinUrl} size={160} />
           </div>
-          <p className="text-xs text-purple-200/70">Audience scans to join — no app needed</p>
+          <p className="text-xs text-purple-200/85">Audience scans to join — no app needed</p>
         </div>
       )}
     </div>
@@ -1163,9 +1209,9 @@ function CreditDisplay({ credits, max, nextCreditSecs, creditCap, regenCap }: {
           <div key={i} className={`w-2.5 h-2.5 rounded-full transition-colors ${i < credits ? 'bg-brand-orange' : 'bg-brand-border/60'}`} />
         ))}
       </div>
-      <span className={`text-xs font-bold ${credits > 0 ? 'text-brand-amber' : 'text-purple-200/70'}`}>{credits}</span>
+      <span className={`text-xs font-bold ${credits > 0 ? 'text-brand-amber' : 'text-purple-200/85'}`}>{credits}</span>
       {showCountdown && (
-        <span className="text-xs text-purple-200/75 tabular-nums">+1 in {mins}:{secs}</span>
+        <span className="text-xs text-purple-200/90 tabular-nums">+1 in {mins}:{secs}</span>
       )}
     </div>
   );
@@ -1185,7 +1231,7 @@ function StatusBadge({ status, isLiveSoon }: { status: string; isLiveSoon: boole
     </span>
   );
   if (status === 'closed') return (
-    <span className="px-2 py-0.5 rounded-full bg-brand-border/30 text-purple-200/75 text-xs font-semibold">Ended</span>
+    <span className="px-2 py-0.5 rounded-full bg-brand-border/30 text-purple-200/90 text-xs font-semibold">Ended</span>
   );
   return (
     <span className="px-2 py-0.5 rounded-full bg-brand-purple/20 text-brand-amber text-xs font-semibold">Upcoming</span>
@@ -1211,7 +1257,7 @@ function SortTabs({ sort, onChange }: { sort: SortOption; onChange: (s: SortOpti
           className={`px-4 py-3 text-sm font-semibold border-b-2 -mb-px whitespace-nowrap transition-all ${
             sort === tab.value
               ? 'border-brand-orange text-white'
-              : 'border-transparent text-purple-200/70 hover:text-purple-200/90'
+              : 'border-transparent text-purple-200/85 hover:text-purple-200/90'
           }`}
         >
           {tab.label}
@@ -1261,7 +1307,7 @@ function FeaturedQuestionCard({ question, isEchoed, isMine, creditsLeft, onEcho,
             )}
             {isMine && <span className="text-xs text-brand-orange/60 font-medium">Your question</span>}
             {question.author_username && (
-              <span className={`text-xs ${question.post_anonymously ? 'text-purple-300/50 italic' : 'text-purple-200/70'}`}>
+              <span className={`text-xs ${question.post_anonymously ? 'text-purple-300/50 italic' : 'text-purple-200/85'}`}>
                 {question.author_username}
               </span>
             )}
@@ -1275,9 +1321,9 @@ function FeaturedQuestionCard({ question, isEchoed, isMine, creditsLeft, onEcho,
           {hostView && (
             <div className="mt-4 pt-3 border-t border-brand-border/30 space-y-2">
               <div className="flex items-center gap-2">
-                <button onClick={onSpotlight} className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-2.5 rounded-lg border transition-colors min-h-[44px] ${isSpotlighted ? 'bg-amber-500/20 border-amber-400/50 text-amber-300' : 'border-brand-border/60 text-purple-200/75 hover:border-amber-400/40 hover:text-amber-300'}`}>🎙 {isSpotlighted ? 'Now Answering' : 'Spotlight'}</button>
-                <button onClick={onStar} className={`text-xs font-bold px-3 py-2.5 rounded-lg border transition-colors min-h-[44px] ${question.status === 'starred' ? 'bg-yellow-500/15 border-yellow-500/40 text-yellow-400' : 'border-brand-border/60 text-purple-200/70 hover:text-yellow-400'}`}>★ Star</button>
-                <button onClick={onAnswered} className={`text-xs font-semibold px-3 py-2.5 rounded-lg border transition-colors min-h-[44px] ${question.status === 'answered' ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-400' : 'border-brand-border/60 text-purple-200/70 hover:text-emerald-400'}`}>{question.status === 'answered' ? 'Answered' : '✓'}</button>
+                <button onClick={onSpotlight} className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-2.5 rounded-lg border transition-colors min-h-[44px] ${isSpotlighted ? 'bg-amber-500/20 border-amber-400/50 text-amber-300' : 'border-brand-border/60 text-purple-200/90 hover:border-amber-400/40 hover:text-amber-300'}`}>🎙 {isSpotlighted ? 'Now Answering' : 'Spotlight'}</button>
+                <button onClick={onStar} className={`text-xs font-bold px-3 py-2.5 rounded-lg border transition-colors min-h-[44px] ${question.status === 'starred' ? 'bg-yellow-500/15 border-yellow-500/40 text-yellow-400' : 'border-brand-border/60 text-purple-200/85 hover:text-yellow-400'}`}>★ Star</button>
+                <button onClick={onAnswered} className={`text-xs font-semibold px-3 py-2.5 rounded-lg border transition-colors min-h-[44px] ${question.status === 'answered' ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-400' : 'border-brand-border/60 text-purple-200/85 hover:text-emerald-400'}`}>{question.status === 'answered' ? '✓ Answered' : '✓ Answered'}</button>
               </div>
               <div className="flex items-center gap-1.5 flex-wrap">
                 <ModButton onClick={onPin} title={question.is_pinned ? 'Unpin' : 'Pin'} active={!!question.is_pinned}>{question.is_pinned ? 'Unpin' : 'Pin'}</ModButton>
@@ -1299,8 +1345,8 @@ function FeaturedQuestionCard({ question, isEchoed, isMine, creditsLeft, onEcho,
               isEchoed
                 ? 'border-brand-amber/50 bg-brand-amber/10 text-brand-amber'
                 : canEcho
-                ? 'border-brand-border text-purple-200/75 hover:border-brand-orange/60 hover:bg-brand-orange/10 hover:text-brand-orange'
-                : 'border-brand-border/30 text-purple-200/50 cursor-not-allowed'
+                ? 'border-brand-border text-purple-200/90 hover:border-brand-orange/60 hover:bg-brand-orange/10 hover:text-brand-orange'
+                : 'border-brand-border/30 text-purple-200/70 cursor-not-allowed'
             }`}
           >
             <span className="text-xl font-black leading-none">↑</span>
@@ -1363,7 +1409,7 @@ function QuestionCard({ question, isEchoed, isMine, creditsLeft, onEcho,
             {question.status === 'starred'  && <span className="text-xs text-yellow-400 font-semibold">★ Starred</span>}
             {question.status === 'answered' && <span className="text-xs text-emerald-400 font-semibold">✓ Answered</span>}
             {question.author_username && (
-              <span className={`text-xs ${question.post_anonymously ? 'text-purple-300/50 italic' : 'text-purple-200/60'}`}>
+              <span className={`text-xs ${question.post_anonymously ? 'text-purple-300/50 italic' : 'text-purple-200/75'}`}>
                 {question.author_username}
               </span>
             )}
@@ -1389,7 +1435,7 @@ function QuestionCard({ question, isEchoed, isMine, creditsLeft, onEcho,
                   className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-2.5 rounded-lg border transition-colors min-h-[44px] ${
                     isSpotlighted
                       ? 'bg-amber-500/20 border-amber-400/50 text-amber-300'
-                      : 'border-brand-border/60 text-purple-200/75 hover:border-amber-400/40 hover:text-amber-300 hover:bg-amber-500/10'
+                      : 'border-brand-border/60 text-purple-200/90 hover:border-amber-400/40 hover:text-amber-300 hover:bg-amber-500/10'
                   }`}
                 >
                   🎙 {isSpotlighted ? 'Now Answering' : 'Spotlight'}
@@ -1402,7 +1448,7 @@ function QuestionCard({ question, isEchoed, isMine, creditsLeft, onEcho,
                   className={`text-xs font-bold px-3 py-2.5 rounded-lg border transition-colors min-h-[44px] ${
                     question.status === 'starred'
                       ? 'bg-yellow-500/15 border-yellow-500/40 text-yellow-400'
-                      : 'border-brand-border/60 text-purple-200/70 hover:text-yellow-400 hover:border-yellow-500/30'
+                      : 'border-brand-border/60 text-purple-200/85 hover:text-yellow-400 hover:border-yellow-500/30'
                   }`}
                 >
                   ★ Star
@@ -1415,10 +1461,10 @@ function QuestionCard({ question, isEchoed, isMine, creditsLeft, onEcho,
                   className={`text-xs font-semibold px-3 py-2.5 rounded-lg border transition-colors min-h-[44px] ${
                     question.status === 'answered'
                       ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-400'
-                      : 'border-brand-border/60 text-purple-200/70 hover:text-emerald-400 hover:border-emerald-500/30'
+                      : 'border-brand-border/60 text-purple-200/85 hover:text-emerald-400 hover:border-emerald-500/30'
                   }`}
                 >
-                  {question.status === 'answered' ? 'Answered' : '✓'}
+                  {question.status === 'answered' ? '✓ Answered' : '✓ Answered'}
                 </button>
               </div>
 
@@ -1454,8 +1500,8 @@ function QuestionCard({ question, isEchoed, isMine, creditsLeft, onEcho,
               isEchoed
                 ? 'border-brand-amber/50 bg-brand-amber/10 text-brand-amber'
                 : canEcho
-                ? 'border-brand-border text-purple-200/75 hover:border-brand-orange/60 hover:bg-brand-orange/10 hover:text-brand-orange'
-                : 'border-brand-border/30 text-purple-200/50 cursor-not-allowed'
+                ? 'border-brand-border text-purple-200/90 hover:border-brand-orange/60 hover:bg-brand-orange/10 hover:text-brand-orange'
+                : 'border-brand-border/30 text-purple-200/70 cursor-not-allowed'
             }`}
           >
             <span className="text-base font-black leading-none">↑</span>
@@ -1482,7 +1528,7 @@ function ModButton({ children, active, danger, onClick, title }: {
       className={`text-xs px-3 py-2.5 rounded-lg border transition-colors font-semibold min-h-[44px] ${
         active  ? 'border-emerald-500/50 bg-emerald-500/10 text-emerald-400' :
         danger  ? 'border-red-700/40 text-red-400 hover:bg-red-900/20' :
-                  'border-brand-border/60 text-purple-200/75 hover:border-brand-purple hover:text-white'
+                  'border-brand-border/60 text-purple-200/90 hover:border-brand-purple hover:text-white'
       }`}
     >
       {children}
@@ -1505,11 +1551,11 @@ function ReplyModal({ question, reply, loading, onChange, onSubmit, onClose }: {
       <div className="card p-6 w-full max-w-lg">
         <div className="flex items-center justify-between mb-2">
           <h2 className="font-bold text-white">Host reply</h2>
-          <button onClick={onClose} className="text-purple-200/70 hover:text-white transition-colors p-1" aria-label="Close">
+          <button onClick={onClose} className="text-purple-200/85 hover:text-white transition-colors p-1" aria-label="Close">
             <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
           </button>
         </div>
-        <p className="text-purple-200/75 text-sm mb-4 line-clamp-2">{question.body}</p>
+        <p className="text-purple-200/90 text-sm mb-4 line-clamp-2">{question.body}</p>
         <form onSubmit={e => { e.preventDefault(); onSubmit(); }}>
           <textarea
             value={reply}
@@ -1534,7 +1580,7 @@ function ReplyModal({ question, reply, loading, onChange, onSubmit, onClose }: {
 
 // ─── Submit bar ───────────────────────────────────────────────────────────────
 
-function SubmitBar({ body, setBody, credits, submitting, similarQuestions, onSubmit, onEchoSimilar, sessionStatus, isRegistered, postAnonymously, onToggleAnon, isMod }: {
+function SubmitBar({ body, setBody, credits, submitting, similarQuestions, onSubmit, onEchoSimilar, sessionStatus, isRegistered, postAnonymously, onToggleAnon, isMod, burstCooldown }: {
   body: string; setBody: (v: string) => void;
   credits: number; submitting: boolean;
   similarQuestions: Question[];
@@ -1544,10 +1590,11 @@ function SubmitBar({ body, setBody, credits, submitting, similarQuestions, onSub
   postAnonymously: boolean;
   onToggleAnon: () => void;
   isMod?: boolean;
+  burstCooldown?: number;
 }) {
   const MAX = 300;
   const remaining = MAX - body.length;
-  const canSubmit = body.trim().length > 0 && (isMod || credits > 0) && !submitting && sessionStatus !== 'closed';
+  const canSubmit = body.trim().length > 0 && (isMod || credits > 0) && !submitting && sessionStatus !== 'closed' && !burstCooldown;
 
   return (
     <div className="fixed bottom-0 inset-x-0 z-40 bg-brand-card border-t border-brand-border shadow-2xl pb-[env(safe-area-inset-bottom)]">
@@ -1587,7 +1634,7 @@ function SubmitBar({ body, setBody, credits, submitting, similarQuestions, onSub
                        text-white text-base placeholder-purple-200/40 resize-none
                        focus:outline-none focus:border-brand-purple transition-colors disabled:opacity-40"
           />
-          <span className={`absolute right-3 bottom-3 text-xs ${remaining < 50 ? 'text-red-400' : 'text-purple-200/70'}`}>
+          <span className={`absolute right-3 bottom-3 text-xs ${remaining < 50 ? 'text-red-400' : 'text-purple-200/85'}`}>
             {remaining} left
           </span>
         </div>
@@ -1601,7 +1648,7 @@ function SubmitBar({ body, setBody, credits, submitting, similarQuestions, onSub
               className={`flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg border transition-colors ${
                 postAnonymously
                   ? 'bg-purple-500/15 border-purple-500/30 text-purple-300'
-                  : 'bg-white/5 border-white/10 text-purple-200/70 hover:text-purple-200/90'
+                  : 'bg-white/5 border-white/10 text-purple-200/85 hover:text-purple-200/90'
               }`}
             >
               {/* Mask icon */}
@@ -1614,8 +1661,8 @@ function SubmitBar({ body, setBody, credits, submitting, similarQuestions, onSub
               {postAnonymously ? 'Anon on' : 'Anon off'}
             </button>
           )}
-          <button onClick={onSubmit} disabled={!canSubmit} className="btn-primary px-4 py-3 disabled:opacity-40 disabled:cursor-not-allowed">
-            {submitting ? '…' : 'Ask'}
+          <button onClick={onSubmit} disabled={!canSubmit} className="btn-primary px-4 py-3 disabled:opacity-40 disabled:cursor-not-allowed min-w-[64px] text-center">
+            {submitting ? '…' : burstCooldown ? `${burstCooldown}s` : 'Ask'}
           </button>
         </div>
       </div>
@@ -1630,7 +1677,7 @@ function LoadingScreen() {
     <div className="min-h-screen bg-brand-bg flex items-center justify-center">
       <div className="text-center">
         <div className="w-8 h-8 border-2 border-brand-orange border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-        <p className="text-purple-200/75 text-sm">Joining session…</p>
+        <p className="text-purple-200/90 text-sm">Joining session…</p>
       </div>
     </div>
   );
@@ -1642,7 +1689,7 @@ function ErrorScreen({ message }: { message: string }) {
       <div className="text-center card p-8 max-w-sm">
         <p className="text-4xl mb-3">🔍</p>
         <h2 className="text-white font-bold text-lg mb-2">Session not found</h2>
-        <p className="text-purple-200/75 text-sm mb-6">{message}</p>
+        <p className="text-purple-200/90 text-sm mb-6">{message}</p>
         <Link href="/" className="btn-primary">Back to GuestSpeak</Link>
       </div>
     </div>
@@ -1677,13 +1724,13 @@ function GuestSignupPrompt({ slug, onDismiss }: { slug: string; onDismiss: () =>
         </Link>
         <Link
           href={`/login?next=${encodeURIComponent('/s/' + slug)}`}
-          className="block text-sm text-purple-200/75 hover:text-white transition-colors mb-4"
+          className="block text-sm text-purple-200/90 hover:text-white transition-colors mb-4"
         >
           Already have an account? Sign in
         </Link>
         <button
           onClick={onDismiss}
-          className="text-xs text-purple-200/60 hover:text-purple-200/75 transition-colors"
+          className="text-xs text-purple-200/75 hover:text-purple-200/90 transition-colors"
         >
           Maybe later — continue watching
         </button>
@@ -1739,7 +1786,7 @@ function RegenUpgradeModal({ slug, onDismiss }: { slug: string; onDismiss: () =>
             </svg>
           </div>
           <h2 className="text-white font-bold text-xl mb-2">You&apos;re in!</h2>
-          <p className="text-purple-200/75 text-sm">Reloading your session with unlimited replenishment…</p>
+          <p className="text-purple-200/90 text-sm">Reloading your session with unlimited replenishment…</p>
         </div>
       </div>
     );
@@ -1758,7 +1805,7 @@ function RegenUpgradeModal({ slug, onDismiss }: { slug: string; onDismiss: () =>
         </div>
 
         <h2 className="text-white font-bold text-xl text-center mb-1">Keep up your contribution!</h2>
-        <p className="text-purple-200/75 text-sm text-center mb-6">
+        <p className="text-purple-200/90 text-sm text-center mb-6">
           Create a free account to receive{' '}
           <span className="text-brand-amber font-semibold">unlimited credit replenishment</span>{' '}
           for the rest of this event.
@@ -1804,7 +1851,7 @@ function RegenUpgradeModal({ slug, onDismiss }: { slug: string; onDismiss: () =>
           </button>
         </form>
 
-        <p className="text-xs text-purple-200/60 text-center mt-4">
+        <p className="text-xs text-purple-200/75 text-center mt-4">
           Already have an account?{' '}
           <Link
             href={`/login?next=${encodeURIComponent('/s/' + slug)}`}
@@ -1816,7 +1863,7 @@ function RegenUpgradeModal({ slug, onDismiss }: { slug: string; onDismiss: () =>
 
         <button
           onClick={onDismiss}
-          className="block w-full text-center text-xs text-purple-200/50 hover:text-purple-200/70 transition-colors mt-3"
+          className="block w-full text-center text-xs text-purple-200/70 hover:text-purple-200/85 transition-colors mt-3"
         >
           Maybe later — I still have credits
         </button>
@@ -1858,13 +1905,13 @@ function WelcomeScreen({ session, onEnter }: {
         <h1 className="text-white font-bold text-xl leading-snug mb-3">{session.title}</h1>
 
         {session.description && (
-          <p className="text-purple-200/75 text-sm leading-relaxed mb-6">{session.description}</p>
+          <p className="text-purple-200/90 text-sm leading-relaxed mb-6">{session.description}</p>
         )}
 
         <div className="flex items-center justify-center gap-2 mb-8">
           <StatusBadge status={session.status} isLiveSoon={false} />
           {session.host_username && (
-            <span className="text-xs text-purple-200/70">· hosted by {session.host_username}</span>
+            <span className="text-xs text-purple-200/85">· hosted by {session.host_username}</span>
           )}
         </div>
 
@@ -1872,7 +1919,7 @@ function WelcomeScreen({ session, onEnter }: {
           Enter Q&amp;A
         </button>
 
-        <p className="text-xs text-purple-200/50 mt-5">Powered by GuestSpeak</p>
+        <p className="text-xs text-purple-200/70 mt-5">Powered by GuestSpeak</p>
       </div>
     </div>
   );
@@ -1972,13 +2019,13 @@ function StreamEmbed({ url, sessionSlug }: { url: string; sessionSlug: string })
             <circle cx="12" cy="12" r="10" />
             <polygon points="10 8 16 12 10 16 10 8" fill="currentColor" stroke="none" />
           </svg>
-          <span className="text-xs font-semibold text-purple-200/75 uppercase tracking-wider">
+          <span className="text-xs font-semibold text-purple-200/90 uppercase tracking-wider">
             {info.type === 'youtube' ? 'YouTube Live' : 'Twitch Stream'}
           </span>
         </div>
         <button
           onClick={toggle}
-          className="text-xs text-purple-200/70 hover:text-purple-200/90 transition-colors flex items-center gap-1"
+          className="text-xs text-purple-200/85 hover:text-purple-200/90 transition-colors flex items-center gap-1"
         >
           {hidden ? (
             <>
@@ -2010,7 +2057,7 @@ function StreamEmbed({ url, sessionSlug }: { url: string; sessionSlug: string })
       {/* When hidden — compact pill so they can still find the stream */}
       {hidden && (
         <div className="flex items-center justify-between bg-brand-card border border-brand-border/50 rounded-xl px-4 py-2.5">
-          <span className="text-sm text-purple-200/70">Stream hidden</span>
+          <span className="text-sm text-purple-200/85">Stream hidden</span>
           <a
             href={info.watchUrl}
             target="_blank"
