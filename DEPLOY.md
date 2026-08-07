@@ -112,3 +112,81 @@ Then replace the `multer.diskStorage` logic with `supabase.storage.from('avatars
 - [ ] Avatar upload works (or Supabase Storage wired up)
 - [ ] Org follower notification email arrives when session goes live
 - [ ] SSE updates appear in real time (session page)
+
+---
+
+## Scaling limits
+
+**The backend must run as a single instance.** Keep Railway's replica count at 1.
+
+SSE subscribers are held in an in-process `Map` (`src/sse/broadcaster.ts`). With
+more than one replica, a question posted on replica A never reaches the audience
+connected to replica B. Nothing errors and nothing is logged — the live feed just
+silently goes stale for part of the room, which is the worst way for this to fail.
+
+Everything else is already replica-safe: the auto-go-live scheduler uses a single
+atomic `UPDATE … RETURNING`, so only one replica ever claims a given session.
+
+To scale out, the broadcaster needs a shared pub/sub (Redis) so every replica
+receives every event. Two things change:
+
+1. `broadcast` / `broadcastByRole` / `broadcastTo` publish to a Redis channel
+   instead of writing directly to sockets.
+2. Each replica subscribes and writes to *its own* connected clients.
+
+Per-session connection capacity is capped by `SSE_MAX_CLIENTS_PER_SESSION`
+(default 500). A single Node process handles a few thousand idle SSE connections
+comfortably; raise the cap before you raise the replica count.
+
+### Very large sessions (thousands of attendees)
+
+Above `LIVE_FEED_MAX_PARTICIPANTS` (default 400) the audience stops receiving a
+live SSE stream. `GET /api/sessions/:slug` returns `feed_mode: 'polling'` and the
+client re-fetches the feed every `FEED_POLL_INTERVAL_MS` instead. Hosts and
+moderators always get `feed_mode: 'live'` regardless of session size — there are
+only ever a handful of them and they are the ones who need immediacy.
+
+This exists because per-event fan-out is O(clients × events) in a single process.
+At 60k connections one echo means 60k socket writes; the model that feels great in
+a room of 50 cannot survive a stadium.
+
+Polling is made cheap by a short-TTL read cache (`FEED_CACHE_TTL_MS`, default 2s)
+in `src/lib/feedCache.ts`. N pollers cost roughly one query per TTL rather than N
+queries. Only the plain audience feed is cached — moderator views and the pending
+queue always read through, and every moderation action invalidates the session's
+cache immediately, so hiding a question is never delayed by the TTL.
+
+Unlike the broadcaster, this cache is replica-safe: it is read-only derived data,
+so a second replica just keeps its own copy.
+
+**What is still required before a genuinely huge event:**
+
+1. Redis pub/sub for the broadcaster (above), so you can run multiple replicas.
+2. Raise `pool.max` in `src/db/pool.ts` above 20, and size the Postgres side to
+   match. Question and echo submission are the write hot paths.
+3. Load-test the write path specifically. Reads are cached; writes are not.
+
+### Guests and IP-based limits
+
+`GUEST_IP_TOKEN_CAP` (default 2000, `0` disables) caps distinct guest tokens per
+IP per session. Be aware that IP is a weak identity signal at venue scale: a
+conference NAT or a stadium's carrier-grade NAT puts thousands of genuinely
+distinct attendees behind a handful of addresses, and from the server a farming
+loop and a filling arena look identical. Set it to `0` for large ticketed events.
+
+Echo is intentionally open to guests. Ballot-stuffing is bounded by one vote per
+identity per question plus the credit budget (~8 echoes per guest token), not by
+IP. If that ever needs tightening, requiring sign-in to Echo is the lever — not a
+lower IP cap.
+
+### Rate limiting
+
+`apiLimiter` is keyed on the authenticated caller, falling back to IP for
+anonymous requests. This matters at conferences: a venue puts every attendee
+behind one NAT address, and a purely IP-keyed limit throttles the entire room as
+though it were a single abusive client. The pre-auth limiters (login, register,
+guest issuance) stay IP-keyed on purpose — that is what makes them useful against
+brute force.
+
+Rate-limit counters are also per-process. They are advisory, not a security
+boundary, so a second replica would weaken them proportionally.

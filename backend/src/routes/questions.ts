@@ -12,7 +12,7 @@ import {
   approveQuestion,
 } from '../controllers/questionController';
 import { requireAuth, optionalAuth } from '../middleware/auth';
-import { questionLimiter } from '../middleware/rateLimit';
+import { questionLimiter, flagLimiter } from '../middleware/rateLimit';
 
 const router = Router();
 
@@ -32,7 +32,7 @@ router.patch('/:id/status', requireAuth, updateQuestionStatus);
 router.post('/:id/echo', optionalAuth, addEcho);
 
 // POST /api/questions/:id/flag
-router.post('/:id/flag', optionalAuth, flagQuestion);
+router.post('/:id/flag', optionalAuth, flagLimiter, flagQuestion);
 
 // PATCH /api/questions/:id/pin  — host-only pin/unpin
 router.patch('/:id/pin', requireAuth, pinQuestion);

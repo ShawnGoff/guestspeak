@@ -32,6 +32,24 @@ const CreateSessionSchema = z.object({
 
 const UpdateSessionSchema = CreateSessionSchema.partial();
 
+/** Roles allowed to see and act on a private session. */
+const ELEVATED_ROLES: readonly string[] = ['host', 'org_owner', 'org_admin', 'moderator'];
+
+/**
+ * Above this many participants a session stops pushing every event to every
+ * client and the audience polls a cached feed instead.
+ *
+ * Per-event SSE fan-out costs one socket write per connected client per event,
+ * in one process. That is the right trade for a room of 50 and the wrong one for
+ * a stadium, where a single echo would mean tens of thousands of writes. Polling
+ * a short-TTL cache turns unbounded fan-out into a fixed cost per interval.
+ *
+ * Hosts and moderators always keep the live stream regardless of size — there are
+ * a handful of them, and they are the ones who need immediacy.
+ */
+const LIVE_FEED_MAX_PARTICIPANTS = parseInt(process.env.LIVE_FEED_MAX_PARTICIPANTS ?? '400', 10);
+const FEED_POLL_INTERVAL_MS = parseInt(process.env.FEED_POLL_INTERVAL_MS ?? '5000', 10);
+
 function makeSlug(title: string): string {
   const base = slugify(title, { lower: true, strict: true }).slice(0, 80);
   const suffix = randomBytes(3).toString('hex');
@@ -46,9 +64,12 @@ function makeSlug(title: string): string {
  */
 function makeJoinCode(prefix?: string | null): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no ambiguous chars (0/O, 1/I)
-  const randomPart = Array.from({ length: prefix ? 3 : 6 })
-    .map(() => chars[Math.floor(Math.random() * chars.length)])
-    .join('');
+  const length = prefix ? 3 : 6;
+  // Crypto-random, not Math.random: for unlisted sessions the join code IS the
+  // access control, so it must not be predictable from other issued codes.
+  // 32 chars is a power of two, so byte % 32 is unbiased.
+  const bytes = randomBytes(length);
+  const randomPart = Array.from(bytes, b => chars[b % chars.length]).join('');
   return prefix ? `${prefix.toUpperCase()}${randomPart}` : randomPart;
 }
 
@@ -129,20 +150,24 @@ export async function getSession(req: Request, res: Response, next: NextFunction
   try {
     const { slug } = req.params;
 
+    // Counts come from correlated subqueries, not joins. Joining participants
+    // and questions together multiplies the rows (participants × questions),
+    // which both inflates SUM(vote_count) and makes the query cost explode on
+    // a busy session.
     const result = await pool.query(
       `SELECT s.*, u.username as host_username,
               o.name as org_name, o.slug as org_slug, o.is_verified as org_is_verified,
               o.avatar_url as org_avatar_url,
-              COUNT(DISTINCT sp.id)::int AS participant_count,
-              COUNT(DISTINCT q.id)::int  AS question_count,
-              COALESCE(SUM(q.vote_count), 0)::int AS total_echoes
+              (SELECT COUNT(*)::int FROM session_participants sp
+                WHERE sp.session_id = s.id) AS participant_count,
+              (SELECT COUNT(*)::int FROM questions q
+                WHERE q.session_id = s.id AND q.status != 'hidden') AS question_count,
+              (SELECT COALESCE(SUM(q.vote_count), 0)::int FROM questions q
+                WHERE q.session_id = s.id AND q.status != 'hidden') AS total_echoes
        FROM sessions s
        JOIN users u ON u.id = s.host_id
        LEFT JOIN organizations o ON o.id = s.org_id
-       LEFT JOIN session_participants sp ON sp.session_id = s.id
-       LEFT JOIN questions q ON q.session_id = s.id AND q.status != 'hidden'
-       WHERE s.slug = $1
-       GROUP BY s.id, u.username, o.name, o.slug, o.is_verified, o.avatar_url`,
+       WHERE s.slug = $1`,
       [slug],
     );
 
@@ -165,14 +190,26 @@ export async function getSession(req: Request, res: Response, next: NextFunction
 
     // Block private sessions for anyone without elevated access.
     // Hosts, org owners/admins, and explicitly assigned moderators may enter.
-    if (session.visibility === 'private') {
-      const elevated = ['host', 'org_owner', 'org_admin', 'moderator'];
-      if (!elevated.includes(caller_role)) {
-        throw new AppError(403, 'This session is private');
-      }
+    if (session.visibility === 'private' && !ELEVATED_ROLES.includes(caller_role)) {
+      throw new AppError(403, 'This session is private');
     }
 
-    res.json({ ...session, caller_role, ...(mod_permissions ? { mod_permissions } : {}) });
+    // Tell the client how to follow this session: stream every event, or poll the
+    // cached feed. Deciding server-side keeps the threshold in one place and lets
+    // it change without shipping a new frontend.
+    const isElevatedCaller = ELEVATED_ROLES.includes(caller_role);
+    const feed_mode: 'live' | 'polling' =
+      isElevatedCaller || session.participant_count <= LIVE_FEED_MAX_PARTICIPANTS
+        ? 'live'
+        : 'polling';
+
+    res.json({
+      ...session,
+      caller_role,
+      feed_mode,
+      poll_interval_ms: FEED_POLL_INTERVAL_MS,
+      ...(mod_permissions ? { mod_permissions } : {}),
+    });
   } catch (err) {
     next(err);
   }
@@ -445,18 +482,34 @@ export async function joinSession(req: Request, res: Response, next: NextFunctio
       }
     }
 
-    // Block non-hosts from joining private sessions
+    // Block non-elevated callers from joining private sessions.
+    // Mirrors getSession's check: org owners/admins and assigned moderators can
+    // enter, otherwise they'd load the page and then fail to join it.
     if (visibility === 'private' && userId !== host_id) {
-      throw new AppError(403, 'This session is private');
+      const { role } = userId
+        ? await resolveCallerRole(id, userId)
+        : { role: 'none' as const };
+      if (!ELEVATED_ROLES.includes(role)) {
+        throw new AppError(403, 'This session is private');
+      }
     }
 
-    // Per-session IP cap for guests: max 5 distinct guest tokens from the same IP.
-    // Prevents the H2 farming loop (create guest → join → use credits → repeat).
-    // Registered users and conference-NAT scenarios are unaffected:
-    //   - Registered users join with user_id, not counted here.
-    //   - Legitimate conference attendees join once and stay joined (idempotent upsert).
-    const IP_TOKEN_CAP = 5;
-    if (!userId && guestToken && ipAddress) {
+    // Per-session cap on distinct guest tokens sharing one IP. Blunts the
+    // farming loop (mint token → join → spend credits → repeat).
+    //
+    // IMPORTANT: this only works when an IP maps to roughly one person. That
+    // holds for a home connection and breaks completely at venue scale — a
+    // conference NAT or a stadium's carrier-grade NAT puts thousands of real,
+    // distinct attendees behind a handful of addresses. A low cap there locks
+    // out the whole room, so the default is set for the large-venue case and
+    // GUEST_IP_TOKEN_CAP=0 disables the check entirely for ticketed events.
+    //
+    // At stadium scale, IP is not a usable identity signal in either direction:
+    // a farming loop and a filling arena look the same from here. Ballot-stuffing
+    // defence for events that large has to come from requiring sign-in to Echo,
+    // not from this check.
+    const IP_TOKEN_CAP = parseInt(process.env.GUEST_IP_TOKEN_CAP ?? '2000', 10);
+    if (IP_TOKEN_CAP > 0 && !userId && guestToken && ipAddress) {
       const existing = await pool.query(
         `SELECT COUNT(DISTINCT guest_token)::int AS cnt
          FROM session_participants
@@ -517,16 +570,23 @@ export async function joinSession(req: Request, res: Response, next: NextFunctio
 }
 
 const GUEST_REGEN_LIMIT  = 2;   // Guests get at most 2 regen credits lifetime per session, then must sign up
+const GUEST_CREDIT_CAP   = 2;   // …and regen never takes a guest above this ceiling
 const USER_CREDIT_CAP    = 6;   // Signed-in users regen up to this ceiling
 const CREDIT_REGEN_MINUTES = 10;
 
 /**
  * POST /api/sessions/:id/heartbeat
  * Called by the frontend every 10 minutes while a participant is in the session.
- * Registered users: awards 1 credit if below USER_CREDIT_CAP.
- * Guests: awards 1 credit if they haven't yet hit GUEST_REGEN_LIMIT lifetime regen credits.
- *   After GUEST_REGEN_LIMIT regen events, guests must sign up to keep earning.
- * Server-side enforcement prevents spam.
+ *
+ * Registered users: awards 1 credit if below USER_CREDIT_CAP. No lifetime limit.
+ * Guests: awards 1 credit if below GUEST_CREDIT_CAP *and* they have not yet used
+ *   GUEST_REGEN_LIMIT lifetime regens. The two guards do different jobs — the
+ *   ceiling stops the balance drifting above the guest tier, the lifetime count
+ *   is what eventually forces the sign-up prompt.
+ *
+ * The ceiling is enforced in the WHERE clause, not just via LEAST, so a guest
+ * who still holds more than the cap (a host may start everyone at up to 6) is
+ * simply skipped rather than having their balance pulled down to it.
  */
 export async function heartbeat(req: Request, res: Response, next: NextFunction) {
   try {
@@ -567,14 +627,15 @@ export async function heartbeat(req: Request, res: Response, next: NextFunction)
       // Guests: lifetime cap of GUEST_REGEN_LIMIT regen credits — after that, sign up to get more
       await pool.query(
         `UPDATE session_participants
-         SET credits_remaining = credits_remaining + 1,
+         SET credits_remaining = LEAST(credits_remaining + 1, $4),
              last_credit_at    = NOW(),
              regen_count       = regen_count + 1
          WHERE session_id  = $2
            AND guest_token = $3
            AND regen_count < $1
+           AND credits_remaining < $4
            AND (last_credit_at IS NULL OR last_credit_at < NOW() - INTERVAL '${CREDIT_REGEN_MINUTES} minutes')`,
-        [GUEST_REGEN_LIMIT, id, guestToken],
+        [GUEST_REGEN_LIMIT, id, guestToken, GUEST_CREDIT_CAP],
       );
       const cur = await pool.query(
         `SELECT credits_remaining, regen_count,
@@ -690,7 +751,7 @@ export async function exportSession(req: Request, res: Response, next: NextFunct
     await requireHostOrOrgAdmin(id, req.user!.userId);
 
     const sessionResult = await pool.query(
-      `SELECT s.title, s.ends_at, s.created_at FROM sessions WHERE id = $1`,
+      `SELECT s.title, s.ends_at, s.created_at FROM sessions s WHERE s.id = $1`,
       [id],
     );
     if (!sessionResult.rows[0]) throw new AppError(404, 'Session not found');
@@ -701,22 +762,23 @@ export async function exportSession(req: Request, res: Response, next: NextFunct
               q.host_replied_at, q.created_at,
               CASE
                 WHEN q.post_anonymously THEN 'Anon' || q.anon_number
-                ELSE COALESCE(u.username, sp.guest_username)
+                ELSE COALESCE(q.author_display_name, 'Removed participant')
               END AS author
        FROM questions q
-       LEFT JOIN users u ON u.id = q.author_id AND NOT q.post_anonymously
-       LEFT JOIN session_participants sp
-         ON sp.session_id = q.session_id
-         AND NOT q.post_anonymously
-         AND sp.guest_token = q.author_guest_token
-         AND q.author_guest_token IS NOT NULL
        WHERE q.session_id = $1 AND q.status NOT IN ('hidden', 'pending')
        ORDER BY q.is_pinned DESC, q.vote_count DESC, q.created_at ASC`,
       [id],
     );
 
-    // Build CSV
-    const escape = (v: any) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+    // Build CSV.
+    // Values starting with = + - @ (or a leading tab/CR) are treated as formulas
+    // by Excel/Sheets, so a question body like `=HYPERLINK(...)` would execute
+    // when the host opens the export. Prefix those with a single quote.
+    const escape = (v: any) => {
+      const s = String(v ?? '');
+      const safe = /^[=+\-@\t\r]/.test(s) ? `'${s}` : s;
+      return `"${safe.replace(/"/g, '""')}"`;
+    };
     const headers = ['Question', 'Echoes', 'Status', 'Pinned', 'Author', 'Host Reply', 'Asked At'];
     const rows = questionsResult.rows.map(q => [
       escape(q.body),
@@ -786,15 +848,14 @@ export async function listMySessions(req: Request, res: Response, next: NextFunc
     const result = await pool.query(
       `SELECT s.id, s.title, s.slug, s.status, s.visibility, s.join_code,
               s.starts_at, s.created_at,
-              COUNT(DISTINCT sp.id)::int AS participant_count,
-              COUNT(DISTINCT q.id)::int  AS question_count,
+              (SELECT COUNT(*)::int FROM session_participants sp
+                WHERE sp.session_id = s.id) AS participant_count,
+              (SELECT COUNT(*)::int FROM questions q
+                WHERE q.session_id = s.id AND q.status != 'hidden') AS question_count,
               o.name AS org_name
        FROM sessions s
-       LEFT JOIN session_participants sp ON sp.session_id = s.id
-       LEFT JOIN questions q ON q.session_id = s.id AND q.status != 'hidden'
        LEFT JOIN organizations o ON o.id = s.org_id
        WHERE s.host_id = $1
-       GROUP BY s.id, o.name
        ORDER BY
          CASE s.status WHEN 'live' THEN 0 WHEN 'upcoming' THEN 1 ELSE 2 END,
          s.created_at DESC

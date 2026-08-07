@@ -20,6 +20,12 @@ interface SessionPageProps {
 
 type SortOption = 'echoes' | 'recent' | 'answered' | 'starred';
 
+/** Seconds between credit regen ticks — mirrors CREDIT_REGEN_MINUTES on the server. */
+const REGEN_SECS = 10 * 60;
+
+/** Roles that run the session rather than participate in it — no credits, no regen. */
+const ELEVATED_ROLES: readonly string[] = ['host', 'org_owner', 'org_admin', 'moderator'];
+
 // ─── Page ────────────────────────────────────────────────────────────────────
 
 export default function SessionPageClient({ params }: SessionPageProps) {
@@ -60,7 +66,11 @@ export default function SessionPageClient({ params }: SessionPageProps) {
   //             Guests cap at 2 (sign-up incentive); registered users cap at 6.
   const CREDIT_CAP  = session?.credits_per_user ?? 3;
   const REGEN_CAP   = isRegistered ? 6 : 2;
-  const REGEN_SECS  = 10 * 60; // 10 minutes
+  // Narrowed out of `session` so effects can depend on the id alone rather than
+  // re-running every time any other session field changes.
+  const sessionId     = session?.id;
+  const sessionStatus = session?.status;
+  const callerRole    = session?.caller_role ?? 'none';
   const [nextCreditSecs, setNextCreditSecs] = useState(REGEN_SECS);
   const [regenExhausted, setRegenExhausted] = useState(false);
   const [showRegenModal, setShowRegenModal] = useState(false);
@@ -79,6 +89,13 @@ export default function SessionPageClient({ params }: SessionPageProps) {
 
   const similarTimer = useRef<ReturnType<typeof setTimeout>>();
   const sseRef = useRef<EventSource | null>(null);
+
+  // The SSE effect must not re-run when `sort` changes — that would drop and
+  // rebuild the live connection every time the user flips the sort tabs. A ref
+  // keeps the reconnect refetch reading the *current* sort instead of the value
+  // captured when the stream was opened.
+  const sortRef = useRef(sort);
+  useEffect(() => { sortRef.current = sort; }, [sort]);
 
   // ── Load session ──────────────────────────────────────────────────────────
 
@@ -140,7 +157,7 @@ export default function SessionPageClient({ params }: SessionPageProps) {
           setShowUsernamePicker(true);
         }
 
-        const result = await api.get<{ data: Question[] }>(`/questions?sessionId=${s.id}&sort=${sort}`);
+        const result = await api.get<{ data: Question[] }>(`/questions?sessionId=${s.id}&sort=${sortRef.current}`);
         setQuestions(result.data);
 
         // Fetch pending queue for hosts/mods on sessions with approval required
@@ -163,6 +180,29 @@ export default function SessionPageClient({ params }: SessionPageProps) {
   useEffect(() => {
     if (!session) return;
     const sessionId = session.id;
+
+    // Very large sessions do not get a live stream — per-event fan-out does not
+    // survive a stadium. The audience polls the cached feed instead; hosts and
+    // mods are always sent feed_mode 'live'.
+    if (session.feed_mode === 'polling') {
+      const intervalMs = session.poll_interval_ms ?? 5000;
+      let cancelled = false;
+
+      const tick = async () => {
+        try {
+          const r = await api.get<{ data: Question[] }>(
+            `/questions?sessionId=${sessionId}&sort=${sortRef.current}`,
+          );
+          if (!cancelled) setQuestions(r.data);
+        } catch {
+          // Transient failure — the next tick retries.
+        }
+      };
+
+      const poll = setInterval(tick, intervalMs);
+      return () => { cancelled = true; clearInterval(poll); };
+    }
+
     let reconnecting = false;
 
     const es = new EventSource(sseUrl(sessionId));
@@ -172,20 +212,23 @@ export default function SessionPageClient({ params }: SessionPageProps) {
     // list so any events missed during the disconnection are caught up.
     es.addEventListener('open', () => {
       if (!reconnecting) { reconnecting = true; return; } // skip the initial open
-      api.get<{ data: Question[] }>(`/questions?sessionId=${sessionId}&sort=${sort}`)
+      api.get<{ data: Question[] }>(`/questions?sessionId=${sessionId}&sort=${sortRef.current}`)
         .then(r => setQuestions(r.data))
         .catch(() => {});
     });
 
     es.addEventListener('question:new', (e) => {
       const q: Question = JSON.parse(e.data);
-      if (q.status === 'pending') {
-        // Route pending questions to the approval queue for hosts/mods
-        setPendingQuestions(prev => [q, ...prev]);
-      } else {
-        setQuestions(prev => [q, ...prev]);
-        if (!atTopRef.current) setNewQuestionsCount(n => n + 1);
-      }
+      // An approved question arrives here as 'new' and leaves the pending queue.
+      setPendingQuestions(prev => prev.filter(p => p.id !== q.id));
+      setQuestions(prev => prev.some(x => x.id === q.id) ? prev : [q, ...prev]);
+      if (!atTopRef.current) setNewQuestionsCount(n => n + 1);
+    });
+
+    // Sent to hosts/mods only, on sessions that require approval.
+    es.addEventListener('question:pending', (e) => {
+      const q: Question = JSON.parse(e.data);
+      setPendingQuestions(prev => prev.some(x => x.id === q.id) ? prev : [q, ...prev]);
     });
     es.addEventListener('echo:added', (e) => {
       const { questionId, vote_count } = JSON.parse(e.data);
@@ -194,6 +237,13 @@ export default function SessionPageClient({ params }: SessionPageProps) {
     es.addEventListener('question:updated', (e) => {
       const updated: Question = JSON.parse(e.data);
       setQuestions(prev => prev.map(q => q.id === updated.id ? updated : q));
+    });
+    // Sent to the audience in place of question:updated when a question is
+    // hidden — the body is deliberately not included, so drop it outright.
+    es.addEventListener('question:removed', (e) => {
+      const { id } = JSON.parse(e.data);
+      setQuestions(prev => prev.filter(q => q.id !== id));
+      setPendingQuestions(prev => prev.filter(q => q.id !== id));
     });
     es.addEventListener('session:live', () => {
       setSession(prev => prev ? { ...prev, status: 'live' } : prev);
@@ -213,7 +263,7 @@ export default function SessionPageClient({ params }: SessionPageProps) {
     });
 
     return () => es.close();
-  }, [session?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [session?.id, session?.feed_mode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Sort change ───────────────────────────────────────────────────────────
 
@@ -256,9 +306,9 @@ export default function SessionPageClient({ params }: SessionPageProps) {
   // ── Credit regen heartbeat ────────────────────────────────────────────────
 
   const sendHeartbeat = useCallback(() => {
-    if (!session) return;
+    if (!sessionId) return;
     api.post<{ credits_remaining: number; regen_exhausted?: boolean; next_credit_secs?: number }>(
-      `/sessions/${session.id}/heartbeat`, {}
+      `/sessions/${sessionId}/heartbeat`, {}
     ).then(r => {
       setCredits(r.credits_remaining);
       // Seed the timer from the server's authoritative value so refreshes don't reset the countdown
@@ -270,21 +320,19 @@ export default function SessionPageClient({ params }: SessionPageProps) {
         });
       }
     }).catch(() => {});
-  }, [session?.id]);
+  }, [sessionId]);
 
   // Fire once on load to sync the timer with the server's last_credit_at
   useEffect(() => {
-    if (!session || session.status === 'closed') return;
-    const callerRole = session.caller_role ?? 'none';
-    if (['host', 'org_owner', 'org_admin', 'moderator'].includes(callerRole)) return;
+    if (!sessionId || sessionStatus === 'closed') return;
+    if (ELEVATED_ROLES.includes(callerRole)) return;
     sendHeartbeat();
-  }, [session?.id]);
+  }, [sessionId, sessionStatus, callerRole, sendHeartbeat]);
 
   // Tick down every second; fire heartbeat when it hits zero
   useEffect(() => {
-    if (!session || session.status === 'closed') return;
-    const callerRole = session.caller_role ?? 'none';
-    if (['host', 'org_owner', 'org_admin', 'moderator'].includes(callerRole)) return;
+    if (!sessionId || sessionStatus === 'closed') return;
+    if (ELEVATED_ROLES.includes(callerRole)) return;
 
     const interval = setInterval(() => {
       setNextCreditSecs(prev => {
@@ -297,22 +345,22 @@ export default function SessionPageClient({ params }: SessionPageProps) {
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [session?.id, session?.status, session?.caller_role, sendHeartbeat]);
+  }, [sessionId, sessionStatus, callerRole, sendHeartbeat]);
 
   // ── Similar detection ─────────────────────────────────────────────────────
 
   const fetchSimilar = useCallback((q: string) => {
-    if (!session || q.trim().length < 4) { setSimilarQuestions([]); return; }
+    if (!sessionId || q.trim().length < 4) { setSimilarQuestions([]); return; }
     clearTimeout(similarTimer.current);
     similarTimer.current = setTimeout(async () => {
       try {
         const results = await api.get<Question[]>(
-          `/questions/similar?sessionId=${session.id}&q=${encodeURIComponent(q)}`
+          `/questions/similar?sessionId=${sessionId}&q=${encodeURIComponent(q)}`
         );
         setSimilarQuestions(results);
       } catch { setSimilarQuestions([]); }
     }, 400);
-  }, [session?.id]);
+  }, [sessionId]);
 
   // ── Submit question ───────────────────────────────────────────────────────
 
@@ -547,8 +595,7 @@ export default function SessionPageClient({ params }: SessionPageProps) {
 
   // ── Display ───────────────────────────────────────────────────────────────
 
-  const callerRole = session?.caller_role ?? 'none';
-  const isMod = ['host', 'org_owner', 'org_admin', 'moderator'].includes(callerRole);
+  const isMod = ELEVATED_ROLES.includes(callerRole);
   // Hosts/org owners have all permissions; mods only have what their permission record grants.
   const isOwnerLevel = ['host', 'org_owner', 'org_admin'].includes(callerRole);
   const canMute   = isOwnerLevel || !!(session?.mod_permissions?.can_mute);
@@ -2006,41 +2053,61 @@ type StreamInfo =
   | { type: 'twitch';  embedUrl: string; watchUrl: string }
   | { type: 'link';    watchUrl: string };
 
+/** Hostname must be the real host or a subdomain of it — never just a substring. */
+function isHost(hostname: string, domain: string): boolean {
+  return hostname === domain || hostname.endsWith(`.${domain}`);
+}
+
 function parseStream(url: string): StreamInfo | null {
   if (!url) return null;
 
-  // YouTube: youtube.com/watch?v=ID, youtu.be/ID, youtube.com/live/ID
-  const ytMatch = url.match(
-    /(?:youtube\.com\/(?:watch\?.*?v=|live\/)|youtu\.be\/)([A-Za-z0-9_-]{11})/,
-  );
-  if (ytMatch) {
-    return {
-      type: 'youtube',
-      embedUrl: `https://www.youtube.com/embed/${ytMatch[1]}?rel=0&modestbranding=1`,
-      watchUrl: url,
-    };
+  // Match on the parsed hostname, not a substring of the whole URL: a bare
+  // /youtube\.com/ test also matches https://example.com/youtube.com/x, which
+  // would render a player for a URL that isn't a YouTube link at all.
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return null;
+  }
+  if (parsed.protocol !== 'https:') return { type: 'link', watchUrl: url };
+
+  const host = parsed.hostname.replace(/^www\./, '');
+
+  if (isHost(host, 'youtube.com') || isHost(host, 'youtu.be')) {
+    const id = isHost(host, 'youtu.be')
+      ? parsed.pathname.slice(1)
+      : parsed.searchParams.get('v') ?? parsed.pathname.match(/^\/(?:live|embed|shorts)\/([^/]+)/)?.[1] ?? '';
+
+    if (/^[A-Za-z0-9_-]{11}$/.test(id)) {
+      return {
+        type: 'youtube',
+        embedUrl: `https://www.youtube.com/embed/${id}?rel=0&modestbranding=1`,
+        watchUrl: url,
+      };
+    }
   }
 
-  // Twitch video: twitch.tv/videos/ID
-  const twitchVideo = url.match(/twitch\.tv\/videos\/(\d+)/);
-  if (twitchVideo) {
+  if (isHost(host, 'twitch.tv')) {
     const parent = typeof window !== 'undefined' ? window.location.hostname : 'guestspeak.app';
-    return {
-      type: 'twitch',
-      embedUrl: `https://player.twitch.tv/?video=${twitchVideo[1]}&parent=${parent}&autoplay=false`,
-      watchUrl: url,
-    };
-  }
 
-  // Twitch channel: twitch.tv/CHANNEL (must not be twitch.tv/videos/…)
-  const twitchChannel = url.match(/twitch\.tv\/([A-Za-z0-9_]+)(?:[/?#]|$)/);
-  if (twitchChannel && twitchChannel[1] !== 'videos') {
-    const parent = typeof window !== 'undefined' ? window.location.hostname : 'guestspeak.app';
-    return {
-      type: 'twitch',
-      embedUrl: `https://player.twitch.tv/?channel=${twitchChannel[1]}&parent=${parent}&autoplay=false`,
-      watchUrl: url,
-    };
+    const videoId = parsed.pathname.match(/^\/videos\/(\d+)$/)?.[1];
+    if (videoId) {
+      return {
+        type: 'twitch',
+        embedUrl: `https://player.twitch.tv/?video=${videoId}&parent=${parent}&autoplay=false`,
+        watchUrl: url,
+      };
+    }
+
+    const channel = parsed.pathname.match(/^\/([A-Za-z0-9_]+)\/?$/)?.[1];
+    if (channel && channel !== 'videos') {
+      return {
+        type: 'twitch',
+        embedUrl: `https://player.twitch.tv/?channel=${channel}&parent=${parent}&autoplay=false`,
+        watchUrl: url,
+      };
+    }
   }
 
   // Anything else — link fallback
@@ -2048,21 +2115,25 @@ function parseStream(url: string): StreamInfo | null {
 }
 
 function StreamEmbed({ url, sessionSlug }: { url: string; sessionSlug: string }) {
-  const info = parseStream(url);
-  if (!info) return null;
-
-  // Persist hide preference per session in localStorage
+  // Every hook must run before any early return. If the host clears the stream
+  // URL mid-session, parseStream starts returning null and a bailout above the
+  // useState would change the hook count on an already-mounted component,
+  // crashing the page for everyone watching.
   const storageKey = `gs_hide_stream_${sessionSlug}`;
   const [hidden, setHidden] = useState(() => {
     if (typeof window === 'undefined') return false;
     return localStorage.getItem(storageKey) === '1';
   });
 
+  const info = parseStream(url);
+
   function toggle() {
     const next = !hidden;
     setHidden(next);
     localStorage.setItem(storageKey, next ? '1' : '0');
   }
+
+  if (!info) return null;
 
   if (info.type === 'link') {
     return (
