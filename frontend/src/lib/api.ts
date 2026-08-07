@@ -31,7 +31,14 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    if (res.status === 401) {
+
+    // Only treat a 401 as "your session expired" when we actually sent a token.
+    // Without this guard, a 401 on a request that was never authenticated in the
+    // first place also cleared storage and bounced to /login — which is exactly
+    // what happened to first-time guests: landing on a session fired the credit
+    // heartbeat before they had a token, and the resulting 401 redirected them
+    // away from the page before they could even pick a display name.
+    if (res.status === 401 && token) {
       // Token expired or invalid — clear auth and redirect to login
       localStorage.removeItem('aa_token');
       localStorage.removeItem('aa_user');

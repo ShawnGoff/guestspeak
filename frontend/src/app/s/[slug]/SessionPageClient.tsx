@@ -23,6 +23,19 @@ type SortOption = 'echoes' | 'recent' | 'answered' | 'starred';
 /** Seconds between credit regen ticks — mirrors CREDIT_REGEN_MINUTES on the server. */
 const REGEN_SECS = 10 * 60;
 
+/** Consecutive SSE failures before giving up and polling instead. */
+const SSE_MAX_CONSECUTIVE_FAILURES = 3;
+
+/** Poll session-level state (status, headcount) every Nth feed tick. */
+const SESSION_REFRESH_EVERY_TICKS = 4;
+
+/**
+ * Floor on how often the credit heartbeat may be sent. A backstop, not the
+ * schedule: the countdown drives normal timing, but no server response or
+ * render pattern should ever be able to turn this into a request storm.
+ */
+const MIN_HEARTBEAT_INTERVAL_MS = 5_000;
+
 /** Roles that run the session rather than participate in it — no credits, no regen. */
 const ELEVATED_ROLES: readonly string[] = ['host', 'org_owner', 'org_admin', 'moderator'];
 
@@ -94,6 +107,15 @@ export default function SessionPageClient({ params }: SessionPageProps) {
   // rebuild the live connection every time the user flips the sort tabs. A ref
   // keeps the reconnect refetch reading the *current* sort instead of the value
   // captured when the stream was opened.
+  // The server decides how to follow the feed, but the client can downgrade
+  // itself to polling if the stream refuses it (see the SSE error handler).
+  // Bumped on every successful join. The initial credit sync waits on this:
+  // a guest picks their display name after the page has already mounted, so
+  // syncing only on mount would skip them entirely.
+  const [joinCount, setJoinCount] = useState(0);
+  const [feedModeOverride, setFeedModeOverride] = useState<'polling' | null>(null);
+  const feedMode = feedModeOverride ?? session?.feed_mode ?? 'live';
+
   const sortRef = useRef(sort);
   useEffect(() => { sortRef.current = sort; }, [sort]);
 
@@ -128,6 +150,7 @@ export default function SessionPageClient({ params }: SessionPageProps) {
             const joined = await api.post<{ credits_remaining: number; anon_credits: number }>(`/sessions/${s.id}/join`, {});
             setCredits(joined.credits_remaining);
             setAnonCredits(joined.anon_credits ?? 2);
+            setJoinCount(n => n + 1);
           } catch (err: any) {
             if (err?.status !== 410 && err?.status !== 403) setCredits(0);
           }
@@ -143,6 +166,7 @@ export default function SessionPageClient({ params }: SessionPageProps) {
             });
             setCredits(joined.credits_remaining);
             setAnonCredits(joined.anon_credits ?? 2);
+            setJoinCount(n => n + 1);
           } catch (err: any) {
             // Name conflict after re-issue: show picker so they can choose another
             if (err?.status === 409) {
@@ -184,9 +208,10 @@ export default function SessionPageClient({ params }: SessionPageProps) {
     // Very large sessions do not get a live stream — per-event fan-out does not
     // survive a stadium. The audience polls the cached feed instead; hosts and
     // mods are always sent feed_mode 'live'.
-    if (session.feed_mode === 'polling') {
+    if (feedMode === 'polling') {
       const intervalMs = session.poll_interval_ms ?? 5000;
       let cancelled = false;
+      let ticks = 0;
 
       const tick = async () => {
         try {
@@ -197,6 +222,28 @@ export default function SessionPageClient({ params }: SessionPageProps) {
         } catch {
           // Transient failure — the next tick retries.
         }
+
+        // Session-level state (status, participant count) is not part of the
+        // question feed and used to arrive over SSE. Without this, a polling
+        // audience never learns the host closed the session — they keep
+        // submitting into a 410. Refreshed on a slower cadence than the feed so
+        // it does not double every poller's request rate.
+        ticks += 1;
+        if (ticks % SESSION_REFRESH_EVERY_TICKS === 0) {
+          try {
+            const s = await api.get<Session & { participant_count?: number }>(
+              `/sessions/${params.slug}`,
+            );
+            if (!cancelled) {
+              setSession(prev => prev
+                ? { ...prev, status: s.status, feed_mode: s.feed_mode }
+                : prev);
+              if (s.participant_count != null) setParticipantCount(s.participant_count);
+            }
+          } catch {
+            // Ignore — the next refresh retries.
+          }
+        }
       };
 
       const poll = setInterval(tick, intervalMs);
@@ -204,13 +251,29 @@ export default function SessionPageClient({ params }: SessionPageProps) {
     }
 
     let reconnecting = false;
+    let failures = 0;
 
     const es = new EventSource(sseUrl(sessionId));
     sseRef.current = es;
 
+    // EventSource reconnects on its own and does not expose the HTTP status, so
+    // a session that has grown past the live-feed threshold answers 409 forever
+    // and the browser would retry that in a tight loop — thousands of clients
+    // hammering an endpoint that will never accept them. Give up after a few
+    // consecutive failures and switch to polling, which is what the server is
+    // asking for anyway.
+    es.addEventListener('error', () => {
+      failures += 1;
+      if (failures >= SSE_MAX_CONSECUTIVE_FAILURES) {
+        es.close();
+        setFeedModeOverride('polling');
+      }
+    });
+
     // On reconnect (open fires again after a drop), re-fetch the full question
     // list so any events missed during the disconnection are caught up.
     es.addEventListener('open', () => {
+      failures = 0; // a successful connect clears the fallback countdown
       if (!reconnecting) { reconnecting = true; return; } // skip the initial open
       api.get<{ data: Question[] }>(`/questions?sessionId=${sessionId}&sort=${sortRef.current}`)
         .then(r => setQuestions(r.data))
@@ -263,7 +326,7 @@ export default function SessionPageClient({ params }: SessionPageProps) {
     });
 
     return () => es.close();
-  }, [session?.id, session?.feed_mode]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [session?.id, feedMode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Sort change ───────────────────────────────────────────────────────────
 
@@ -305,8 +368,17 @@ export default function SessionPageClient({ params }: SessionPageProps) {
 
   // ── Credit regen heartbeat ────────────────────────────────────────────────
 
+  const lastHeartbeatRef = useRef(0);
+
   const sendHeartbeat = useCallback(() => {
     if (!sessionId) return;
+    // Nothing to sync until the visitor actually has an identity. A guest who
+    // has not picked a display name yet holds no token, and this would just 401.
+    if (typeof window !== 'undefined' && !localStorage.getItem('aa_token')) return;
+
+    const now = Date.now();
+    if (now - lastHeartbeatRef.current < MIN_HEARTBEAT_INTERVAL_MS) return;
+    lastHeartbeatRef.current = now;
     api.post<{ credits_remaining: number; regen_exhausted?: boolean; next_credit_secs?: number }>(
       `/sessions/${sessionId}/heartbeat`, {}
     ).then(r => {
@@ -328,12 +400,14 @@ export default function SessionPageClient({ params }: SessionPageProps) {
     });
   }, [sessionId]);
 
-  // Fire once on load to sync the timer with the server's last_credit_at
+  // Sync the timer with the server's last_credit_at — on load, and again once
+  // the visitor has joined. A guest picks their display name after mount, so
+  // syncing only on mount would leave their countdown running on a guess.
   useEffect(() => {
     if (!sessionId || sessionStatus === 'closed') return;
     if (ELEVATED_ROLES.includes(callerRole)) return;
     sendHeartbeat();
-  }, [sessionId, sessionStatus, callerRole, sendHeartbeat]);
+  }, [sessionId, sessionStatus, callerRole, joinCount, sendHeartbeat]);
 
   // Tick down every second; fire heartbeat when it hits zero
   useEffect(() => {
@@ -341,13 +415,15 @@ export default function SessionPageClient({ params }: SessionPageProps) {
     if (ELEVATED_ROLES.includes(callerRole)) return;
 
     const interval = setInterval(() => {
+      // The request is fired here, not inside the setState updater. React may
+      // invoke an updater more than once for a single update, so calling
+      // sendHeartbeat() in there produced a burst of requests per tick.
+      let due = false;
       setNextCreditSecs(prev => {
-        if (prev <= 1) {
-          sendHeartbeat();
-          return REGEN_SECS; // fallback until server responds with accurate value
-        }
+        if (prev <= 1) { due = true; return REGEN_SECS; }
         return prev - 1;
       });
+      if (due) sendHeartbeat();
     }, 1000);
 
     return () => clearInterval(interval);
@@ -603,6 +679,7 @@ export default function SessionPageClient({ params }: SessionPageProps) {
       guest_username: username,
     });
     setCredits(joined.credits_remaining);
+    setJoinCount(n => n + 1);
     setShowUsernamePicker(false);
   }
 

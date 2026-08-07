@@ -602,12 +602,18 @@ export async function heartbeat(req: Request, res: Response, next: NextFunction)
       );
       const cur = await pool.query(
         `SELECT credits_remaining,
-                GREATEST(0, EXTRACT(EPOCH FROM (
-                  COALESCE(last_credit_at, NOW() - INTERVAL '${CREDIT_REGEN_MINUTES} minutes')
-                  + INTERVAL '${CREDIT_REGEN_MINUTES} minutes' - NOW()
-                ))::int) AS next_credit_secs
+                CASE
+                  -- Nothing is pending while the balance is at the ceiling, so
+                  -- report a full interval. Reporting 0 told the client a credit
+                  -- was due immediately, and it would ask again, forever.
+                  WHEN credits_remaining >= $3 THEN ${CREDIT_REGEN_MINUTES} * 60
+                  ELSE GREATEST(0, EXTRACT(EPOCH FROM (
+                    COALESCE(last_credit_at, NOW() - INTERVAL '${CREDIT_REGEN_MINUTES} minutes')
+                    + INTERVAL '${CREDIT_REGEN_MINUTES} minutes' - NOW()
+                  ))::int)
+                END AS next_credit_secs
          FROM session_participants WHERE session_id = $1 AND user_id = $2`,
-        [id, userId],
+        [id, userId, USER_CREDIT_CAP],
       );
       credits_remaining = cur.rows[0]?.credits_remaining ?? 0;
       next_credit_secs  = cur.rows[0]?.next_credit_secs ?? next_credit_secs;
@@ -627,12 +633,19 @@ export async function heartbeat(req: Request, res: Response, next: NextFunction)
       );
       const cur = await pool.query(
         `SELECT credits_remaining, regen_count,
-                GREATEST(0, EXTRACT(EPOCH FROM (
-                  COALESCE(last_credit_at, NOW() - INTERVAL '${CREDIT_REGEN_MINUTES} minutes')
-                  + INTERVAL '${CREDIT_REGEN_MINUTES} minutes' - NOW()
-                ))::int) AS next_credit_secs
+                CASE
+                  -- No credit is pending when the guest is at the ceiling or has
+                  -- spent their lifetime regen budget. Reporting 0 in those cases
+                  -- made the client ask again immediately, in a loop.
+                  WHEN credits_remaining >= $3 OR regen_count >= $4
+                    THEN ${CREDIT_REGEN_MINUTES} * 60
+                  ELSE GREATEST(0, EXTRACT(EPOCH FROM (
+                    COALESCE(last_credit_at, NOW() - INTERVAL '${CREDIT_REGEN_MINUTES} minutes')
+                    + INTERVAL '${CREDIT_REGEN_MINUTES} minutes' - NOW()
+                  ))::int)
+                END AS next_credit_secs
          FROM session_participants WHERE session_id = $1 AND guest_token = $2`,
-        [id, guestToken],
+        [id, guestToken, GUEST_CREDIT_CAP, GUEST_REGEN_LIMIT],
       );
       credits_remaining = cur.rows[0]?.credits_remaining ?? 0;
       regen_exhausted   = (cur.rows[0]?.regen_count ?? 0) >= GUEST_REGEN_LIMIT;
