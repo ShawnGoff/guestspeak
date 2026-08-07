@@ -6,7 +6,7 @@ import { broadcast, broadcastByRole, broadcastElevated } from '../sse/broadcaste
 import { resolveCallerRole, requireHostOrOrgAdmin, type CallerRole } from '../db/permissions';
 import { filterText } from '../lib/wordFilter';
 import { createNotificationsForUsers } from './notificationController';
-import { fetchPublicQuestion, toPublicQuestion } from '../lib/questionHelpers';
+import { fetchPublicQuestion } from '../lib/questionHelpers';
 import { cacheKey, getCached, setCached, invalidateSession } from '../lib/feedCache';
 type SortOption = 'echoes' | 'recent' | 'answered' | 'starred';
 
@@ -104,7 +104,7 @@ export async function getQuestions(req: Request, res: Response, next: NextFuncti
               -- renaming a guest never rewrites bylines already on screen.
               CASE
                 WHEN q.post_anonymously THEN 'Anon' || q.anon_number
-                ELSE COALESCE(q.author_display_name, 'Removed participant')
+                ELSE COALESCE(q.author_display_name, u.username, sp.guest_username, 'Removed participant')
               END AS author_username,
               -- participant_id and is_muted only for non-anon posts (avoids identity-via-mod-action)
               CASE WHEN q.post_anonymously THEN NULL ELSE sp.id END AS participant_id,
@@ -630,8 +630,9 @@ export async function spotlightQuestion(req: Request, res: Response, next: NextF
       [session_id, id],
     );
 
-    const updated = result.rows[0];
-    const nowSpotlighted: boolean = updated.is_spotlighted;
+    const nowSpotlighted: boolean = result.rows[0].is_spotlighted;
+
+    invalidateSession(session_id);
 
     // session:spotlight tells all clients which question (or null) is now spotlighted
     broadcast(session_id, {
@@ -639,7 +640,11 @@ export async function spotlightQuestion(req: Request, res: Response, next: NextF
       data: { question_id: nowSpotlighted ? id : null },
     });
 
-    res.json(toPublicQuestion(updated));
+    // Re-read through the full projection rather than serialising the RETURNING *
+    // row: a bare question row carries no join data, so it cannot fall back to a
+    // live byline lookup when the snapshot is null.
+    const publicQuestion = await fetchPublicQuestion(id, session_id);
+    res.json(publicQuestion);
   } catch (err) {
     next(err);
   }

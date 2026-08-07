@@ -762,9 +762,15 @@ export async function exportSession(req: Request, res: Response, next: NextFunct
               q.host_replied_at, q.created_at,
               CASE
                 WHEN q.post_anonymously THEN 'Anon' || q.anon_number
-                ELSE COALESCE(q.author_display_name, 'Removed participant')
+                ELSE COALESCE(q.author_display_name, u.username, sp.guest_username, 'Removed participant')
               END AS author
        FROM questions q
+       LEFT JOIN users u ON u.id = q.author_id AND NOT q.post_anonymously
+       LEFT JOIN session_participants sp
+         ON sp.session_id = q.session_id
+         AND NOT q.post_anonymously
+         AND q.author_guest_token IS NOT NULL
+         AND sp.guest_token = q.author_guest_token
        WHERE q.session_id = $1 AND q.status NOT IN ('hidden', 'pending')
        ORDER BY q.is_pinned DESC, q.vote_count DESC, q.created_at ASC`,
       [id],
