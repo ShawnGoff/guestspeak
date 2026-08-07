@@ -125,14 +125,13 @@ export async function getOrg(req: Request, res: Response, next: NextFunction) {
       `SELECT s.id, s.title, s.slug, s.status, s.visibility,
               s.city, s.ends_at, s.created_at,
               u.username as host_username,
-              COUNT(DISTINCT sp.id)::int AS participant_count,
-              COUNT(DISTINCT q.id)::int  AS question_count
+              (SELECT COUNT(*)::int FROM session_participants sp
+                WHERE sp.session_id = s.id) AS participant_count,
+              (SELECT COUNT(*)::int FROM questions q
+                WHERE q.session_id = s.id AND q.status != 'hidden') AS question_count
        FROM sessions s
        JOIN users u ON u.id = s.host_id
-       LEFT JOIN session_participants sp ON sp.session_id = s.id
-       LEFT JOIN questions q ON q.session_id = s.id AND q.status != 'hidden'
        WHERE s.org_id = $1 AND s.visibility = 'public' AND s.status = 'closed'
-       GROUP BY s.id, u.username
        ORDER BY s.ends_at DESC NULLS LAST, s.created_at DESC
        LIMIT 50`,
       [org.id],
@@ -148,21 +147,28 @@ export async function getOrg(req: Request, res: Response, next: NextFunction) {
       caller_role = memberResult.rows[0]?.role ?? 'none';
     }
 
-    // Aggregate channel stats across all sessions
+    // Aggregate channel stats across all sessions.
+    // Each metric is its own scan: joining participants and questions together
+    // multiplies the rows, which inflated total_echoes by the participant count
+    // and made the cost grow quadratically with channel size.
     const statsResult = await pool.query(
       `SELECT
-         COUNT(DISTINCT s.id)::int          AS total_sessions,
-         COUNT(DISTINCT sp.id)::int         AS total_participants,
-         COUNT(DISTINCT q.id)::int          AS total_questions,
-         COALESCE(SUM(q.vote_count), 0)::int AS total_echoes
-       FROM sessions s
-       LEFT JOIN session_participants sp ON sp.session_id = s.id
-       LEFT JOIN questions q ON q.session_id = s.id AND q.status != 'hidden'
-       WHERE s.org_id = $1`,
+         (SELECT COUNT(*)::int FROM sessions s WHERE s.org_id = $1) AS total_sessions,
+         (SELECT COUNT(*)::int FROM session_participants sp
+            JOIN sessions s ON s.id = sp.session_id
+           WHERE s.org_id = $1) AS total_participants,
+         (SELECT COUNT(*)::int FROM questions q
+            JOIN sessions s ON s.id = q.session_id
+           WHERE s.org_id = $1 AND q.status != 'hidden') AS total_questions,
+         (SELECT COALESCE(SUM(q.vote_count), 0)::int FROM questions q
+            JOIN sessions s ON s.id = q.session_id
+           WHERE s.org_id = $1 AND q.status != 'hidden') AS total_echoes`,
       [org.id],
     );
 
-    // Top 5 contributors: registered users with most-echoed questions in this channel
+    // Top 5 contributors: registered users with most-echoed questions in this channel.
+    // Anonymous posts are excluded entirely — counting them toward a named total
+    // leaks authorship by arithmetic in a small channel.
     const contributorsResult = await pool.query(
       `SELECT
          u.id AS user_id,
@@ -172,7 +178,8 @@ export async function getOrg(req: Request, res: Response, next: NextFunction) {
        FROM questions q
        JOIN sessions s ON s.id = q.session_id
        JOIN users u ON u.id = q.author_id
-       WHERE s.org_id = $1 AND q.status != 'hidden' AND q.author_id IS NOT NULL
+       WHERE s.org_id = $1 AND q.status != 'hidden'
+         AND q.author_id IS NOT NULL AND NOT q.post_anonymously
        GROUP BY u.id, u.username
        ORDER BY total_echoes DESC, question_count DESC
        LIMIT 5`,
@@ -184,10 +191,13 @@ export async function getOrg(req: Request, res: Response, next: NextFunction) {
       `SELECT
          q.id, q.body AS text, q.vote_count, (q.status = 'answered') AS is_answered,
          s.title AS session_title, s.slug AS session_slug,
-         COALESCE(u.username, 'Anonymous') AS author_username
+         CASE
+           WHEN q.post_anonymously THEN 'Anon' || q.anon_number
+           ELSE COALESCE(u.username, 'Anonymous')
+         END AS author_username
        FROM questions q
        JOIN sessions s ON s.id = q.session_id
-       LEFT JOIN users u ON u.id = q.author_id
+       LEFT JOIN users u ON u.id = q.author_id AND NOT q.post_anonymously
        WHERE s.org_id = $1
          AND q.status != 'hidden'
          AND q.vote_count > 0
@@ -240,7 +250,7 @@ export async function listMembers(req: Request, res: Response, next: NextFunctio
     await requireOrgOwnerOrAdmin(id, req.user!.userId);
 
     const result = await pool.query(
-      `SELECT om.id, om.user_id, om.role, om.joined_at, u.username, u.email
+      `SELECT om.id, om.user_id, om.role, om.joined_at, u.username
        FROM organization_members om
        JOIN users u ON u.id = om.user_id
        WHERE om.org_id = $1

@@ -1,13 +1,11 @@
 /**
- * Shared helpers for safely serializing question rows.
+ * Shared helper for safely serializing question rows.
  *
- * NEVER send a raw `RETURNING *` question row to clients or broadcast it.
- * Always go through fetchPublicQuestion() or toPublicQuestion() first.
- *
- * - fetchPublicQuestion: full projection with author masking, for question:new
- *   and question:updated events where the client needs the complete object.
- * - toPublicQuestion: lightweight strip for responses where author fields are
- *   not needed (e.g. the HTTP response to the host who just took an action).
+ * NEVER send a raw `RETURNING *` question row to clients or broadcast it —
+ * always go through fetchPublicQuestion(). Besides stripping author_id and
+ * author_guest_token, it is the only path that resolves the byline correctly:
+ * a bare question row carries no join data, so it cannot fall back to a live
+ * lookup when author_display_name is null.
  */
 
 import { pool } from '../db/pool';
@@ -28,7 +26,7 @@ export async function fetchPublicQuestion(
             q.post_anonymously, q.anon_number,
             CASE
               WHEN q.post_anonymously THEN 'Anon' || q.anon_number
-              ELSE COALESCE(u.username, sp.guest_username)
+              ELSE COALESCE(q.author_display_name, u.username, sp.guest_username, 'Removed participant')
             END AS author_username,
             CASE WHEN q.post_anonymously THEN NULL ELSE sp.id END AS participant_id,
             CASE WHEN q.post_anonymously THEN NULL ELSE sp.is_muted END AS author_is_muted
@@ -47,24 +45,4 @@ export async function fetchPublicQuestion(
   );
 
   return result.rows[0] ?? null;
-}
-
-// ─── Strip-only serializer ───────────────────────────────────────────────────
-
-/**
- * Remove author_id and author_guest_token from a raw RETURNING * row, and
- * synthesize author_username for anon posts. Use when you cannot call
- * fetchPublicQuestion (e.g. the question's session_id is not in scope).
- */
-export function toPublicQuestion(row: Record<string, unknown>): Record<string, unknown> {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { author_id, author_guest_token, ...pub } = row;
-
-  if (pub.post_anonymously) {
-    pub.author_username = pub.anon_number != null ? `Anon${pub.anon_number}` : 'Anonymous';
-    pub.participant_id = null;
-    pub.author_is_muted = null;
-  }
-
-  return pub;
 }

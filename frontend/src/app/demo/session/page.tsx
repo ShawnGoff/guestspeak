@@ -13,7 +13,7 @@ type Q = {
   echoed: boolean;
   answered: boolean;
   starred: boolean;
-  hidden: boolean;
+  hidden?: boolean;
   author: string;
   authorColor: string;
   ago: string;
@@ -581,7 +581,7 @@ function SessionPageInner() {
       setNewIds(prev => new Set([...prev, 99]));
     }, 9000);
     return () => clearTimeout(t);
-  }, []);
+  }, [titleParam]);
 
   function echo(id: number) {
     if (view === 'audience' && credits <= 0) return;
@@ -669,6 +669,10 @@ function SessionPageInner() {
       .map(([name, { color, echoes }]) => ({ name, color, echoes }))
       .sort((a, b) => b.echoes - a.echoes)
       .slice(0, 5);
+    // visibleQs is derived inline, so it gets a fresh identity every render.
+    // Depending on it would recompute this memo constantly; qs + view are its
+    // only actual inputs.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [qs, view]);
 
   // ── Duplicate detection ───────────────────────────────────────────────────
@@ -680,6 +684,8 @@ function SessionPageInner() {
       .filter(q => !q.answered)
       .filter(q => words.some(w => q.text.toLowerCase().includes(w)))
       .slice(0, 2);
+    // See above — visibleQs is a per-render derivation of qs + view.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draft, qs, view]);
 
   return (

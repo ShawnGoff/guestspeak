@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { api } from '@/lib/api';
 
 interface Mod {
@@ -57,11 +57,7 @@ export default function ModeratorPanel({ sessionId, hostId, onClose }: {
   const [error, setError]       = useState<string | null>(null);
   const searchTimer = useRef<ReturnType<typeof setTimeout>>();
 
-  useEffect(() => {
-    loadMods();
-  }, [sessionId]);
-
-  async function loadMods() {
+  const loadMods = useCallback(async () => {
     setLoading(true);
     try {
       const rows = await api.get<Mod[]>(`/sessions/${sessionId}/moderators`);
@@ -69,7 +65,11 @@ export default function ModeratorPanel({ sessionId, hostId, onClose }: {
     } catch (err: any) {
       setError(err.message ?? 'Failed to load moderators');
     } finally { setLoading(false); }
-  }
+  }, [sessionId]);
+
+  useEffect(() => {
+    loadMods();
+  }, [loadMods]);
 
   // ── User search ───────────────────────────────────────────────────────────
 

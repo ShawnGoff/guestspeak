@@ -38,7 +38,10 @@ async function runMigrations() {
 
     if (pending.length === 0) {
       console.log('[migrate] All migrations up to date.');
-      await pool.end();
+      // Do not close the pool here — `client` is still checked out, and
+      // pool.end() waits for every client to be released. The release only
+      // happens in the finally block below, which cannot run until this await
+      // resolves, so ending the pool here deadlocks. Let the finally do it.
       return;
     }
 

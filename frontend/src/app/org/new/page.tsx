@@ -35,7 +35,7 @@ export default function NewOrgPage() {
   useEffect(() => {
     setMounted(true);
     if (!isLoggedIn() || isGuest()) router.push('/login?next=/org/new');
-  }, []);
+  }, [router]);
 
   if (!mounted) return null;
 

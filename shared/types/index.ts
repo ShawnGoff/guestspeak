@@ -118,6 +118,14 @@ export interface Session {
   created_at: string;
   updated_at: string;
   caller_role?: CallerRole;
+  /**
+   * How the client should follow this session. 'live' opens an SSE stream;
+   * 'polling' re-fetches the cached feed on an interval, used for sessions too
+   * large for per-event fan-out. Hosts and moderators always receive 'live'.
+   */
+  feed_mode?: 'live' | 'polling';
+  /** Interval the client should use when feed_mode is 'polling'. */
+  poll_interval_ms?: number;
 }
 
 // ─── Questions ───────────────────────────────────────────────────────────────

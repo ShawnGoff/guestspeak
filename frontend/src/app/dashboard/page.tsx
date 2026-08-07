@@ -106,7 +106,7 @@ export default function DashboardPage() {
     } else {
       fetchDiscover();
     }
-  }, []);
+  }, [router]);
 
   if (!mounted) return null;
 
@@ -581,7 +581,7 @@ function DiscoverFeed({ data, orgs }: { data: DiscoverResponse | null; orgs: Dis
           {!hasSessions && (
             <div className="card p-8 text-center border-dashed">
               <p className="text-purple-200/70 text-sm">No public sessions at the moment.</p>
-              <p className="text-purple-200/60 text-xs mt-1">When other hosts go live, you'll see them here.</p>
+              <p className="text-purple-200/60 text-xs mt-1">When other hosts go live, you&apos;ll see them here.</p>
             </div>
           )}
           {following.length > 0 && (

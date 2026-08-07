@@ -2,11 +2,12 @@ import { Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { pool } from '../db/pool';
 import { AppError } from '../middleware/errorHandler';
-import { broadcast } from '../sse/broadcaster';
-import { resolveCallerRole, requireHostOrOrgAdmin } from '../db/permissions';
+import { broadcast, broadcastByRole, broadcastElevated } from '../sse/broadcaster';
+import { resolveCallerRole, requireHostOrOrgAdmin, type CallerRole } from '../db/permissions';
 import { filterText } from '../lib/wordFilter';
 import { createNotificationsForUsers } from './notificationController';
-import { fetchPublicQuestion, toPublicQuestion } from '../lib/questionHelpers';
+import { fetchPublicQuestion } from '../lib/questionHelpers';
+import { cacheKey, getCached, setCached, invalidateSession } from '../lib/feedCache';
 type SortOption = 'echoes' | 'recent' | 'answered' | 'starred';
 
 const CreateQuestionSchema = z.object({
@@ -23,6 +24,9 @@ const FlagSchema = z.object({
   reason: z.enum(['spam', 'offensive', 'harassment', 'off_topic', 'other']),
 });
 
+/** Roles allowed to see hidden/pending questions and enter private sessions. */
+const ELEVATED_ROLES: readonly string[] = ['host', 'org_owner', 'org_admin', 'moderator'];
+
 
 export async function getQuestions(req: Request, res: Response, next: NextFunction) {
   try {
@@ -34,12 +38,39 @@ export async function getQuestions(req: Request, res: Response, next: NextFuncti
 
     if (!sessionId) throw new AppError(400, 'sessionId is required');
 
+    const sessionResult = await pool.query(
+      'SELECT visibility FROM sessions WHERE id = $1',
+      [sessionId],
+    );
+    if (!sessionResult.rows[0]) throw new AppError(404, 'Session not found');
+
     // Hosts/mods can see hidden questions; everyone else cannot
     const callerId = req.user?.isGuest === false ? req.user.userId : null;
-    let includeHidden = false;
+    let role: CallerRole = 'none';
     if (callerId) {
-      const { role } = await resolveCallerRole(sessionId, callerId);
-      includeHidden = ['host', 'org_owner', 'org_admin', 'moderator'].includes(role);
+      ({ role } = await resolveCallerRole(sessionId, callerId));
+    }
+    const isElevated = ELEVATED_ROLES.includes(role);
+
+    // Private sessions are readable only by elevated callers. Without this,
+    // anyone holding the session UUID could read a private session's questions.
+    if (sessionResult.rows[0].visibility === 'private' && !isElevated) {
+      throw new AppError(403, 'This session is private');
+    }
+
+    const includeHidden = isElevated;
+
+    // Cache only the plain audience feed. Elevated callers and status-filtered
+    // queries (the moderation queue) must always hit the database — a mod acting
+    // on a question has to see the result now, not after the TTL.
+    const cacheable = !isElevated && !status;
+    const key = cacheKey(sessionId, sort, limit, offset);
+    if (cacheable) {
+      const hit = getCached<{ data: unknown[]; limit: number; offset: number }>(key);
+      if (hit) {
+        res.json(hit);
+        return;
+      }
     }
 
     const conditions = ['q.session_id = $1'];
@@ -68,10 +99,12 @@ export async function getQuestions(req: Request, res: Response, next: NextFuncti
       `SELECT q.id, q.body, q.status, q.is_pinned, q.is_spotlighted, q.vote_count,
               q.host_reply, q.host_replied_at, q.created_at,
               q.post_anonymously, q.anon_number,
-              -- For anon posts: return "Anon{n}" as the display name; hide real identity from everyone
+              -- For anon posts: return "Anon{n}" as the display name; hide real identity from everyone.
+              -- Named posts read the snapshot taken at post time, so removing or
+              -- renaming a guest never rewrites bylines already on screen.
               CASE
                 WHEN q.post_anonymously THEN 'Anon' || q.anon_number
-                ELSE COALESCE(u.username, sp.guest_username)
+                ELSE COALESCE(q.author_display_name, u.username, sp.guest_username, 'Removed participant')
               END AS author_username,
               -- participant_id and is_muted only for non-anon posts (avoids identity-via-mod-action)
               CASE WHEN q.post_anonymously THEN NULL ELSE sp.id END AS participant_id,
@@ -92,7 +125,10 @@ export async function getQuestions(req: Request, res: Response, next: NextFuncti
       params,
     );
 
-    res.json({ data: result.rows, limit, offset });
+    const payload = { data: result.rows, limit, offset };
+    if (cacheable) setCached(key, payload);
+
+    res.json(payload);
   } catch (err) {
     next(err);
   }
@@ -117,13 +153,16 @@ export async function createQuestion(req: Request, res: Response, next: NextFunc
 
     const { status, submission_cutoff_at, visibility, host_id, requires_approval } = sessionResult.rows[0];
 
+    // Resolve the caller's standing once. Guests can never hold an elevated
+    // role, and the host is already known from the session row, so the extra
+    // lookup only happens for other registered users.
+    const isHostLevel = !!userId && userId === host_id;
+    const isElevated = isHostLevel || (userId ? await callerIsElevated(session_id, userId) : false);
+
     // Block non-elevated users from submitting to private sessions.
     // Hosts and moderators are allowed; regular participants are not.
-    if (visibility === 'private' && userId !== host_id) {
-      const { role } = await resolveCallerRole(session_id, userId ?? '');
-      if (!['host', 'org_owner', 'org_admin', 'moderator'].includes(role)) {
-        throw new AppError(403, 'This session is private');
-      }
+    if (visibility === 'private' && !isElevated) {
+      throw new AppError(403, 'This session is private');
     }
 
     if (status === 'closed') throw new AppError(410, 'Session is closed');
@@ -134,23 +173,20 @@ export async function createQuestion(req: Request, res: Response, next: NextFunc
       throw new AppError(403, 'Question submission has closed for this session');
     }
 
-    // Hosts own the session — they bypass join/ban/mute/burst checks entirely
-    const isHostLevel = userId === host_id;
-
-    // Verify the user has joined (participant row must exist) — hosts bypass
-    if (!isHostLevel) {
+    // Everyone running the session — host, org owner/admin, assigned moderator —
+    // bypasses join/ban/mute/burst and the credit economy. They are staffing the
+    // room, not competing for airtime in it, and the UI shows them no credit
+    // meter. Charging them meant they hit a hard 402 with nothing on screen to
+    // explain it, and no heartbeat runs for elevated roles to ever regen it.
+    if (!isElevated) {
       await verifyParticipant(session_id, userId, guestToken);
-    }
-
-    // Reject if the participant is muted or session-banned — hosts bypass
-    if (!isHostLevel) {
       await rejectIfMutedOrBanned(session_id, userId, guestToken, req.ip ?? null);
     }
 
     // Burst limit: 2 questions fire freely; if both land within BURST_WINDOW seconds
     // of each other, a BURST_COOLDOWN cooldown kicks in before the next one.
     // Questions spaced more than BURST_WINDOW seconds apart never trigger the cooldown.
-    if (!isHostLevel) {
+    if (!isElevated) {
       const BURST_LIMIT    = 2;
       const BURST_WINDOW   = 10; // seconds — rapid-fire detection window
       const BURST_COOLDOWN = 30; // seconds — cooldown after hitting the limit
@@ -199,7 +235,10 @@ export async function createQuestion(req: Request, res: Response, next: NextFunc
 
     // Deduct 1 credit — anon posts draw from a separate anon_credits pool (no replenishment),
     // regular posts draw from credits_remaining as normal.
-    if (postAnonymously) {
+    // Elevated roles are exempt (see above).
+    if (isElevated) {
+      // no credit cost
+    } else if (postAnonymously) {
       const col = userId ? 'user_id' : 'guest_token';
       const val = userId ?? guestToken;
       const anonResult = await pool.query(
@@ -233,18 +272,32 @@ export async function createQuestion(req: Request, res: Response, next: NextFunc
       anonNumber = counterResult.rows[0].anon_counter;
     }
 
+    // Snapshot the byline. It is a fact about who posted this, at the time they
+    // posted it — not a live lookup. Resolving it later broke when a guest was
+    // removed (their participant row is deleted) or renamed (the row is updated),
+    // in both cases silently rewriting history on questions already on screen.
+    const authorDisplayName = postAnonymously
+      ? null
+      : await resolveAuthorDisplayName(session_id, userId, guestToken);
+
     const result = await pool.query(
-      `INSERT INTO questions (session_id, author_id, author_guest_token, body, status, post_anonymously, anon_number)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
+      `INSERT INTO questions (session_id, author_id, author_guest_token, body, status, post_anonymously, anon_number, author_display_name)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
        RETURNING id`,
-      [session_id, userId, guestToken, cleanBody, initialStatus, postAnonymously, anonNumber],
+      [session_id, userId, guestToken, cleanBody, initialStatus, postAnonymously, anonNumber, authorDisplayName],
     );
 
     const newId = result.rows[0].id;
     const publicQuestion = await fetchPublicQuestion(newId, session_id);
 
     // C4: only broadcast approved questions — pending ones wait for host approval
-    if (initialStatus !== 'pending') {
+    invalidateSession(session_id);
+    if (initialStatus === 'pending') {
+      // Pending questions go to hosts/mods only — they need to appear in the
+      // approval queue the moment they arrive, without the room seeing them
+      // before they are approved.
+      broadcastElevated(session_id, { type: 'question:pending', data: publicQuestion });
+    } else {
       broadcast(session_id, { type: 'question:new', data: publicQuestion });
     }
 
@@ -262,13 +315,17 @@ export async function updateQuestionStatus(req: Request, res: Response, next: Ne
 
     // Look up question + session
     const qResult = await pool.query(
-      `SELECT q.session_id, s.host_id FROM questions q
+      `SELECT q.session_id, q.status AS current_status, q.author_id,
+              q.author_guest_token, q.post_anonymously, s.host_id
+       FROM questions q
        JOIN sessions s ON s.id = q.session_id WHERE q.id = $1`,
       [id],
     );
     if (!qResult.rows[0]) throw new AppError(404, 'Question not found');
 
-    const { session_id } = qResult.rows[0];
+    const {
+      session_id, current_status, author_id, author_guest_token, post_anonymously,
+    } = qResult.rows[0];
     const { role, permissions } = await resolveCallerRole(session_id, callerId);
 
     if (role === 'participant' || role === 'none') {
@@ -278,23 +335,52 @@ export async function updateQuestionStatus(req: Request, res: Response, next: Ne
     // Hosts, org owners, and org admins have full rights.
     // Explicit moderators must have the specific permission.
     if (role === 'moderator') {
-      const permCol = statusToPermColumn(status) as keyof typeof permissions;
+      const permCol = transitionToPermColumn(current_status, status) as keyof typeof permissions;
       if (!permissions[permCol]) {
         throw new AppError(403, 'Insufficient permissions');
       }
     }
 
+    // $1 was previously used both as the assigned value and inside the CASE
+    // comparison. status is varchar(20) but a comparison against a literal
+    // deduces text, so Postgres could not settle on one type for the parameter
+    // and every call failed with 42P08 — hide, star, and mark-answered included.
+    // The spotlight decision is made here and passed as its own boolean.
     await pool.query(
       `UPDATE questions
        SET status = $1,
-           is_spotlighted = CASE WHEN $1 = 'answered' THEN false ELSE is_spotlighted END,
+           is_spotlighted = CASE WHEN $2 THEN false ELSE is_spotlighted END,
            updated_at = NOW()
-       WHERE id = $2`,
-      [status, id],
+       WHERE id = $3`,
+      [status, status === 'answered', id],
     );
 
+    // Rejecting a question that never reached the audience refunds its credit.
+    // The author paid to ask, a moderator declined to publish it, and without
+    // this they are just down a credit with nothing to show for it and no
+    // explanation. Scoped to pending -> hidden: hiding an already-published
+    // question moderates content the author did get airtime for, and must not
+    // pay them back.
+    if (current_status === 'pending' && status === 'hidden') {
+      await refundQuestionCredit(session_id, author_id, author_guest_token, post_anonymously);
+    }
+
     const publicQuestion = await fetchPublicQuestion(id, session_id);
-    broadcast(session_id, { type: 'question:updated', data: publicQuestion });
+
+    invalidateSession(session_id);
+
+    if (status === 'hidden') {
+      // Don't push the body of a just-hidden question to every connected
+      // browser. Mods need it for their panel; the audience gets a bare id so
+      // their client can drop it.
+      broadcastByRole(
+        session_id,
+        { type: 'question:updated', data: publicQuestion },
+        { type: 'question:removed', data: { id } },
+      );
+    } else {
+      broadcast(session_id, { type: 'question:updated', data: publicQuestion });
+    }
 
     res.json(publicQuestion);
   } catch (err) {
@@ -311,22 +397,35 @@ export async function addEcho(req: Request, res: Response, next: NextFunction) {
     if (!userId && !guestToken) throw new AppError(401, 'Authentication required to Echo');
 
     const qResult = await pool.query(
-      'SELECT session_id, author_id, author_guest_token FROM questions WHERE id = $1',
+      `SELECT q.session_id, q.author_id, q.author_guest_token, s.status
+       FROM questions q
+       JOIN sessions s ON s.id = q.session_id
+       WHERE q.id = $1`,
       [questionId],
     );
     if (!qResult.rows[0]) throw new AppError(404, 'Question not found');
 
-    const { session_id, author_id, author_guest_token } = qResult.rows[0];
+    const { session_id, author_id, author_guest_token, status } = qResult.rows[0];
+
+    // A closed session is closed to echoing too. Submission already returned 410
+    // here, but echoes did not check at all, so vote counts kept moving after the
+    // host ended the session — shifting the ranking underneath a host who had
+    // already read the top questions, and drifting from the CSV they exported.
+    if (status === 'closed') throw new AppError(410, 'Session is closed');
 
     // Prevent self-echo
     if (userId && userId === author_id) throw new AppError(409, 'You cannot Echo your own question');
     if (guestToken && guestToken === author_guest_token) throw new AppError(409, 'You cannot Echo your own question');
 
-    // Verify participant membership
-    await verifyParticipant(session_id, userId, guestToken);
+    // Session staff echo without cost, matching question submission: the UI shows
+    // them no credit meter and no heartbeat regenerates credits for them.
+    const isElevated = userId ? await callerIsElevated(session_id, userId) : false;
 
-    // Reject muted, session-banned, or platform-banned users (pass IP for platform ban check)
-    await rejectIfMutedOrBanned(session_id, userId, guestToken, req.ip ?? null);
+    if (!isElevated) {
+      await verifyParticipant(session_id, userId, guestToken);
+      // Reject muted, session-banned, or platform-banned users (pass IP for platform ban check)
+      await rejectIfMutedOrBanned(session_id, userId, guestToken, req.ip ?? null);
+    }
 
     // Wrap credit spend + vote insert in a transaction.
     // Spend credit FIRST so a failed spend never lets the vote land.
@@ -338,16 +437,18 @@ export async function addEcho(req: Request, res: Response, next: NextFunction) {
       await client.query('BEGIN');
 
       // Deduct credit — rolls back everything if user is out
-      const spendResult = await client.query(
-        `UPDATE session_participants
-         SET credits_remaining = credits_remaining - 1, actions_used = actions_used + 1
-         WHERE session_id = $1 AND ${col} = $2 AND credits_remaining > 0
-         RETURNING credits_remaining`,
-        [session_id, val],
-      );
-      if (spendResult.rowCount === 0) {
-        await client.query('ROLLBACK');
-        throw new AppError(402, 'No credits remaining');
+      if (!isElevated) {
+        const spendResult = await client.query(
+          `UPDATE session_participants
+           SET credits_remaining = credits_remaining - 1, actions_used = actions_used + 1
+           WHERE session_id = $1 AND ${col} = $2 AND credits_remaining > 0
+           RETURNING credits_remaining`,
+          [session_id, val],
+        );
+        if (spendResult.rowCount === 0) {
+          await client.query('ROLLBACK');
+          throw new AppError(402, 'No credits remaining');
+        }
       }
 
       // Insert vote — unique constraint catches duplicate echoes
@@ -372,6 +473,7 @@ export async function addEcho(req: Request, res: Response, next: NextFunction) {
     );
     const { vote_count } = updated.rows[0];
 
+    invalidateSession(session_id);
     broadcast(session_id, { type: 'echo:added', data: { questionId, vote_count } });
 
     res.json({ vote_count });
@@ -395,11 +497,19 @@ export async function flagQuestion(req: Request, res: Response, next: NextFuncti
     );
     if (!qResult.rows[0]) throw new AppError(404, 'Question not found');
 
+    const sessionId = qResult.rows[0].session_id;
+
+    // Flagging is a moderation signal, so it must come from someone actually in
+    // the session and in good standing. Without this, minting throwaway guest
+    // tokens is enough to bury any question under fake reports.
+    await verifyParticipant(sessionId, userId, guestToken);
+    await rejectIfMutedOrBanned(sessionId, userId, guestToken, req.ip ?? null);
+
     let isModeratorFlag = false;
     if (userId) {
       const modResult = await pool.query(
         `SELECT can_flag FROM session_moderators WHERE session_id = $1 AND user_id = $2`,
-        [qResult.rows[0].session_id, userId],
+        [sessionId, userId],
       );
       isModeratorFlag = modResult.rows[0]?.can_flag === true;
     }
@@ -482,6 +592,7 @@ export async function approveQuestion(req: Request, res: Response, next: NextFun
       [id],
     );
     const publicQuestion = await fetchPublicQuestion(id, session_id);
+    invalidateSession(session_id);
     broadcast(session_id, { type: 'question:new', data: publicQuestion });
     res.json(publicQuestion);
   } catch (err) {
@@ -547,8 +658,9 @@ export async function spotlightQuestion(req: Request, res: Response, next: NextF
       [session_id, id],
     );
 
-    const updated = result.rows[0];
-    const nowSpotlighted: boolean = updated.is_spotlighted;
+    const nowSpotlighted: boolean = result.rows[0].is_spotlighted;
+
+    invalidateSession(session_id);
 
     // session:spotlight tells all clients which question (or null) is now spotlighted
     broadcast(session_id, {
@@ -556,7 +668,11 @@ export async function spotlightQuestion(req: Request, res: Response, next: NextF
       data: { question_id: nowSpotlighted ? id : null },
     });
 
-    res.json(toPublicQuestion(updated));
+    // Re-read through the full projection rather than serialising the RETURNING *
+    // row: a bare question row carries no join data, so it cannot fall back to a
+    // live byline lookup when the snapshot is null.
+    const publicQuestion = await fetchPublicQuestion(id, session_id);
+    res.json(publicQuestion);
   } catch (err) {
     next(err);
   }
@@ -610,6 +726,48 @@ export async function addHostReply(req: Request, res: Response, next: NextFuncti
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
 /**
+ * The name to record on a question at post time.
+ *
+ * Registered users are named by their account; guests by the display name they
+ * joined this session under. Returns null only if neither resolves, in which
+ * case the read path falls back to a generic label.
+ */
+async function resolveAuthorDisplayName(
+  sessionId: string,
+  userId: string | null,
+  guestToken: string | null,
+): Promise<string | null> {
+  if (userId) {
+    const result = await pool.query(
+      'SELECT username FROM users WHERE id = $1',
+      [userId],
+    );
+    return result.rows[0]?.username ?? null;
+  }
+
+  if (guestToken) {
+    const result = await pool.query(
+      'SELECT guest_username FROM session_participants WHERE session_id = $1 AND guest_token = $2',
+      [sessionId, guestToken],
+    );
+    return result.rows[0]?.guest_username ?? null;
+  }
+
+  return null;
+}
+
+/**
+ * True when the caller runs the session (host, org owner/admin, or an assigned
+ * moderator). Session staff bypass the participant economy — credits, burst
+ * limits, and join checks all apply to the audience, not to the people
+ * moderating it.
+ */
+async function callerIsElevated(sessionId: string, userId: string): Promise<boolean> {
+  const { role } = await resolveCallerRole(sessionId, userId);
+  return ELEVATED_ROLES.includes(role);
+}
+
+/**
  * Throws 403 if user/guest does not have a participant row for the session.
  * Guests must call POST /sessions/:id/join before they can act.
  */
@@ -645,53 +803,101 @@ async function rejectIfMutedOrBanned(
   const col = userId ? 'user_id' : 'guest_token';
   const val = userId ?? guestToken;
 
-  // Check mute
-  const muteResult = await pool.query(
-    `SELECT is_muted FROM session_participants WHERE session_id = $1 AND ${col} = $2`,
-    [sessionId, val],
-  );
-  if (muteResult.rows[0]?.is_muted) {
-    throw new AppError(403, 'You have been muted in this session');
+  // One round trip, not three. This runs on every question and every echo, so at
+  // venue scale the difference is three connections held per action instead of
+  // one against a 20-connection pool.
+  const params: unknown[] = [sessionId, val];
+
+  // Platform bans are matched on user_id, guest_token, AND IP so all three ban
+  // vectors are enforced. Built dynamically because a guest has no user_id and a
+  // proxied request may have no IP.
+  const banConditions: string[] = [];
+  if (userId) {
+    params.push(userId);
+    banConditions.push(`user_id = $${params.length}`);
   }
-
-  // Check session ban
-  const banResult = await pool.query(
-    `SELECT id FROM session_bans WHERE session_id = $1 AND ${col} = $2`,
-    [sessionId, val],
-  );
-  if (banResult.rows[0]) {
-    throw new AppError(403, 'You have been removed from this session');
+  if (guestToken) {
+    params.push(guestToken);
+    banConditions.push(`guest_token = $${params.length}`);
   }
+  if (ipAddress) {
+    params.push(ipAddress);
+    banConditions.push(`ip_address = $${params.length}`);
+  }
+  // `FALSE` keeps the SQL valid when there is nothing to match on.
+  const banWhere = banConditions.length ? banConditions.join(' OR ') : 'FALSE';
 
-  // Check platform ban — enforced on every action, not just at join.
-  // Checks user_id, guest_token, AND IP so all three ban vectors are enforced.
-  if (userId || guestToken || ipAddress) {
-    const conditions: string[] = [];
-    const params: unknown[] = [];
+  const result = await pool.query(
+    `SELECT
+       EXISTS (
+         SELECT 1 FROM session_participants
+         WHERE session_id = $1 AND ${col} = $2 AND is_muted
+       ) AS muted,
+       EXISTS (
+         SELECT 1 FROM session_bans
+         WHERE session_id = $1 AND ${col} = $2
+       ) AS session_banned,
+       EXISTS (
+         SELECT 1 FROM platform_bans
+         WHERE (${banWhere}) AND (expires_at IS NULL OR expires_at > NOW())
+       ) AS platform_banned`,
+    params,
+  );
 
-    if (userId) {
-      params.push(userId);
-      conditions.push(`user_id = $${params.length}`);
-    }
-    if (guestToken) {
-      params.push(guestToken);
-      conditions.push(`guest_token = $${params.length}`);
-    }
-    if (ipAddress) {
-      params.push(ipAddress);
-      conditions.push(`ip_address = $${params.length}`);
-    }
-    params.push(new Date().toISOString());
-    const expiryCheck = `(expires_at IS NULL OR expires_at > $${params.length})`;
+  const { muted, session_banned, platform_banned } = result.rows[0];
 
-    const platformBan = await pool.query(
-      `SELECT id FROM platform_bans WHERE (${conditions.join(' OR ')}) AND ${expiryCheck} LIMIT 1`,
-      params,
+  // Order preserved from the original sequential checks — the most specific
+  // explanation wins.
+  if (muted)           throw new AppError(403, 'You have been muted in this session');
+  if (session_banned)  throw new AppError(403, 'You have been removed from this session');
+  if (platform_banned) throw new AppError(403, 'Your account has been suspended');
+}
+
+/**
+ * Return the credit spent on a question that was rejected before publication.
+ *
+ * Mirrors exactly what createQuestion charged:
+ *  - anonymous posts drew from anon_credits and did not touch actions_used
+ *  - everything else drew from credits_remaining and incremented actions_used
+ *
+ * Session staff are skipped. They are exempt from the credit economy, so they
+ * were never charged, and crediting them would mint credits from nothing.
+ *
+ * A missing participant row (the author was removed from the session) is not an
+ * error — there is simply nobody left to refund, and the moderator's action
+ * should still succeed.
+ */
+async function refundQuestionCredit(
+  sessionId: string,
+  authorId: string | null,
+  authorGuestToken: string | null,
+  postAnonymously: boolean,
+): Promise<void> {
+  if (!authorId && !authorGuestToken) return;
+
+  // Guests can never be elevated, so only registered authors need the lookup.
+  if (authorId && await callerIsElevated(sessionId, authorId)) return;
+
+  const col = authorId ? 'user_id' : 'guest_token';
+  const val = authorId ?? authorGuestToken;
+
+  if (postAnonymously) {
+    await pool.query(
+      `UPDATE session_participants
+       SET anon_credits = anon_credits + 1
+       WHERE session_id = $1 AND ${col} = $2`,
+      [sessionId, val],
     );
-    if (platformBan.rows[0]) {
-      throw new AppError(403, 'Your account has been suspended');
-    }
+    return;
   }
+
+  await pool.query(
+    `UPDATE session_participants
+     SET credits_remaining = credits_remaining + 1,
+         actions_used      = GREATEST(actions_used - 1, 0)
+     WHERE session_id = $1 AND ${col} = $2`,
+    [sessionId, val],
+  );
 }
 
 /**
@@ -719,7 +925,17 @@ async function spendCredit(
   }
 }
 
-function statusToPermColumn(status: string): string {
+/**
+ * Maps a status transition to the moderator permission it requires.
+ *
+ * The target status alone is not enough: setting a question back to 'new' means
+ * "reopen" when it was answered/starred, but "un-hide" when it was hidden. Those
+ * are different powers, so un-hiding is gated on can_hide — otherwise a mod with
+ * only can_mark_answered could reveal anything a host had hidden.
+ */
+function transitionToPermColumn(currentStatus: string, nextStatus: string): string {
+  if (currentStatus === 'hidden') return 'can_hide';
+
   const map: Record<string, string> = {
     answered: 'can_mark_answered',
     new:      'can_mark_answered', // reopening an answered question
@@ -727,5 +943,5 @@ function statusToPermColumn(status: string): string {
     hidden:   'can_hide',
     flagged:  'can_flag',
   };
-  return map[status] ?? 'can_mark_answered'; // safe fallback
+  return map[nextStatus] ?? 'can_hide'; // fail closed on an unmapped status
 }

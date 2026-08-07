@@ -27,7 +27,18 @@ app.use('/api', apiLimiter);
 // Serve uploaded files — both paths for compatibility
 // /api/uploads is preferred (always routed correctly through any proxy)
 // /uploads kept for backwards compat with existing stored URLs
-const UPLOADS_STATIC = express.static(path.join(__dirname, '../uploads'));
+//
+// These are user-supplied bytes served from our own origin, so they are pinned
+// to their stored Content-Type, never sniffed, and never allowed to execute as
+// a document. The upload route already restricts extensions to image types;
+// this is the second layer in case an older file predates that.
+const UPLOADS_STATIC = express.static(path.join(__dirname, '../uploads'), {
+  setHeaders: (res) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Content-Security-Policy', "default-src 'none'; sandbox");
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+  },
+});
 app.use('/api/uploads', UPLOADS_STATIC);
 app.use('/uploads',     UPLOADS_STATIC);
 

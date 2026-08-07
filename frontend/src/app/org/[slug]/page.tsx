@@ -452,7 +452,7 @@ function NotFound() {
       <div className="text-center card p-8 max-w-sm">
         <p className="text-4xl mb-3">🔍</p>
         <h2 className="text-white font-bold text-lg mb-2">Channel not found</h2>
-        <p className="text-purple-200/75 text-sm mb-6">This page doesn't exist or has been removed.</p>
+        <p className="text-purple-200/75 text-sm mb-6">This page doesn&apos;t exist or has been removed.</p>
         <Link href="/discover" className="btn-primary">Browse sessions</Link>
       </div>
     </div>

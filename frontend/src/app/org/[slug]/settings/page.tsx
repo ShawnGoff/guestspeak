@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { api, resolveAsset } from '@/lib/api';
@@ -23,6 +23,8 @@ interface Org {
   country?: string;
   lat?: number;
   lng?: number;
+  categories?: string[];
+  is_online?: boolean;
   created_at: string;
 }
 
@@ -30,7 +32,6 @@ interface Member {
   id: string;
   user_id: string;
   username: string;
-  email: string;
   role: 'owner' | 'admin' | 'member';
   joined_at: string;
 }
@@ -70,13 +71,7 @@ export default function OrgSettingsPage({ params }: { params: { slug: string } }
   const [memberRole, setMemberRole] = useState<'admin' | 'member'>('member');
   const searchTimer = useRef<ReturnType<typeof setTimeout>>();
 
-  useEffect(() => {
-    setMounted(true);
-    if (!isLoggedIn() || isGuest()) { router.push('/login'); return; }
-    loadData();
-  }, [params.slug]);
-
-  async function loadData() {
+  const loadData = useCallback(async () => {
     try {
       const data = await api.get<{ org: Org; sessions: any[] }>(`/orgs/${params.slug}`);
       setOrg(data.org);
@@ -99,7 +94,13 @@ export default function OrgSettingsPage({ params }: { params: { slug: string } }
     } finally {
       setLoading(false);
     }
-  }
+  }, [params.slug]);
+
+  useEffect(() => {
+    setMounted(true);
+    if (!isLoggedIn() || isGuest()) { router.push('/login'); return; }
+    loadData();
+  }, [loadData, router]);
 
   if (!mounted) return null;
   if (loading) return <PageSkeleton />;
@@ -117,6 +118,7 @@ export default function OrgSettingsPage({ params }: { params: { slug: string } }
 
   async function saveDetails(e: React.FormEvent) {
     e.preventDefault();
+    if (!org) return; // form is not rendered until the channel has loaded
     setSaving(true); setSaveMsg(null);
     try {
       let avatar_url: string | undefined;
@@ -175,6 +177,7 @@ export default function OrgSettingsPage({ params }: { params: { slug: string } }
   }
 
   async function addMember(user: UserResult) {
+    if (!org) return;
     setAddingMember(true);
     try {
       await api.post(`/orgs/${org.id}/members`, { user_id: user.id, role: memberRole });
@@ -186,6 +189,7 @@ export default function OrgSettingsPage({ params }: { params: { slug: string } }
   }
 
   async function removeMember(userId: string) {
+    if (!org) return;
     try {
       await api.delete(`/orgs/${org.id}/members/${userId}`);
       setMembers(prev => prev.filter(m => m.user_id !== userId));
@@ -412,7 +416,6 @@ export default function OrgSettingsPage({ params }: { params: { slug: string } }
               <div key={m.user_id} className="flex items-center justify-between py-2 border-b border-brand-border/20 last:border-0">
                 <div>
                   <span className="text-sm text-white font-medium">@{m.username}</span>
-                  <span className="ml-2 text-xs text-purple-200/70">{m.email}</span>
                 </div>
                 <div className="flex items-center gap-3">
                   <RoleBadge role={m.role} />
@@ -509,7 +512,7 @@ function NotFound() {
       <div className="text-center card p-8 max-w-sm">
         <p className="text-4xl mb-3">🔒</p>
         <h2 className="text-white font-bold text-lg mb-2">Not found</h2>
-        <p className="text-purple-200/75 text-sm mb-6">This channel doesn't exist or you don't have access.</p>
+        <p className="text-purple-200/75 text-sm mb-6">This channel doesn&apos;t exist or you don&apos;t have access.</p>
         <Link href="/dashboard" className="btn-primary">Go to dashboard</Link>
       </div>
     </div>

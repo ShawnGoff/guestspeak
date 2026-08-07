@@ -7,7 +7,8 @@ import { requireRegistered } from './auth';
  * Chain after requireAuth — do not use standalone.
  */
 export function requireAdmin(req: Request, res: Response, next: NextFunction) {
-  requireRegistered(req, res, async () => {
+  requireRegistered(req, res, async (err?: unknown) => {
+    if (err) return next(err);
     try {
       const result = await pool.query<{ is_platform_admin: boolean }>(
         'SELECT is_platform_admin FROM users WHERE id = $1',

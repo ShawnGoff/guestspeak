@@ -270,7 +270,7 @@ export default function DiscoverPage() {
         <div className="rounded-2xl bg-gradient-to-r from-brand-orange/10 via-brand-purple/10 to-brand-orange/5 border border-brand-orange/20 px-6 py-6 mb-10 flex flex-col sm:flex-row items-center justify-between gap-5">
           <div>
             <p className="font-bold text-white text-lg mb-1">Curious what the host sees?</p>
-            <p className="text-purple-200/80 text-sm">Create a session in seconds — you'll land in the room with the host controls in hand.</p>
+            <p className="text-purple-200/80 text-sm">Create a session in seconds — you&apos;ll land in the room with the host controls in hand.</p>
           </div>
           <Link
             href="/demo/create"

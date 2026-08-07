@@ -47,7 +47,7 @@ export default function CreateSessionPage() {
     if (!isLoggedIn() || isGuest()) { router.push('/login?next=/create'); return; }
     // Load orgs the user belongs to as owner/admin
     api.get<{ orgs: Org[] }>('/orgs/mine').then(r => setOrgs(r.orgs)).catch(() => {});
-  }, []);
+  }, [router]);
 
   if (!mounted) return null;
 

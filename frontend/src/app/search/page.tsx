@@ -22,10 +22,14 @@ function SearchPageInner() {
 
   const currentUser = mounted ? getUser() : null;
 
+  // Mount only. `query` is deliberately excluded: the debounced effect below
+  // already re-runs the search as the user types, and including it here would
+  // fire a second undebounced request on every keystroke.
   useEffect(() => {
     setMounted(true);
     inputRef.current?.focus();
     if (query) doSearch(query);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -138,7 +142,7 @@ function SearchPageInner() {
 
         {!loading && query.trim() && results.length === 0 && (
           <div className="text-center py-16">
-            <p className="text-purple-200/70 text-sm">No users found for "<span className="text-white">{query}</span>"</p>
+            <p className="text-purple-200/70 text-sm">No users found for &quot;<span className="text-white">{query}</span>&quot;</p>
           </div>
         )}
 

@@ -37,7 +37,7 @@ export default function MySessionsPage() {
       .then(r => setSessions(r.sessions))
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, []);
+  }, [router]);
 
   function copyCode(code: string) {
     navigator.clipboard.writeText(code);
@@ -83,7 +83,7 @@ export default function MySessionsPage() {
         <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-2xl font-extrabold text-white">My Sessions</h1>
-            <p className="text-purple-200/70 text-sm mt-0.5">All sessions you've hosted.</p>
+            <p className="text-purple-200/70 text-sm mt-0.5">All sessions you&apos;ve hosted.</p>
           </div>
           <Link href="/create" className="btn-primary text-sm py-2 px-4">+ New session</Link>
         </div>

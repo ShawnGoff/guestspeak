@@ -109,7 +109,7 @@ function FlagsTab() {
             <span className="text-xs text-purple-200/60 shrink-0">{fmt(f.flagged_at)}</span>
           </div>
 
-          <p className="text-white text-sm leading-relaxed mb-2">"{f.body}"</p>
+          <p className="text-white text-sm leading-relaxed mb-2">&quot;{f.body}&quot;</p>
 
           <div className="flex items-center gap-2 text-xs text-purple-200/70 mb-3 flex-wrap">
             {f.author_username && <span>by {f.author_username}</span>}
