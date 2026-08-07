@@ -315,13 +315,17 @@ export async function updateQuestionStatus(req: Request, res: Response, next: Ne
 
     // Look up question + session
     const qResult = await pool.query(
-      `SELECT q.session_id, q.status AS current_status, s.host_id FROM questions q
+      `SELECT q.session_id, q.status AS current_status, q.author_id,
+              q.author_guest_token, q.post_anonymously, s.host_id
+       FROM questions q
        JOIN sessions s ON s.id = q.session_id WHERE q.id = $1`,
       [id],
     );
     if (!qResult.rows[0]) throw new AppError(404, 'Question not found');
 
-    const { session_id, current_status } = qResult.rows[0];
+    const {
+      session_id, current_status, author_id, author_guest_token, post_anonymously,
+    } = qResult.rows[0];
     const { role, permissions } = await resolveCallerRole(session_id, callerId);
 
     if (role === 'participant' || role === 'none') {
@@ -345,6 +349,16 @@ export async function updateQuestionStatus(req: Request, res: Response, next: Ne
        WHERE id = $2`,
       [status, id],
     );
+
+    // Rejecting a question that never reached the audience refunds its credit.
+    // The author paid to ask, a moderator declined to publish it, and without
+    // this they are just down a credit with nothing to show for it and no
+    // explanation. Scoped to pending -> hidden: hiding an already-published
+    // question moderates content the author did get airtime for, and must not
+    // pay them back.
+    if (current_status === 'pending' && status === 'hidden') {
+      await refundQuestionCredit(session_id, author_id, author_guest_token, post_anonymously);
+    }
 
     const publicQuestion = await fetchPublicQuestion(id, session_id);
 
@@ -378,12 +392,21 @@ export async function addEcho(req: Request, res: Response, next: NextFunction) {
     if (!userId && !guestToken) throw new AppError(401, 'Authentication required to Echo');
 
     const qResult = await pool.query(
-      'SELECT session_id, author_id, author_guest_token FROM questions WHERE id = $1',
+      `SELECT q.session_id, q.author_id, q.author_guest_token, s.status
+       FROM questions q
+       JOIN sessions s ON s.id = q.session_id
+       WHERE q.id = $1`,
       [questionId],
     );
     if (!qResult.rows[0]) throw new AppError(404, 'Question not found');
 
-    const { session_id, author_id, author_guest_token } = qResult.rows[0];
+    const { session_id, author_id, author_guest_token, status } = qResult.rows[0];
+
+    // A closed session is closed to echoing too. Submission already returned 410
+    // here, but echoes did not check at all, so vote counts kept moving after the
+    // host ended the session — shifting the ranking underneath a host who had
+    // already read the top questions, and drifting from the CSV they exported.
+    if (status === 'closed') throw new AppError(410, 'Session is closed');
 
     // Prevent self-echo
     if (userId && userId === author_id) throw new AppError(409, 'You cannot Echo your own question');
@@ -823,6 +846,53 @@ async function rejectIfMutedOrBanned(
   if (muted)           throw new AppError(403, 'You have been muted in this session');
   if (session_banned)  throw new AppError(403, 'You have been removed from this session');
   if (platform_banned) throw new AppError(403, 'Your account has been suspended');
+}
+
+/**
+ * Return the credit spent on a question that was rejected before publication.
+ *
+ * Mirrors exactly what createQuestion charged:
+ *  - anonymous posts drew from anon_credits and did not touch actions_used
+ *  - everything else drew from credits_remaining and incremented actions_used
+ *
+ * Session staff are skipped. They are exempt from the credit economy, so they
+ * were never charged, and crediting them would mint credits from nothing.
+ *
+ * A missing participant row (the author was removed from the session) is not an
+ * error — there is simply nobody left to refund, and the moderator's action
+ * should still succeed.
+ */
+async function refundQuestionCredit(
+  sessionId: string,
+  authorId: string | null,
+  authorGuestToken: string | null,
+  postAnonymously: boolean,
+): Promise<void> {
+  if (!authorId && !authorGuestToken) return;
+
+  // Guests can never be elevated, so only registered authors need the lookup.
+  if (authorId && await callerIsElevated(sessionId, authorId)) return;
+
+  const col = authorId ? 'user_id' : 'guest_token';
+  const val = authorId ?? authorGuestToken;
+
+  if (postAnonymously) {
+    await pool.query(
+      `UPDATE session_participants
+       SET anon_credits = anon_credits + 1
+       WHERE session_id = $1 AND ${col} = $2`,
+      [sessionId, val],
+    );
+    return;
+  }
+
+  await pool.query(
+    `UPDATE session_participants
+     SET credits_remaining = credits_remaining + 1,
+         actions_used      = GREATEST(actions_used - 1, 0)
+     WHERE session_id = $1 AND ${col} = $2`,
+    [sessionId, val],
+  );
 }
 
 /**
