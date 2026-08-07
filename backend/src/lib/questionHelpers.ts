@@ -28,7 +28,7 @@ export async function fetchPublicQuestion(
             q.post_anonymously, q.anon_number,
             CASE
               WHEN q.post_anonymously THEN 'Anon' || q.anon_number
-              ELSE COALESCE(u.username, sp.guest_username)
+              ELSE COALESCE(q.author_display_name, 'Removed participant')
             END AS author_username,
             CASE WHEN q.post_anonymously THEN NULL ELSE sp.id END AS participant_id,
             CASE WHEN q.post_anonymously THEN NULL ELSE sp.is_muted END AS author_is_muted
@@ -58,12 +58,16 @@ export async function fetchPublicQuestion(
  */
 export function toPublicQuestion(row: Record<string, unknown>): Record<string, unknown> {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { author_id, author_guest_token, ...pub } = row;
+  const { author_id, author_guest_token, author_display_name, ...pub } = row;
 
   if (pub.post_anonymously) {
     pub.author_username = pub.anon_number != null ? `Anon${pub.anon_number}` : 'Anonymous';
     pub.participant_id = null;
     pub.author_is_muted = null;
+  } else {
+    // Surface the snapshotted byline under the same key the full projection uses,
+    // so callers never see the raw column name or a missing author.
+    pub.author_username = (author_display_name as string | null) ?? 'Removed participant';
   }
 
   return pub;

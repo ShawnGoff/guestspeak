@@ -33,7 +33,7 @@ export async function listFlags(req: Request, res: Response, next: NextFunction)
          COUNT(f.id) OVER (PARTITION BY f.question_id)::int AS flag_count,
          q.id AS question_id, q.body, q.status, q.session_id,
          s.title AS session_title, s.slug AS session_slug,
-         COALESCE(u.username, sp.guest_username) AS author_username,
+         COALESCE(q.author_display_name, u.username, sp.guest_username, 'Removed participant') AS author_username,
          sp.id AS participant_id
        FROM flags f
        JOIN questions q ON q.id = f.question_id
@@ -226,6 +226,7 @@ export async function revealIdentity(req: Request, res: Response, next: NextFunc
 
     const result = await pool.query(
       `SELECT q.id, q.body, q.author_id, q.author_guest_token,
+              q.author_display_name,
               u.username, u.email,
               sp.guest_username, sp.guest_token
        FROM questions q
