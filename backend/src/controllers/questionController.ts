@@ -117,9 +117,13 @@ export async function createQuestion(req: Request, res: Response, next: NextFunc
 
     const { status, submission_cutoff_at, visibility, host_id, requires_approval } = sessionResult.rows[0];
 
-    // Block non-hosts from submitting to private sessions
+    // Block non-elevated users from submitting to private sessions.
+    // Hosts and moderators are allowed; regular participants are not.
     if (visibility === 'private' && userId !== host_id) {
-      throw new AppError(403, 'This session is private');
+      const { role } = await resolveCallerRole(session_id, userId ?? '');
+      if (!['host', 'org_owner', 'org_admin', 'moderator'].includes(role)) {
+        throw new AppError(403, 'This session is private');
+      }
     }
 
     if (status === 'closed') throw new AppError(410, 'Session is closed');
@@ -718,9 +722,10 @@ async function spendCredit(
 function statusToPermColumn(status: string): string {
   const map: Record<string, string> = {
     answered: 'can_mark_answered',
-    starred: 'can_star',
-    hidden: 'can_hide',
-    flagged: 'can_flag',
+    new:      'can_mark_answered', // reopening an answered question
+    starred:  'can_star',
+    hidden:   'can_hide',
+    flagged:  'can_flag',
   };
-  return map[status] ?? 'can_hide';
+  return map[status] ?? 'can_mark_answered'; // safe fallback
 }

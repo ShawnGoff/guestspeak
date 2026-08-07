@@ -66,6 +66,8 @@ export default function SessionPageClient({ params }: SessionPageProps) {
   const [showRegenModal, setShowRegenModal] = useState(false);
 
   const [showSignupPrompt, setShowSignupPrompt]   = useState(false);
+  const [showReport, setShowReport]               = useState(false);
+  const [reportDone, setReportDone]               = useState(false);
   const [burstCooldown, setBurstCooldown]         = useState(0); // seconds remaining in burst cooldown
   const burstTimerRef = useRef<ReturnType<typeof setInterval>>();
 
@@ -434,6 +436,18 @@ export default function SessionPageClient({ params }: SessionPageProps) {
     setShowWelcome(false);
   }
 
+  async function handleReport(reason: string, details: string) {
+    if (!session) return;
+    try {
+      await api.post(`/sessions/${session.id}/report`, { reason, details: details || undefined });
+      setShowReport(false);
+      setReportDone(true);
+      setTimeout(() => setReportDone(false), 4000);
+    } catch (err: any) {
+      setError(err.message ?? 'Failed to submit report');
+    }
+  }
+
   async function handleExport() {
     if (!session) return;
     try {
@@ -442,7 +456,9 @@ export default function SessionPageClient({ params }: SessionPageProps) {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
       if (!res.ok) {
-        const msg = await res.text().catch(() => '');
+        let msg = '';
+        try { const b = await res.json(); msg = b.error ?? b.message ?? ''; }
+        catch { msg = await res.text().catch(() => ''); }
         setError(`Export failed (${res.status})${msg ? `: ${msg}` : ''}`);
         return;
       }
@@ -587,6 +603,7 @@ export default function SessionPageClient({ params }: SessionPageProps) {
         creditCap={CREDIT_CAP}
         regenCap={REGEN_CAP}
         onToggleHostView={() => setHostView(v => !v)}
+        onReport={!isMod ? () => setShowReport(true) : undefined}
       />
 
       {/* Host controls bar */}
@@ -996,13 +1013,28 @@ export default function SessionPageClient({ params }: SessionPageProps) {
           onClose={() => { setReplyTarget(null); setReplyText(''); }}
         />
       )}
+
+      {/* Report session modal */}
+      {showReport && (
+        <ReportSessionModal
+          onSubmit={handleReport}
+          onClose={() => setShowReport(false)}
+        />
+      )}
+
+      {/* Report success toast */}
+      {reportDone && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-green-900/90 border border-green-500/40 text-green-200 text-sm px-4 py-2.5 rounded-lg shadow-lg">
+          Report submitted — thank you.
+        </div>
+      )}
     </div>
   );
 }
 
 // ─── Session header ───────────────────────────────────────────────────────────
 
-function SessionHeader({ session, isLiveSoon, credits, isMod, hostView, participantCount, nextCreditSecs, creditCap, regenCap, onToggleHostView }: {
+function SessionHeader({ session, isLiveSoon, credits, isMod, hostView, participantCount, nextCreditSecs, creditCap, regenCap, onToggleHostView, onReport }: {
   session: Session;
   isLiveSoon: boolean;
   credits: number;
@@ -1013,6 +1045,7 @@ function SessionHeader({ session, isLiveSoon, credits, isMod, hostView, particip
   creditCap?: number;
   regenCap?: number;
   onToggleHostView: () => void;
+  onReport?: () => void;
 }) {
   return (
     <header className="sticky top-0 z-40 bg-brand-bg/90 backdrop-blur border-b border-brand-border/50">
@@ -1065,6 +1098,15 @@ function SessionHeader({ session, isLiveSoon, credits, isMod, hostView, particip
               ? null
               : <Link href="/dashboard" className="text-xs text-purple-200/75 hover:text-white transition-colors">Dashboard</Link>
             }
+            {!isMod && onReport && (
+              <button
+                onClick={onReport}
+                title="Report this session"
+                className="text-purple-200/40 hover:text-red-400/70 transition-colors"
+              >
+                <FlagIcon />
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -1117,8 +1159,8 @@ function HostControlBar({ session, closing, reopening, deleting, onGoLive, onClo
         {/* Primary row — status action + join code */}
         <div className="flex items-center gap-3 flex-wrap">
 
-          {/* Primary session action */}
-          {session.status === 'upcoming' && (
+          {/* Primary session action — owner-only */}
+          {isOwner && session.status === 'upcoming' && (
             <button
               onClick={() => { if (confirm('Go live now?')) onGoLive(); }}
               className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-500/15 border border-emerald-500/40 text-emerald-400 font-semibold text-sm hover:bg-emerald-500/25 transition-colors"
@@ -1127,7 +1169,7 @@ function HostControlBar({ session, closing, reopening, deleting, onGoLive, onClo
               Go live
             </button>
           )}
-          {session.status === 'live' && (
+          {isOwner && session.status === 'live' && (
             <button
               onClick={() => { if (confirm('Close this session? Submissions will stop.')) onClose(); }}
               disabled={closing}
@@ -1139,15 +1181,19 @@ function HostControlBar({ session, closing, reopening, deleting, onGoLive, onClo
           {session.status === 'closed' && (
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-xs font-semibold text-purple-200/85 uppercase tracking-wider">Session ended</span>
-              <button onClick={onExport} className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-brand-border text-purple-200/90 hover:text-white transition-colors">
-                <DownloadIcon /> Export CSV
-              </button>
-              <button onClick={onReopen} disabled={reopening} className="text-xs px-3 py-1.5 rounded-lg border border-emerald-600/50 text-emerald-400 hover:bg-emerald-900/20 transition-colors disabled:opacity-40">
-                {reopening ? 'Reopening…' : 'Reopen'}
-              </button>
-              <button onClick={onDelete} disabled={deleting} className="text-xs px-3 py-1.5 rounded-lg border border-red-700/40 text-red-400/70 hover:text-red-400 hover:bg-red-900/20 transition-colors disabled:opacity-40">
-                {deleting ? 'Deleting…' : 'Delete'}
-              </button>
+              {isOwner && (
+                <>
+                  <button onClick={onExport} className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-brand-border text-purple-200/90 hover:text-white transition-colors">
+                    <DownloadIcon /> Export CSV
+                  </button>
+                  <button onClick={onReopen} disabled={reopening} className="text-xs px-3 py-1.5 rounded-lg border border-emerald-600/50 text-emerald-400 hover:bg-emerald-900/20 transition-colors disabled:opacity-40">
+                    {reopening ? 'Reopening…' : 'Reopen'}
+                  </button>
+                  <button onClick={onDelete} disabled={deleting} className="text-xs px-3 py-1.5 rounded-lg border border-red-700/40 text-red-400/70 hover:text-red-400 hover:bg-red-900/20 transition-colors disabled:opacity-40">
+                    {deleting ? 'Deleting…' : 'Delete'}
+                  </button>
+                </>
+              )}
             </div>
           )}
 
@@ -2153,5 +2199,99 @@ function DownloadIcon() {
       <polyline points="7 10 12 15 17 10" />
       <line x1="12" y1="15" x2="12" y2="3" />
     </svg>
+  );
+}
+
+function FlagIcon() {
+  return (
+    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" />
+      <line x1="4" y1="22" x2="4" y2="15" />
+    </svg>
+  );
+}
+
+// ─── Report session modal ──────────────────────────────────────────────────────
+
+const REPORT_REASONS: { value: string; label: string }[] = [
+  { value: 'spam',           label: 'Spam or self-promotion' },
+  { value: 'inappropriate',  label: 'Inappropriate content' },
+  { value: 'impersonation',  label: 'Impersonation' },
+  { value: 'misinformation', label: 'Misinformation' },
+  { value: 'other',          label: 'Other' },
+];
+
+function ReportSessionModal({ onSubmit, onClose }: {
+  onSubmit: (reason: string, details: string) => Promise<void>;
+  onClose: () => void;
+}) {
+  const [reason, setReason] = useState('');
+  const [details, setDetails] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!reason) return;
+    setLoading(true);
+    try {
+      await onSubmit(reason, details.trim());
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+      <div className="bg-brand-card border border-white/10 rounded-xl shadow-xl w-full max-w-md p-6">
+        <h2 className="text-base font-semibold text-white mb-1">Report this session</h2>
+        <p className="text-xs text-purple-200/60 mb-4">Our team will review your report. Thank you for helping keep things safe.</p>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-1.5">
+            {REPORT_REASONS.map(r => (
+              <label key={r.value} className="flex items-center gap-2.5 cursor-pointer group">
+                <input
+                  type="radio"
+                  name="reason"
+                  value={r.value}
+                  checked={reason === r.value}
+                  onChange={() => setReason(r.value)}
+                  className="accent-brand-orange"
+                />
+                <span className="text-sm text-purple-100/80 group-hover:text-white transition-colors">{r.label}</span>
+              </label>
+            ))}
+          </div>
+
+          <div>
+            <textarea
+              value={details}
+              onChange={e => setDetails(e.target.value.slice(0, 500))}
+              placeholder="Additional details (optional)"
+              rows={3}
+              className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-purple-200/40 resize-none focus:outline-none focus:border-brand-orange/50"
+            />
+            <p className="text-xs text-purple-200/40 text-right mt-0.5">{details.length}/500</p>
+          </div>
+
+          <div className="flex gap-2 justify-end pt-1">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-1.5 text-sm text-purple-200/70 hover:text-white transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={!reason || loading}
+              className="px-4 py-1.5 text-sm bg-red-700/80 hover:bg-red-600/80 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg transition-colors"
+            >
+              {loading ? 'Submitting…' : 'Submit report'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
   );
 }

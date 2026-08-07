@@ -7,7 +7,7 @@ import { AppError } from '../middleware/errorHandler';
 import { requireHostOrOrgAdmin, resolveCallerRole } from '../db/permissions';
 import { broadcast } from '../sse/broadcaster';
 import { createNotificationsForUsers } from './notificationController';
-import { containsBannedWord } from '../lib/wordFilter';
+import { rejectIfBanned } from '../lib/wordFilter';
 import { sendSessionLive } from '../lib/mailer';
 
 const CreateSessionSchema = z.object({
@@ -55,8 +55,8 @@ function makeJoinCode(prefix?: string | null): string {
 export async function createSession(req: Request, res: Response, next: NextFunction) {
   try {
     const data = CreateSessionSchema.parse(req.body);
-    if (containsBannedWord(data.title)) throw new AppError(400, 'Inappropriate language detected');
-    if (data.description && containsBannedWord(data.description)) throw new AppError(400, 'Inappropriate language detected');
+    await rejectIfBanned(data.title);
+    if (data.description) await rejectIfBanned(data.description);
     const hostId = req.user!.userId;
     const slug = makeSlug(data.title);
 
@@ -150,11 +150,6 @@ export async function getSession(req: Request, res: Response, next: NextFunction
 
     const session = result.rows[0];
 
-    // Block private sessions for non-hosts (future: invite list)
-    if (session.visibility === 'private' && req.user?.userId !== session.host_id) {
-      throw new AppError(403, 'This session is private');
-    }
-
     // Attach caller's role so the frontend can render host/mod controls.
     // For moderator callers, also include their specific permission set so the
     // frontend can gate mute/remove/approve buttons without an extra round-trip.
@@ -168,6 +163,15 @@ export async function getSession(req: Request, res: Response, next: NextFunction
       }
     }
 
+    // Block private sessions for anyone without elevated access.
+    // Hosts, org owners/admins, and explicitly assigned moderators may enter.
+    if (session.visibility === 'private') {
+      const elevated = ['host', 'org_owner', 'org_admin', 'moderator'];
+      if (!elevated.includes(caller_role)) {
+        throw new AppError(403, 'This session is private');
+      }
+    }
+
     res.json({ ...session, caller_role, ...(mod_permissions ? { mod_permissions } : {}) });
   } catch (err) {
     next(err);
@@ -178,8 +182,8 @@ export async function updateSession(req: Request, res: Response, next: NextFunct
   try {
     const { id } = req.params;
     const data = UpdateSessionSchema.parse(req.body);
-    if (data.title && containsBannedWord(data.title)) throw new AppError(400, 'Inappropriate language detected');
-    if (data.description && containsBannedWord(data.description)) throw new AppError(400, 'Inappropriate language detected');
+    if (data.title) await rejectIfBanned(data.title);
+    if (data.description) await rejectIfBanned(data.description);
 
     const sessionResult = await pool.query('SELECT id FROM sessions WHERE id = $1', [id]);
     if (!sessionResult.rows[0]) throw new AppError(404, 'Session not found');
@@ -375,7 +379,7 @@ export async function joinSession(req: Request, res: Response, next: NextFunctio
     // Guests must supply a display name
     if (!userId) {
       if (!guest_username) throw new AppError(400, 'A display name is required to join');
-      if (containsBannedWord(guest_username)) throw new AppError(400, 'Inappropriate language detected');
+      await rejectIfBanned(guest_username);
 
       // Block names already claimed by registered users
       const taken = await pool.query(
@@ -642,6 +646,38 @@ export async function deleteSession(req: Request, res: Response, next: NextFunct
     await pool.query('DELETE FROM sessions WHERE id = $1', [id]);
 
     res.json({ deleted: true });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/** POST /api/sessions/:id/report — submit a report for admin review (any authenticated user except the host) */
+export async function reportSession(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { id } = req.params;
+    const userId     = req.user?.isGuest === false ? req.user.userId : null;
+    const guestToken = req.user?.guestToken ?? null;
+
+    if (!userId && !guestToken) throw new AppError(401, 'Authentication required to report a session');
+
+    const { reason, details } = z.object({
+      reason:  z.enum(['spam', 'inappropriate', 'impersonation', 'misinformation', 'other']),
+      details: z.string().max(500).optional(),
+    }).parse(req.body);
+
+    // Can't report your own session
+    const sessionResult = await pool.query('SELECT host_id FROM sessions WHERE id = $1', [id]);
+    if (!sessionResult.rows[0]) throw new AppError(404, 'Session not found');
+    if (sessionResult.rows[0].host_id === userId) throw new AppError(403, 'You cannot report your own session');
+
+    await pool.query(
+      `INSERT INTO session_reports (session_id, reporter_user_id, reporter_guest_token, reason, details)
+       VALUES ($1, $2, $3, $4, $5)
+       ON CONFLICT DO NOTHING`,
+      [id, userId, guestToken, reason, details ?? null],
+    );
+
+    res.status(201).json({ reported: true });
   } catch (err) {
     next(err);
   }

@@ -6,7 +6,7 @@ import { pool } from '../db/pool';
 import { signToken } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
 import { sendPasswordReset } from '../lib/mailer';
-import { containsBannedWord } from '../lib/wordFilter';
+import { rejectIfBanned } from '../lib/wordFilter';
 
 const RegisterSchema = z.object({
   email: z.string().email(),
@@ -36,7 +36,7 @@ export async function register(req: Request, res: Response, next: NextFunction) 
   const client = await pool.connect();
   try {
     const { email, username, password, guest_token } = RegisterSchema.parse(req.body);
-    if (containsBannedWord(username)) throw new AppError(400, 'Inappropriate language detected');
+    await rejectIfBanned(username);
     const passwordHash = await bcrypt.hash(password, 12);
 
     await client.query('BEGIN');

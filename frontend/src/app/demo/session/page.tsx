@@ -13,6 +13,7 @@ type Q = {
   echoed: boolean;
   answered: boolean;
   starred: boolean;
+  hidden: boolean;
   author: string;
   authorColor: string;
   ago: string;
@@ -35,7 +36,7 @@ const SEED_MUSIC: Q[] = [
   {
     id: 1,
     text: "What's the story behind the title track — it feels way more personal than anything you've released before?",
-    echoes: 129, echoed: false, answered: false, starred: true,
+    echoes: 129, echoed: false, answered: false, starred: true, hidden: false,
     author: 'superfan_sadie', authorColor: '#7C3AED',
     ago: '2m ago', ts: BASE_TS - 120000,
     supporters: ['record_collector', 'backstage_beats', 'melody_chaser', 'vinyl_vibes'],
@@ -43,28 +44,28 @@ const SEED_MUSIC: Q[] = [
   {
     id: 2,
     text: "Which collab on this record surprised you the most — and how did it come together?",
-    echoes: 87, echoed: false, answered: false, starred: false,
+    echoes: 87, echoed: false, answered: false, starred: false, hidden: false,
     author: 'record_collector', authorColor: '#059669',
     ago: '4m ago', ts: BASE_TS - 240000,
   },
   {
     id: 3,
     text: "There's a lyric in track 4 that feels like it's about a specific moment. Are you ever nervous about how specific you get?",
-    echoes: 65, echoed: false, answered: false, starred: false,
+    echoes: 65, echoed: false, answered: false, starred: false, hidden: false,
     author: 'anon', authorColor: '#DC2626',
     ago: '6m ago', ts: BASE_TS - 360000,
   },
   {
     id: 4,
     text: "How do you decide what makes the final cut vs what stays in the vault?",
-    echoes: 44, echoed: false, answered: false, starred: false,
+    echoes: 44, echoed: false, answered: false, starred: false, hidden: false,
     author: 'backstage_beats', authorColor: '#D97706',
     ago: '8m ago', ts: BASE_TS - 480000,
   },
   {
     id: 5,
     text: "Which song from this album are you most excited to finally play live?",
-    echoes: 108, echoed: false, answered: true, starred: false,
+    echoes: 108, echoed: false, answered: true, starred: false, hidden: false,
     author: 'melody_chaser', authorColor: '#2563EB',
     ago: '10m ago', ts: BASE_TS - 600000,
     host_reply: "Honestly? “Signal Fire” — we've never played it live and I can't wait to see how the room reacts.",
@@ -72,14 +73,14 @@ const SEED_MUSIC: Q[] = [
   {
     id: 6,
     text: "Do you write to a beat or melody first, or does it change every time?",
-    echoes: 31, echoed: false, answered: false, starred: false,
+    echoes: 31, echoed: false, answered: false, starred: false, hidden: false,
     author: 'vinyl_vibes', authorColor: '#0891B2',
     ago: '13m ago', ts: BASE_TS - 780000,
   },
   {
     id: 7,
     text: "Will the vault tracks ever see the light of day — or are some locked forever?",
-    echoes: 19, echoed: false, answered: true, starred: false,
+    echoes: 19, echoed: false, answered: true, starred: false, hidden: false,
     author: 'midnight_listener', authorColor: '#7C3AED',
     ago: '15m ago', ts: BASE_TS - 900000,
     host_reply: "Some will. There's one from the Raven sessions I've been sitting on for three years — this might finally be its moment.",
@@ -105,21 +106,21 @@ const SEED_NBA: Q[] = [
   {
     id: 3,
     text: "What's your philosophy on developing young talent vs. playing to win right now?",
-    echoes: 41, echoed: false, answered: false, starred: false,
+    echoes: 41, echoed: false, answered: false, starred: false, hidden: false,
     author: 'lakeshow_liv', authorColor: '#7C3AED',
     ago: '5m ago', ts: BASE_TS - 300000,
   },
   {
     id: 4,
     text: "How involved are you in trade deadline conversations with the front office?",
-    echoes: 33, echoed: false, answered: false, starred: false,
+    echoes: 33, echoed: false, answered: false, starred: false, hidden: false,
     author: 'the_stat_line', authorColor: '#D97706',
     ago: '8m ago', ts: BASE_TS - 480000,
   },
   {
     id: 5,
     text: "What does your film room process look like — how far ahead do you prep for opponents?",
-    echoes: 98, echoed: false, answered: true, starred: false,
+    echoes: 98, echoed: false, answered: true, starred: false, hidden: false,
     author: 'bench_mob_77', authorColor: '#2563EB',
     ago: '10m ago', ts: BASE_TS - 600000,
     host_reply: "We usually start the opponent's tendencies two days out. By game day I want every guy knowing the pick-and-roll coverage cold.",
@@ -127,7 +128,7 @@ const SEED_NBA: Q[] = [
   {
     id: 6,
     text: "How do you keep veteran players bought in when their roles change late in their careers?",
-    echoes: 19, echoed: false, answered: false, starred: false,
+    echoes: 19, echoed: false, answered: false, starred: false, hidden: false,
     author: 'paint_and_pick', authorColor: '#0891B2',
     ago: '13m ago', ts: BASE_TS - 780000,
   },
@@ -137,7 +138,7 @@ const SEED_STARTUP: Q[] = [
   {
     id: 1,
     text: "What's your biggest differentiator and why hasn't a larger player built this already?",
-    echoes: 74, echoed: false, answered: false, starred: true,
+    echoes: 74, echoed: false, answered: false, starred: true, hidden: false,
     author: 'venture_vince', authorColor: '#7C3AED',
     ago: '2m ago', ts: BASE_TS - 120000,
     supporters: ['founding_vibes', 'seed_round_sue', 'angel_alicia', 'cap_table_cal'],
@@ -145,28 +146,28 @@ const SEED_STARTUP: Q[] = [
   {
     id: 2,
     text: "How did you validate demand before writing a single line of code?",
-    echoes: 61, echoed: false, answered: false, starred: false,
+    echoes: 61, echoed: false, answered: false, starred: false, hidden: false,
     author: 'founding_vibes', authorColor: '#059669',
     ago: '3m ago', ts: BASE_TS - 180000,
   },
   {
     id: 3,
     text: "What does your path to profitability look like and what's your runway right now?",
-    echoes: 39, echoed: false, answered: false, starred: false,
+    echoes: 39, echoed: false, answered: false, starred: false, hidden: false,
     author: 'seed_round_sue', authorColor: '#DC2626',
     ago: '6m ago', ts: BASE_TS - 360000,
   },
   {
     id: 4,
     text: "Are you going enterprise or consumer first — and why?",
-    echoes: 28, echoed: false, answered: false, starred: false,
+    echoes: 28, echoed: false, answered: false, starred: false, hidden: false,
     author: 'angel_alicia', authorColor: '#D97706',
     ago: '8m ago', ts: BASE_TS - 480000,
   },
   {
     id: 5,
     text: "What's your fundraising plan after today — Seed extension or straight to Series A?",
-    echoes: 103, echoed: false, answered: true, starred: false,
+    echoes: 103, echoed: false, answered: true, starred: false, hidden: false,
     author: 'cap_table_cal', authorColor: '#2563EB',
     ago: '11m ago', ts: BASE_TS - 660000,
     host_reply: "We're heads-down on a seed extension right now — want to hit two more proof points before we go out for A.",
@@ -174,7 +175,7 @@ const SEED_STARTUP: Q[] = [
   {
     id: 6,
     text: "How are you thinking about hiring — when do you bring on your first non-technical role?",
-    echoes: 12, echoed: false, answered: false, starred: false,
+    echoes: 12, echoed: false, answered: false, starred: false, hidden: false,
     author: 'operator_opal', authorColor: '#0891B2',
     ago: '14m ago', ts: BASE_TS - 840000,
   },
@@ -239,22 +240,28 @@ function Avatar({ name, color, size = 'sm' }: { name: string; color: string; siz
 // ─── Question Cards ───────────────────────────────────────────────────────────
 
 function TopQuestionCard({
-  q, view, isNew, showFlash, noCredits, onEcho, onStar, onAnswer,
+  q, view, isNew, showFlash, noCredits, spotlighted, onEcho, onStar, onAnswer, onSpotlight, onHide,
 }: {
-  q: Q; view: 'audience' | 'host'; isNew?: boolean; showFlash?: boolean; noCredits?: boolean;
-  onEcho(): void; onStar(): void; onAnswer(): void;
+  q: Q; view: 'audience' | 'host'; isNew?: boolean; showFlash?: boolean; noCredits?: boolean; spotlighted?: boolean;
+  onEcho(): void; onStar(): void; onAnswer(): void; onSpotlight(): void; onHide(): void;
 }) {
   return (
     <div className={`rounded-2xl border border-brand-orange/60 bg-brand-card p-5 shadow-orange-glow ${isNew ? 'animate-fade-up' : ''}`}>
       <div className="flex items-center gap-2 mb-4">
         <span className="text-xs font-bold text-brand-orange tracking-wide">🔥 TOP QUESTION</span>
         {view === 'host' && (
-          <div className="ml-auto flex gap-2">
+          <div className="ml-auto flex gap-2 flex-wrap justify-end">
+            <button onClick={onSpotlight} title={spotlighted ? 'Clear Now Answering' : 'Mark as Now Answering'} className={`text-xs px-2.5 py-1 rounded-lg border transition-all ${spotlighted ? 'border-brand-purple/60 text-brand-purple-light bg-brand-purple/15' : 'border-brand-border/60 text-white/70 hover:border-brand-purple/40 hover:text-brand-purple-light'}`}>
+              🎙 Now Answering
+            </button>
             <button onClick={onStar} className={`text-xs px-2.5 py-1 rounded-lg border transition-all ${q.starred ? 'border-yellow-500/40 text-yellow-400 bg-yellow-500/10' : 'border-brand-border/60 text-white/70 hover:border-yellow-500/40 hover:text-yellow-400'}`}>
               ★ {q.starred ? 'Starred' : 'Star'}
             </button>
             <button onClick={onAnswer} className={`text-xs px-2.5 py-1 rounded-lg border transition-all ${q.answered ? 'border-emerald-500/40 text-emerald-400 bg-emerald-500/10' : 'border-brand-border/60 text-white/70 hover:border-green-500/40 hover:text-green-400'}`}>
-              {q.answered ? '✓ Answered' : '✓ Mark answered'}
+              {q.answered ? '✓ Answered' : '✓ Answered'}
+            </button>
+            <button onClick={onHide} className="text-xs px-2.5 py-1 rounded-lg border border-brand-border/60 text-white/70 hover:border-red-500/40 hover:text-red-400 transition-all">
+              Hide
             </button>
           </div>
         )}
@@ -329,14 +336,15 @@ function TopQuestionCard({
 }
 
 function QuestionCard({
-  q, view, isNew, showFlash, noCredits, onEcho, onStar, onAnswer,
+  q, view, isNew, showFlash, noCredits, spotlighted, onEcho, onStar, onAnswer, onSpotlight, onHide,
 }: {
-  q: Q; view: 'audience' | 'host'; isNew?: boolean; showFlash?: boolean; noCredits?: boolean;
-  onEcho(): void; onStar(): void; onAnswer(): void;
+  q: Q; view: 'audience' | 'host'; isNew?: boolean; showFlash?: boolean; noCredits?: boolean; spotlighted?: boolean;
+  onEcho(): void; onStar(): void; onAnswer(): void; onSpotlight(): void; onHide(): void;
 }) {
   return (
     <div
       className={`flex gap-3 rounded-2xl border bg-brand-card p-4 transition-all duration-200 ${
+        q.hidden     ? 'border-brand-border/30 opacity-40' :
         q.starred    ? 'border-yellow-500/40 bg-yellow-500/5' :
         q.answered   ? 'border-emerald-500/30 bg-emerald-500/5 opacity-70' :
                        'border-brand-border hover:border-brand-border/80'
@@ -390,10 +398,21 @@ function QuestionCard({
             {q.answered && <span className="text-[11px] font-semibold text-emerald-400">✓ Answered</span>}
             <span>{q.ago}</span>
             {view === 'host' && (
-              <div className="flex gap-1.5">
+              <div className="flex gap-1.5 flex-wrap">
+                <button
+                  onClick={onSpotlight}
+                  title={spotlighted ? 'Clear Now Answering' : 'Mark as Now Answering'}
+                  className={`px-2 py-0.5 rounded border transition-all text-[11px] ${
+                    spotlighted
+                      ? 'border-brand-purple/60 text-brand-purple-light bg-brand-purple/10'
+                      : 'border-brand-border text-white/65 hover:border-brand-purple/40 hover:text-brand-purple-light'
+                  }`}
+                >
+                  🎙 Now Answering
+                </button>
                 <button
                   onClick={onStar}
-                  className={`px-2 py-0.5 rounded border transition-all ${
+                  className={`px-2 py-0.5 rounded border transition-all text-[11px] ${
                     q.starred
                       ? 'border-yellow-500/40 text-yellow-400'
                       : 'border-brand-border text-white/65 hover:border-yellow-500/40 hover:text-yellow-400'
@@ -403,7 +422,7 @@ function QuestionCard({
                 </button>
                 <button
                   onClick={onAnswer}
-                  className={`px-2 py-0.5 rounded border transition-all ${
+                  className={`px-2 py-0.5 rounded border transition-all text-[11px] ${
                     q.answered
                       ? 'border-emerald-500/40 text-emerald-400 hover:border-red-500/40 hover:text-red-400'
                       : 'border-brand-border text-white/65 hover:border-emerald-500/40 hover:text-emerald-400'
@@ -411,8 +430,94 @@ function QuestionCard({
                 >
                   {q.answered ? 'Reopen' : '✓ Answered'}
                 </button>
+                <button
+                  onClick={onHide}
+                  className="px-2 py-0.5 rounded border text-[11px] border-brand-border text-white/65 hover:border-red-500/40 hover:text-red-400 transition-all"
+                >
+                  {q.hidden ? 'Unhide' : 'Hide'}
+                </button>
               </div>
             )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Spotlight Card ───────────────────────────────────────────────────────────
+
+function SpotlightCard({
+  q, view, showFlash, noCredits, onEcho, onStar, onAnswer, onSpotlight, onHide,
+}: {
+  q: Q; view: 'audience' | 'host'; showFlash?: boolean; noCredits?: boolean;
+  onEcho(): void; onStar(): void; onAnswer(): void; onSpotlight(): void; onHide(): void;
+}) {
+  return (
+    <div className="rounded-2xl border border-brand-purple/60 bg-brand-card p-5" style={{ boxShadow: '0 0 20px rgba(124,58,237,0.15)' }}>
+      <div className="flex items-center gap-2 mb-4">
+        <span className="text-xs font-bold text-brand-purple-light tracking-wide">🎙 NOW ANSWERING</span>
+        {view === 'host' && (
+          <div className="ml-auto flex gap-2 flex-wrap justify-end">
+            <button onClick={onSpotlight} className="text-xs px-2.5 py-1 rounded-lg border border-brand-purple/60 text-brand-purple-light bg-brand-purple/15 transition-all hover:bg-brand-purple/25">
+              🎙 Now Answering
+            </button>
+            <button onClick={onStar} className={`text-xs px-2.5 py-1 rounded-lg border transition-all ${q.starred ? 'border-yellow-500/40 text-yellow-400 bg-yellow-500/10' : 'border-brand-border/60 text-white/70 hover:border-yellow-500/40 hover:text-yellow-400'}`}>
+              ★ {q.starred ? 'Starred' : 'Star'}
+            </button>
+            <button onClick={onAnswer} className={`text-xs px-2.5 py-1 rounded-lg border transition-all ${q.answered ? 'border-emerald-500/40 text-emerald-400 bg-emerald-500/10' : 'border-brand-border/60 text-white/70 hover:border-green-500/40 hover:text-green-400'}`}>
+              ✓ Answered
+            </button>
+            <button onClick={onHide} className="text-xs px-2.5 py-1 rounded-lg border border-brand-border/60 text-white/70 hover:border-red-500/40 hover:text-red-400 transition-all">
+              Hide
+            </button>
+          </div>
+        )}
+      </div>
+
+      <div className="flex gap-4 sm:gap-6">
+        <div className="flex-1 min-w-0">
+          <p className="text-base sm:text-lg font-bold leading-snug mb-3">{q.text}</p>
+          <div className="flex items-center gap-2 text-xs text-white/70 flex-wrap">
+            {q.starred && <span className="text-yellow-400 font-semibold">★ Starred</span>}
+            <Avatar name={q.author} color={q.authorColor} size="xs" />
+            <span className="font-medium text-white/60">{q.author}</span>
+            <span>·</span>
+            <span>{q.ago}</span>
+          </div>
+          {q.host_reply && (
+            <div className="mt-3 pl-3 border-l-2 border-brand-purple/40">
+              <p className="text-xs text-brand-purple-light/70 font-semibold mb-1">Host reply</p>
+              <p className="text-sm text-white/80">{q.host_reply}</p>
+            </div>
+          )}
+        </div>
+
+        <div className="shrink-0 flex flex-col items-center gap-3 min-w-[72px]">
+          <div className="relative w-full">
+            {showFlash && (
+              <span
+                className="absolute -top-5 left-1/2 text-xs font-bold text-brand-amber pointer-events-none"
+                style={{ animation: 'floatUp 0.65s ease-out forwards' }}
+              >
+                +1
+              </span>
+            )}
+            <button
+              onClick={onEcho}
+              disabled={q.echoed || !!noCredits}
+              className={`w-full flex flex-col items-center gap-1 px-3 py-3 rounded-xl border transition-all duration-150 active:scale-95 ${
+                q.echoed
+                  ? 'border-brand-amber/50 bg-brand-amber/10 text-brand-amber'
+                  : noCredits
+                  ? 'border-brand-border/30 text-white/50 cursor-not-allowed'
+                  : 'border-brand-border text-white/80 hover:border-brand-purple/60 hover:bg-brand-purple/10 hover:text-brand-purple-light'
+              }`}
+            >
+              <span className="text-xl font-black leading-none">↑</span>
+              <span className="text-2xl font-black leading-none">{q.echoes}</span>
+              <span className="text-[10px] font-semibold tracking-wide opacity-60">Echoes</span>
+            </button>
           </div>
         </div>
       </div>
@@ -439,7 +544,8 @@ function SessionPageInner() {
   const [attending, setAttending] = useState(143);
   const [newCount, setNewCount] = useState(7);
   const [newIds, setNewIds]     = useState<Set<number>>(new Set());
-  const [echoFlash, setEchoFlash] = useState<Record<number, boolean>>({});
+  const [echoFlash, setEchoFlash]       = useState<Record<number, boolean>>({});
+  const [spotlightedId, setSpotlightedId] = useState<number | null>(null);
   const guestName = 'stellar_wave_88';
 
   useEffect(() => {
@@ -467,7 +573,7 @@ function SessionPageInner() {
       const newQ: Q = {
         id: 99,
         text: getAutoQ(titleParam),
-        echoes: 0, echoed: false, answered: false, starred: false,
+        echoes: 0, echoed: false, answered: false, starred: false, hidden: false,
         author: 'new_arrival_52', authorColor: '#0891B2',
         ago: 'just now', ts: Date.now(),
       };
@@ -493,7 +599,7 @@ function SessionPageInner() {
     const anonLabel = isAnon ? `Anon${anonCounter + 1}` : null;
     if (isAnon) setAnonCounter(c => c + 1);
     setQs(prev => [...prev, {
-      id, text, echoes: 0, echoed: false, answered: false, starred: false,
+      id, text, echoes: 0, echoed: false, answered: false, starred: false, hidden: false,
       author: anonLabel ?? guestName, authorColor: isAnon ? '#6B7280' : '#0891B2',
       ago: 'just now', ts: Date.now(),
     }]);
@@ -509,35 +615,49 @@ function SessionPageInner() {
   }
 
   function toggleAnswer(id: number) {
+    // Marking answered also clears the spotlight (matches production)
     setQs(prev => prev.map(q => q.id === id ? { ...q, answered: !q.answered } : q));
+    if (spotlightedId === id) setSpotlightedId(null);
   }
 
-  const allSorted = [...qs].sort((a, b) => {
+  function toggleSpotlight(id: number) {
+    setSpotlightedId(prev => prev === id ? null : id);
+  }
+
+  function toggleHide(id: number) {
+    setQs(prev => prev.map(q => q.id === id ? { ...q, hidden: !q.hidden } : q));
+    if (spotlightedId === id) setSpotlightedId(null);
+  }
+
+  const visibleQs = qs.filter(q => view === 'host' || !q.hidden);
+
+  const allSorted = [...visibleQs].sort((a, b) => {
     if (sort === 'recent')  return b.ts - a.ts;
     if (sort === 'starred') return (b.starred ? 1 : 0) - (a.starred ? 1 : 0) || b.echoes - a.echoes;
     return b.echoes - a.echoes;
   });
 
-  const unanswered   = allSorted.filter(q => !q.answered);
+  const spotlightedQ = spotlightedId ? qs.find(q => q.id === spotlightedId) ?? null : null;
+  const unanswered   = allSorted.filter(q => !q.answered && q.id !== spotlightedId);
   const answeredList = allSorted.filter(q => q.answered);
   const starredList  = allSorted.filter(q => q.starred);
-  const featuredQ    = sort === 'top' ? (unanswered[0] ?? null) : null;
+  const featuredQ    = sort === 'top' && !spotlightedQ ? (unanswered[0] ?? null) : null;
   const listQs       = sort === 'answered'
     ? answeredList
     : sort === 'starred'
     ? starredList
     : sort === 'top'
-      ? [...unanswered.slice(1), ...answeredList]
+      ? [...unanswered.slice(spotlightedQ ? 0 : 1), ...answeredList]
       : [...unanswered, ...answeredList];
 
-  const totalAsked  = qs.length;
-  const awaitingAns = qs.filter(q => !q.answered).length;
-  const answeredCnt = qs.filter(q => q.answered).length;
+  const totalAsked  = visibleQs.length;
+  const awaitingAns = visibleQs.filter(q => !q.answered).length;
+  const answeredCnt = visibleQs.filter(q => q.answered).length;
 
   // ── Top Participants: echoes received per author ──────────────────────────
   const topParticipants = useMemo((): Participant[] => {
     const map = new Map<string, { color: string; echoes: number }>();
-    qs.forEach(q => {
+    visibleQs.forEach(q => {
       if (q.author === 'anon') return;
       const prev = map.get(q.author);
       map.set(q.author, {
@@ -549,18 +669,18 @@ function SessionPageInner() {
       .map(([name, { color, echoes }]) => ({ name, color, echoes }))
       .sort((a, b) => b.echoes - a.echoes)
       .slice(0, 5);
-  }, [qs]);
+  }, [qs, view]);
 
   // ── Duplicate detection ───────────────────────────────────────────────────
   const similar = useMemo(() => {
     if (draft.length < 12) return [];
     const words = draft.toLowerCase().split(/\s+/).filter(w => w.length > 4);
     if (!words.length) return [];
-    return qs
+    return visibleQs
       .filter(q => !q.answered)
       .filter(q => words.some(w => q.text.toLowerCase().includes(w)))
       .slice(0, 2);
-  }, [draft, qs]);
+  }, [draft, qs, view]);
 
   return (
     <>
@@ -709,6 +829,20 @@ function SessionPageInner() {
 
             <main className="flex-1 lg:overflow-y-auto">
             <div className="p-4 sm:p-5 flex flex-col gap-3 pb-28 lg:pb-6">
+              {spotlightedQ && (
+                <SpotlightCard
+                  q={spotlightedQ}
+                  view={view}
+                  showFlash={!!echoFlash[spotlightedQ.id]}
+                  noCredits={credits === 0 && view === 'audience'}
+                  onEcho={() => echo(spotlightedQ.id)}
+                  onStar={() => toggleStar(spotlightedQ.id)}
+                  onAnswer={() => toggleAnswer(spotlightedQ.id)}
+                  onSpotlight={() => toggleSpotlight(spotlightedQ.id)}
+                  onHide={() => toggleHide(spotlightedQ.id)}
+                />
+              )}
+
               {featuredQ && (
                 <TopQuestionCard
                   q={featuredQ}
@@ -716,9 +850,12 @@ function SessionPageInner() {
                   isNew={newIds.has(featuredQ.id)}
                   showFlash={!!echoFlash[featuredQ.id]}
                   noCredits={credits === 0 && view === 'audience'}
+                  spotlighted={spotlightedId === featuredQ.id}
                   onEcho={() => echo(featuredQ.id)}
                   onStar={() => toggleStar(featuredQ.id)}
                   onAnswer={() => toggleAnswer(featuredQ.id)}
+                  onSpotlight={() => toggleSpotlight(featuredQ.id)}
+                  onHide={() => toggleHide(featuredQ.id)}
                 />
               )}
 
@@ -734,9 +871,12 @@ function SessionPageInner() {
                   isNew={newIds.has(q.id)}
                   showFlash={!!echoFlash[q.id]}
                   noCredits={credits === 0 && view === 'audience'}
+                  spotlighted={spotlightedId === q.id}
                   onEcho={() => echo(q.id)}
                   onStar={() => toggleStar(q.id)}
                   onAnswer={() => toggleAnswer(q.id)}
+                  onSpotlight={() => toggleSpotlight(q.id)}
+                  onHide={() => toggleHide(q.id)}
                 />
               ))}
             </div>
@@ -821,21 +961,9 @@ function SessionPageInner() {
           )}
           {view === 'audience' ? (
             <div className="px-4 sm:px-6 py-3 flex items-center gap-3 sm:gap-4">
-              <div className="hidden sm:block shrink-0">
-                <p className="text-xs font-bold text-white/60 mb-1.5">Ask a question</p>
-                <div className="flex items-center gap-1.5">
-                  {Array.from({ length: creditsParam }).map((_, i) => (
-                    <div
-                      key={i}
-                      className={`w-2 h-2 rounded-full transition-colors ${
-                        i < credits ? 'bg-brand-orange' : 'bg-brand-border/40'
-                      }`}
-                    />
-                  ))}
-                  <span className="text-[10px] text-white/60 ml-0.5">
-                    {credits} credit{credits !== 1 ? 's' : ''} left
-                  </span>
-                </div>
+              <div className="hidden sm:block shrink-0 text-center">
+                <p className="text-xs text-white/55 mb-0.5">Credits</p>
+                <p className="text-lg font-bold text-brand-orange leading-none">{credits}</p>
               </div>
 
               {submitted ? (
@@ -847,46 +975,53 @@ function SessionPageInner() {
                   You&apos;re out of credits for this session — sit back and watch the Echoes roll in
                 </div>
               ) : (
-                <form onSubmit={submit} className="flex-1 flex items-center gap-2">
+                <form onSubmit={submit} className="flex-1 flex items-end gap-2">
                   <div className="relative flex-1">
-                    <input
+                    <textarea
                       id="ask-input"
-                      className="input text-sm !py-2.5 w-full pr-14"
-                      placeholder="What do you want to ask?"
+                      rows={2}
+                      className="w-full bg-brand-bg border border-brand-border rounded-xl px-4 py-3 pr-12
+                                 text-white text-sm placeholder-purple-200/40 resize-none
+                                 focus:outline-none focus:border-brand-purple transition-colors"
+                      placeholder="Ask a question…"
                       value={draft}
                       onChange={e => setDraft(e.target.value.slice(0, 300))}
+                      onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit(e as any); } }}
                     />
                     {draft.length > 0 && (
-                      <span className={`absolute right-3 top-1/2 -translate-y-1/2 text-[11px] tabular-nums pointer-events-none ${
+                      <span className={`absolute right-3 bottom-3 text-[11px] tabular-nums pointer-events-none ${
                         draft.length >= 280 ? 'text-red-400' : 'text-white/55'
                       }`}>
                         {300 - draft.length}
                       </span>
                     )}
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setIsAnon(v => !v)}
-                    className={`hidden sm:block shrink-0 text-xs font-semibold px-3 py-2 rounded-lg border transition-all ${
-                      isAnon
-                        ? 'border-brand-purple/60 text-brand-purple-light bg-brand-purple/10'
-                        : 'border-brand-border text-white/65 hover:border-white/20'
-                    }`}
-                  >
-                    {isAnon ? '🙈 Anon' : 'Anonymous'}
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={!draft.trim()}
-                    className={`shrink-0 flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-bold transition-all ${
-                      draft.trim()
-                        ? 'bg-orange-gradient text-white shadow-orange-glow hover:brightness-110 active:scale-95'
-                        : 'bg-brand-card border border-brand-border text-white/50 cursor-default'
-                    }`}
-                  >
-                    <span className="sm:hidden">↑ Ask</span>
-                    <span className="hidden sm:inline">↑ Submit</span>
-                  </button>
+                  <div className="flex flex-col items-end gap-2 self-end">
+                    <button
+                      type="button"
+                      onClick={() => setIsAnon(v => !v)}
+                      className={`hidden sm:flex items-center gap-1.5 shrink-0 text-xs px-2.5 py-1.5 rounded-lg border transition-all ${
+                        isAnon
+                          ? 'border-brand-purple/60 text-brand-purple-light bg-brand-purple/10'
+                          : 'border-brand-border text-white/65 hover:border-white/20'
+                      }`}
+                    >
+                      <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2z" />
+                        <path d="M8 14s1.5 2 4 2 4-2 4-2" />
+                        <line x1="9" y1="9" x2="9.01" y2="9" strokeWidth="3" />
+                        <line x1="15" y1="9" x2="15.01" y2="9" strokeWidth="3" />
+                      </svg>
+                      {isAnon ? 'Anon on' : 'Anon off'}
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={!draft.trim()}
+                      className="shrink-0 btn-primary px-4 py-3 disabled:opacity-40 disabled:cursor-not-allowed min-w-[64px] text-center"
+                    >
+                      Ask
+                    </button>
+                  </div>
                 </form>
               )}
             </div>

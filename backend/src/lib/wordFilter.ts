@@ -103,9 +103,23 @@ export async function filterText(text: string): Promise<string> {
 /**
  * Synchronous check — returns true if text contains any banned word.
  * Uses the cached list; if cache is cold it returns false (safe default).
- * Useful for validation layers that can't await.
+ * Prefer rejectIfBanned() for validation endpoints — it always warms the cache first.
  */
 export function containsBannedWord(text: string): boolean {
   if (cachedWords.length === 0) return false;
   return cachedWords.some(word => buildPattern(word).test(text));
+}
+
+/**
+ * Async validation helper for input fields (usernames, session titles, guest names).
+ * Always warms the cache before checking, so it works correctly on a cold server.
+ * Throws AppError 400 if the text contains a banned word.
+ */
+export async function rejectIfBanned(text: string): Promise<void> {
+  const words = await getWords();
+  const hit = words.some(word => buildPattern(word).test(text));
+  if (hit) {
+    const { AppError } = await import('../middleware/errorHandler');
+    throw new AppError(400, 'Inappropriate language detected');
+  }
 }

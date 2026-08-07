@@ -14,6 +14,7 @@ import {
   listMySessions,
   listAttendedSessions,
   exportSession,
+  reportSession,
 } from '../controllers/sessionController';
 import { muteParticipant, removeParticipant } from '../controllers/moderatorController';
 import { requireAuth, requireRegistered, optionalAuth } from '../middleware/auth';
@@ -57,6 +58,9 @@ router.delete('/:id', requireRegistered, deleteSession);
 
 // GET  /api/sessions/:id/export   — download Q&A as CSV (host only)
 router.get('/:id/export', requireRegistered, exportSession);
+
+// POST /api/sessions/:id/report   — report session to admins (any authenticated user)
+router.post('/:id/report', optionalAuth, reportSession);
 
 // POST /api/sessions/:id/join      — join (guest or registered)
 router.post('/:id/join', optionalAuth, joinSession);
