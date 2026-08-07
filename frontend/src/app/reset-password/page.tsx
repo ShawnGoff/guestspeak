@@ -4,7 +4,7 @@ import { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { api } from '@/lib/api';
-import { AuthShell, Field } from '@/app/login/page';
+import { AuthShell, Field } from '@/components/AuthShell';
 
 function ResetPasswordForm() {
   const router = useRouter();

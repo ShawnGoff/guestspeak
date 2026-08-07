@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { api } from '@/lib/api';
-import { AuthShell, Field } from '@/app/login/page';
+import { AuthShell, Field } from '@/components/AuthShell';
 
 export default function ForgotPasswordPage() {
   const [email, setEmail]     = useState('');
@@ -35,7 +35,7 @@ export default function ForgotPasswordPage() {
           <div className="text-4xl mb-3">📬</div>
           <p className="text-white font-semibold mb-2">Check your email</p>
           <p className="text-purple-200/75 text-sm">
-            If <span className="text-white">{email}</span> is registered, a reset link is on its way. Check your spam if it doesn't arrive.
+            If <span className="text-white">{email}</span> is registered, a reset link is on its way. Check your spam if it doesn&apos;t arrive.
           </p>
         </div>
       ) : (
