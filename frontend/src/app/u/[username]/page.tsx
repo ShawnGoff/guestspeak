@@ -59,7 +59,7 @@ export default function UserProfilePage({ params }: { params: { username: string
       .then(d => setTabUsers(d.users))
       .catch(() => setTabUsers([]))
       .finally(() => setTabLoading(false));
-  }, [tab]);
+  }, [tab, params.username]);
 
   async function toggleFollow() {
     if (!isLoggedIn()) { router.push(`/login?next=/u/${params.username}`); return; }

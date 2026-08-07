@@ -68,7 +68,7 @@ export default function DemoCreatePage() {
         <div className="mb-10">
           <p className="text-brand-orange text-sm font-semibold uppercase tracking-widest mb-2">Step 2 of 3</p>
           <h1 className="text-3xl sm:text-4xl font-extrabold text-white mb-2">Create a session</h1>
-          <p className="text-purple-200/75">Set up your session — you'll land in the Q&amp;A as the host.</p>
+          <p className="text-purple-200/75">Set up your session — you&apos;ll land in the Q&amp;A as the host.</p>
         </div>
 
         <form onSubmit={handleLaunch} className="flex flex-col gap-7">

@@ -68,7 +68,7 @@ export default function DiscoverPage() {
       const result = await api.get<DiscoverResponse>(`/discover?${params}`);
       setData(result);
     } catch {
-      setData({ live_now: [], nearby: [], following: [] });
+      setData({ live_now: [], featured: [], nearby: [], following: [] });
     } finally {
       setLoading(false);
     }

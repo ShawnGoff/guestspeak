@@ -40,7 +40,7 @@ export default function SettingsPage() {
       .then(u => { setMe(u); setPrefix(u.code_prefix ?? ''); })
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, []);
+  }, [router]);
 
   if (!mounted) return null;
 
@@ -188,7 +188,7 @@ export default function SettingsPage() {
             <div className="card p-6 space-y-4">
               <div>
                 <h2 className="text-xs font-bold text-brand-orange uppercase tracking-widest mb-1">Change password</h2>
-                <p className="text-purple-200/75 text-sm">You'll stay logged in on this device.</p>
+                <p className="text-purple-200/75 text-sm">You&apos;ll stay logged in on this device.</p>
               </div>
 
               <form onSubmit={changePassword} className="space-y-3">

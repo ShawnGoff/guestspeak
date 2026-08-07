@@ -92,7 +92,7 @@ export default function EditSessionPage({ params }: { params: { slug: string } }
         if (err.status === 404) setNotFound(true);
       })
       .finally(() => setPageLoading(false));
-  }, [params.slug]);
+  }, [params.slug, router]);
 
   if (!mounted || pageLoading) return null;
 
@@ -104,7 +104,7 @@ export default function EditSessionPage({ params }: { params: { slug: string } }
 
   if (forbidden) return (
     <div className="min-h-screen bg-brand-bg flex items-center justify-center gap-4 flex-col">
-      <p className="text-white font-bold">You don't have permission to edit this session.</p>
+      <p className="text-white font-bold">You don&apos;t have permission to edit this session.</p>
       <Link href={`/s/${params.slug}`} className="text-brand-orange text-sm">Back to session →</Link>
     </div>
   );

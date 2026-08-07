@@ -132,7 +132,7 @@ export default function GuestUsernameModal({
         <div className="mb-5">
           <p className="text-xs text-brand-orange font-bold uppercase tracking-widest mb-1">Joining</p>
           <h2 className="text-white font-bold text-lg leading-snug line-clamp-2">{sessionTitle}</h2>
-          <p className="text-purple-200/75 text-sm mt-1">You'll post as this name. No account needed.</p>
+          <p className="text-purple-200/75 text-sm mt-1">You&apos;ll post as this name. No account needed.</p>
         </div>
 
         {/* Auto-name pill */}
