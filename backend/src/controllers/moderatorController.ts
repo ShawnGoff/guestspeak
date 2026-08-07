@@ -44,7 +44,7 @@ export async function listModerators(req: Request, res: Response, next: NextFunc
     await requireHost(id, req.user!.userId);
 
     const result = await pool.query(
-      `SELECT sm.id, sm.user_id, u.username, u.email,
+      `SELECT sm.id, sm.user_id, u.username,
               sm.can_mark_answered, sm.can_star, sm.can_flag, sm.can_hide,
               sm.can_mute, sm.can_remove, sm.can_approve,
               sm.assigned_at

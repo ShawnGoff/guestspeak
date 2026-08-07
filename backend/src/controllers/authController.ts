@@ -8,6 +8,9 @@ import { AppError } from '../middleware/errorHandler';
 import { sendPasswordReset } from '../lib/mailer';
 import { rejectIfBanned } from '../lib/wordFilter';
 
+/** Single source of truth — changing a password must not weaken its hash. */
+const BCRYPT_ROUNDS = 12;
+
 const RegisterSchema = z.object({
   email: z.string().email(),
   username: z.string().min(3).max(50).regex(/^[a-zA-Z0-9_]+$/),
@@ -37,7 +40,7 @@ export async function register(req: Request, res: Response, next: NextFunction) 
   try {
     const { email, username, password, guest_token } = RegisterSchema.parse(req.body);
     await rejectIfBanned(username);
-    const passwordHash = await bcrypt.hash(password, 12);
+    const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
 
     await client.query('BEGIN');
 
@@ -154,7 +157,7 @@ export async function updateMe(req: Request, res: Response, next: NextFunction) 
       const valid = await bcrypt.compare(data.current_password, userResult.rows[0]?.password_hash ?? '');
       if (!valid) throw new AppError(400, 'Current password is incorrect');
 
-      const newHash = await bcrypt.hash(data.new_password, 10);
+      const newHash = await bcrypt.hash(data.new_password, BCRYPT_ROUNDS);
       await client.query(
         `UPDATE users SET password_hash = $1, token_version = token_version + 1 WHERE id = $2`,
         [newHash, userId],
@@ -256,7 +259,7 @@ export async function resetPassword(req: Request, res: Response, next: NextFunct
     if (row.used_at) throw new AppError(400, 'This reset link has already been used.');
     if (new Date(row.expires_at) < new Date()) throw new AppError(400, 'This reset link has expired.');
 
-    const passwordHash = await bcrypt.hash(password, 12);
+    const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
 
     await pool.query(
       `UPDATE users SET password_hash = $1, token_version = token_version + 1 WHERE id = $2`,

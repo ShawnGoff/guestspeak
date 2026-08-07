@@ -18,7 +18,39 @@ declare global {
   }
 }
 
-const JWT_SECRET = process.env.JWT_SECRET!;
+if (!process.env.JWT_SECRET) {
+  throw new Error('JWT_SECRET environment variable is required');
+}
+const JWT_SECRET = process.env.JWT_SECRET;
+
+/**
+ * Verifies a token and confirms its token_version still matches the user's.
+ * Returns the payload, or null if the token is invalid/expired/revoked.
+ *
+ * Revocation matters on every route, not just the ones behind requireAuth:
+ * a password change bumps token_version, and a stolen token must stop working
+ * on the participant-facing routes (ask, echo, flag, join, stream) too.
+ */
+async function verifyToken(token: string): Promise<JwtPayload | null> {
+  let payload: JwtPayload;
+  try {
+    payload = jwt.verify(token, JWT_SECRET) as JwtPayload;
+  } catch {
+    return null;
+  }
+
+  // Guests have no password and no token_version to rotate.
+  if (payload.isGuest || payload.v === undefined) return payload;
+
+  const result = await pool.query(
+    'SELECT token_version FROM users WHERE id = $1',
+    [payload.userId],
+  );
+  const row = result.rows[0];
+  if (!row || row.token_version !== payload.v) return null;
+
+  return payload;
+}
 
 /**
  * Verifies a JWT from the Authorization header.
@@ -32,38 +64,26 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     return;
   }
   try {
-    const payload = jwt.verify(token, JWT_SECRET) as JwtPayload;
-
-    // For registered users with a versioned token, verify the version hasn't been rotated
-    if (!payload.isGuest && payload.v !== undefined) {
-      const result = await pool.query(
-        'SELECT token_version FROM users WHERE id = $1',
-        [payload.userId],
-      );
-      const row = result.rows[0];
-      if (!row || row.token_version !== payload.v) {
-        res.status(401).json({ error: 'Session expired. Please sign in again.' });
-        return;
-      }
+    const payload = await verifyToken(token);
+    if (!payload) {
+      res.status(401).json({ error: 'Session expired. Please sign in again.' });
+      return;
     }
 
     req.user = payload;
     next();
-  } catch {
-    res.status(401).json({ error: 'Invalid or expired token' });
+  } catch (err) {
+    next(err);
   }
 }
 
-/**
- * Attaches user to req if a valid token is present, but does not block guests.
- * Useful for routes accessible to both authenticated users and guests.
- */
 /**
  * Like requireAuth, but also blocks guest accounts.
  * Use on routes that require a real registered user (e.g. create session, create org).
  */
 export function requireRegistered(req: Request, res: Response, next: NextFunction) {
-  requireAuth(req, res, () => {
+  requireAuth(req, res, (err?: unknown) => {
+    if (err) return next(err);
     if (req.user?.isGuest) {
       res.status(403).json({ error: 'You must have an account to do this' });
       return;
@@ -72,16 +92,14 @@ export function requireRegistered(req: Request, res: Response, next: NextFunctio
   });
 }
 
-export function optionalAuth(req: Request, res: Response, next: NextFunction) {
-  const token = extractToken(req, false);
-  if (token) {
-    try {
-      req.user = jwt.verify(token, JWT_SECRET) as JwtPayload;
-    } catch {
-      // ignore — guest continues unauthenticated
-    }
-  }
-  next();
+/**
+ * Attaches user to req if a valid, non-revoked token is present, but does not
+ * block guests. Useful for routes accessible to both authenticated users and
+ * guests. A revoked token is treated as no token at all — the caller falls back
+ * to being anonymous rather than acting as the user.
+ */
+export async function optionalAuth(req: Request, res: Response, next: NextFunction) {
+  await attachOptionalUser(req, next, false);
 }
 
 /**
@@ -91,16 +109,25 @@ export function optionalAuth(req: Request, res: Response, next: NextFunction) {
  * Do NOT use on regular REST routes: query-string tokens leak into logs
  * and browser history.
  */
-export function optionalAuthSSE(req: Request, res: Response, next: NextFunction) {
-  const token = extractToken(req, true);
-  if (token) {
-    try {
-      req.user = jwt.verify(token, JWT_SECRET) as JwtPayload;
-    } catch {
-      // ignore — guest continues unauthenticated
-    }
+export async function optionalAuthSSE(req: Request, res: Response, next: NextFunction) {
+  await attachOptionalUser(req, next, true);
+}
+
+async function attachOptionalUser(req: Request, next: NextFunction, allowQuery: boolean) {
+  const token = extractToken(req, allowQuery);
+  if (!token) {
+    next();
+    return;
   }
-  next();
+  try {
+    const payload = await verifyToken(token);
+    if (payload) req.user = payload;
+    next();
+  } catch (err) {
+    // A DB failure during revocation check must not silently downgrade the
+    // caller to anonymous — surface it instead.
+    next(err);
+  }
 }
 
 function extractToken(req: Request, allowQuery: boolean): string | null {
