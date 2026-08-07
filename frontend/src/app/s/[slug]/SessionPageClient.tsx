@@ -319,7 +319,13 @@ export default function SessionPageClient({ params }: SessionPageProps) {
           return true;
         });
       }
-    }).catch(() => {});
+    }).catch((err) => {
+      // Swallowed so a failed tick never breaks the session UI — but not
+      // silently. A bad SQL query made this endpoint 500 on every call and the
+      // bare catch hid it completely, which meant the credit meter never
+      // refreshed and the guest sign-up prompt never fired.
+      console.error('[heartbeat] credit sync failed:', err);
+    });
   }, [sessionId]);
 
   // Fire once on load to sync the timer with the server's last_credit_at

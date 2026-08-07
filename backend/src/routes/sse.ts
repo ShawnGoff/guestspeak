@@ -2,6 +2,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { addClient, removeClient, clientCount } from '../sse/broadcaster';
 import { optionalAuthSSE } from '../middleware/auth';
 import { resolveCallerRole } from '../db/permissions';
+import { feedModeFor } from '../lib/feedPolicy';
 import { pool } from '../db/pool';
 
 const ELEVATED_ROLES: readonly string[] = ['host', 'org_owner', 'org_admin', 'moderator'];
@@ -32,7 +33,10 @@ router.get('/:id/stream', optionalAuthSSE, async (req: Request, res: Response, n
 
     // Verify session exists
     const result = await pool.query(
-      'SELECT status, visibility, host_id FROM sessions WHERE id = $1',
+      `SELECT s.status, s.visibility, s.host_id,
+              (SELECT COUNT(*)::int FROM session_participants sp
+                WHERE sp.session_id = s.id) AS participant_count
+       FROM sessions s WHERE s.id = $1`,
       [id],
     );
     if (!result.rows[0]) {
@@ -40,7 +44,7 @@ router.get('/:id/stream', optionalAuthSSE, async (req: Request, res: Response, n
       return;
     }
 
-    const { status, visibility } = result.rows[0];
+    const { status, visibility, participant_count } = result.rows[0];
 
     const callerId = req.user?.isGuest === false ? req.user.userId : null;
     const role = callerId ? (await resolveCallerRole(id, callerId)).role : 'none';
@@ -57,12 +61,15 @@ router.get('/:id/stream', optionalAuthSSE, async (req: Request, res: Response, n
       return;
     }
 
-    // Enforce per-session connection cap to prevent DoS.
-    // Elevated callers are exempt: there are only ever a handful of them, and a
-    // host locked out of their own live feed because the room filled up is worse
-    // than the load they add.
+    // Enforce the same threshold getSession advertises. Without this the server
+    // tells a large session's audience to poll but still accepts them if they
+    // stream anyway — a stale cached bundle, or anything not using our client,
+    // would reopen exactly the fan-out the threshold exists to prevent.
+    // Elevated callers are exempt: only ever a handful, and they need immediacy.
     const SSE_CAP = parseInt(process.env.SSE_MAX_CLIENTS_PER_SESSION ?? '500', 10);
-    if (!elevated && clientCount(id) >= SSE_CAP) {
+    const tooLarge = feedModeFor(participant_count, elevated) === 'polling';
+
+    if (!elevated && (tooLarge || clientCount(id) >= SSE_CAP)) {
       // 409 rather than 503: this is not transient, and retrying will not help.
       // The client should fall back to polling the cached feed instead.
       res.status(409).json({

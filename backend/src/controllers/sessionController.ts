@@ -9,6 +9,7 @@ import { broadcast } from '../sse/broadcaster';
 import { createNotificationsForUsers } from './notificationController';
 import { rejectIfBanned } from '../lib/wordFilter';
 import { sendSessionLive } from '../lib/mailer';
+import { feedModeFor, FEED_POLL_INTERVAL_MS } from '../lib/feedPolicy';
 
 const CreateSessionSchema = z.object({
   title: z.string().min(1).max(255),
@@ -35,20 +36,6 @@ const UpdateSessionSchema = CreateSessionSchema.partial();
 /** Roles allowed to see and act on a private session. */
 const ELEVATED_ROLES: readonly string[] = ['host', 'org_owner', 'org_admin', 'moderator'];
 
-/**
- * Above this many participants a session stops pushing every event to every
- * client and the audience polls a cached feed instead.
- *
- * Per-event SSE fan-out costs one socket write per connected client per event,
- * in one process. That is the right trade for a room of 50 and the wrong one for
- * a stadium, where a single echo would mean tens of thousands of writes. Polling
- * a short-TTL cache turns unbounded fan-out into a fixed cost per interval.
- *
- * Hosts and moderators always keep the live stream regardless of size — there are
- * a handful of them, and they are the ones who need immediacy.
- */
-const LIVE_FEED_MAX_PARTICIPANTS = parseInt(process.env.LIVE_FEED_MAX_PARTICIPANTS ?? '400', 10);
-const FEED_POLL_INTERVAL_MS = parseInt(process.env.FEED_POLL_INTERVAL_MS ?? '5000', 10);
 
 function makeSlug(title: string): string {
   const base = slugify(title, { lower: true, strict: true }).slice(0, 80);
@@ -199,11 +186,10 @@ export async function getSession(req: Request, res: Response, next: NextFunction
     // Tell the client how to follow this session: stream every event, or poll the
     // cached feed. Deciding server-side keeps the threshold in one place and lets
     // it change without shipping a new frontend.
-    const isElevatedCaller = ELEVATED_ROLES.includes(caller_role);
-    const feed_mode: 'live' | 'polling' =
-      isElevatedCaller || session.participant_count <= LIVE_FEED_MAX_PARTICIPANTS
-        ? 'live'
-        : 'polling';
+    const feed_mode = feedModeFor(
+      session.participant_count,
+      ELEVATED_ROLES.includes(caller_role),
+    );
 
     res.json({
       ...session,
@@ -619,7 +605,7 @@ export async function heartbeat(req: Request, res: Response, next: NextFunction)
                 GREATEST(0, EXTRACT(EPOCH FROM (
                   COALESCE(last_credit_at, NOW() - INTERVAL '${CREDIT_REGEN_MINUTES} minutes')
                   + INTERVAL '${CREDIT_REGEN_MINUTES} minutes' - NOW()
-                ))::int AS next_credit_secs
+                ))::int) AS next_credit_secs
          FROM session_participants WHERE session_id = $1 AND user_id = $2`,
         [id, userId],
       );
@@ -644,7 +630,7 @@ export async function heartbeat(req: Request, res: Response, next: NextFunction)
                 GREATEST(0, EXTRACT(EPOCH FROM (
                   COALESCE(last_credit_at, NOW() - INTERVAL '${CREDIT_REGEN_MINUTES} minutes')
                   + INTERVAL '${CREDIT_REGEN_MINUTES} minutes' - NOW()
-                ))::int AS next_credit_secs
+                ))::int) AS next_credit_secs
          FROM session_participants WHERE session_id = $1 AND guest_token = $2`,
         [id, guestToken],
       );
