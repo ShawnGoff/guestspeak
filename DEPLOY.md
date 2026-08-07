@@ -17,26 +17,83 @@
 ## 1. Supabase (database)
 
 1. Create a new project at [supabase.com](https://supabase.com).
-2. In **SQL Editor**, run the entire contents of `database/migrations/001_initial_schema.sql`.
-3. Then run each subsequent migration in order:
-   ```
-   002_password_reset_tokens.sql
-   003_featured_sessions.sql
-   004_user_follows.sql
-   005_flags_unique_constraint.sql
-   006_guest_username.sql
-   007_org_location.sql
-   008_session_online.sql
-   009_org_categories.sql
-   010_org_online.sql
-   011_question_pin.sql
-   012_question_spotlight.sql
-   ```
-4. Enable extensions (Dashboard → Database → Extensions):
+2. Enable extensions (Dashboard → Database → Extensions) **before** running migrations:
    - `pgcrypto` ✓ (usually enabled by default)
    - `cube` ✓ (required by earthdistance)
    - `earthdistance` ✓ (for Nearby discovery)
-5. Copy your **Transaction pooler** connection string from Settings → Database → Connection string (use port **6543**, not 5432, to stay within connection limits).
+3. Copy your **Transaction pooler** connection string from Settings → Database → Connection string (use port **6543**, not 5432, to stay within connection limits).
+4. Run the migrations — see below.
+
+### Running migrations
+
+Do not paste migration files in by hand. `npm run migrate` applies every pending
+file in `database/migrations` in filename order and records each one in a
+`schema_migrations` table, so it is safe to re-run and never applies the same
+file twice. Each migration runs in its own transaction and startup aborts on the
+first failure rather than leaving a half-applied schema.
+
+```bash
+cd backend && DATABASE_URL="<your-connection-string>" npm run migrate
+```
+
+That is the whole process for a fresh database, and the only step needed for
+every migration added from here on. This section deliberately does not list the
+migration files: the previous version enumerated them, fell fifteen behind, and
+silently produced a broken schema for anyone following it.
+
+### Adopting the migration runner on a hand-migrated database
+
+If a database was set up by pasting SQL into the Supabase SQL Editor, its
+`schema_migrations` table is empty, so `npm run migrate` would try to replay
+everything from `001` — which fails immediately, because `001_initial_schema.sql`
+uses bare `CREATE TABLE` with no `IF NOT EXISTS`.
+
+Tell the runner what has already been applied, once, before the first
+`npm run migrate` against that database:
+
+```sql
+CREATE TABLE IF NOT EXISTS schema_migrations (
+  filename   TEXT PRIMARY KEY,
+  applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- List every migration already applied by hand, then stop before the first one
+-- that has NOT been applied yet. Anything omitted here will run on the next
+-- `npm run migrate`.
+INSERT INTO schema_migrations (filename) VALUES
+  ('001_initial_schema.sql'),
+  ('002_password_reset_tokens.sql'),
+  ('003_featured_sessions.sql'),
+  ('004_user_follows.sql'),
+  ('005_flags_unique_constraint.sql'),
+  ('006_guest_username.sql'),
+  ('007_org_location.sql'),
+  ('008_session_online.sql'),
+  ('009_org_categories.sql'),
+  ('010_org_online.sql'),
+  ('011_question_pin.sql'),
+  ('012_question_spotlight.sql'),
+  ('013_banned_words.sql'),
+  ('014_moderation_controls.sql'),
+  ('015_platform_bans_admin.sql'),
+  ('016_anonymous_posts.sql'),
+  ('017_stream_url.sql'),
+  ('018_credit_regen.sql'),
+  ('019_seed_banned_words.sql'),
+  ('020_ip_address.sql'),
+  ('021_token_version.sql'),
+  ('022_guest_regen_count.sql'),
+  ('023_credits_max_6.sql'),
+  ('024_question_burst_limit.sql'),
+  ('025_anon_credits.sql'),
+  ('026_session_reports.sql'),
+  ('027_question_author_snapshot.sql')
+ON CONFLICT (filename) DO NOTHING;
+```
+
+Verify with `SELECT count(*) FROM schema_migrations;` — it should match the
+number of `.sql` files in `database/migrations`. After this, `npm run migrate`
+picks up from wherever you left off.
 
 ---
 
