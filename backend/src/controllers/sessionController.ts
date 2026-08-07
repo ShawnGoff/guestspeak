@@ -116,8 +116,9 @@ export async function createSession(req: Request, res: Response, next: NextFunct
     const result = await pool.query(
       `INSERT INTO sessions
          (host_id, org_id, title, description, visibility, credits_per_user, slug,
-          join_code, starts_at, submission_cutoff_at, city, region, country, lat, lng, is_online, stream_url)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
+          join_code, starts_at, submission_cutoff_at, city, region, country, lat, lng, is_online, stream_url,
+          requires_approval)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
        RETURNING *`,
       [
         hostId,
@@ -137,6 +138,7 @@ export async function createSession(req: Request, res: Response, next: NextFunct
         data.lng ?? null,
         data.is_online ?? false,
         data.stream_url || null,
+        data.requires_approval ?? false,
       ],
     );
 
