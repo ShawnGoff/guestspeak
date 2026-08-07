@@ -341,13 +341,18 @@ export async function updateQuestionStatus(req: Request, res: Response, next: Ne
       }
     }
 
+    // $1 was previously used both as the assigned value and inside the CASE
+    // comparison. status is varchar(20) but a comparison against a literal
+    // deduces text, so Postgres could not settle on one type for the parameter
+    // and every call failed with 42P08 — hide, star, and mark-answered included.
+    // The spotlight decision is made here and passed as its own boolean.
     await pool.query(
       `UPDATE questions
        SET status = $1,
-           is_spotlighted = CASE WHEN $1 = 'answered' THEN false ELSE is_spotlighted END,
+           is_spotlighted = CASE WHEN $2 THEN false ELSE is_spotlighted END,
            updated_at = NOW()
-       WHERE id = $2`,
-      [status, id],
+       WHERE id = $3`,
+      [status, status === 'answered', id],
     );
 
     // Rejecting a question that never reached the audience refunds its credit.

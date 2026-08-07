@@ -417,6 +417,11 @@ export default function SessionPageClient({ params }: SessionPageProps) {
   // ── Mod actions ───────────────────────────────────────────────────────────
 
   async function setQuestionStatus(questionId: string, status: string) {
+    // Capture the prior state so a failed request can actually be undone. This
+    // used to claim it reverted and never did, so a rejected moderation action
+    // left the host looking at a change the server had refused.
+    const previous = questions.find(q => q.id === questionId);
+
     // Optimistic update — don't wait for SSE round-trip
     setQuestions(prev => prev.map(q =>
       q.id === questionId
@@ -427,7 +432,9 @@ export default function SessionPageClient({ params }: SessionPageProps) {
       await api.patch(`/questions/${questionId}/status`, { status });
     } catch (err: any) {
       setError(err.message);
-      // Revert on failure — SSE will resync from the server's next broadcast
+      if (previous) {
+        setQuestions(prev => prev.map(q => q.id === questionId ? previous : q));
+      }
     }
   }
 
