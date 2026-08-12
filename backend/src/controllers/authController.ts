@@ -271,6 +271,9 @@ export async function deleteAccount(req: Request, res: Response, next: NextFunct
     // Relationships and anything addressed to them personally. These would
     // cascade on a real DELETE; since the row survives, remove them explicitly.
     await client.query('DELETE FROM notifications WHERE user_id = $1', [userId]);
+    // Would cascade on a real DELETE; since the row survives anonymisation, a
+    // deleted account would otherwise keep receiving push on their devices.
+    await client.query('DELETE FROM push_subscriptions WHERE user_id = $1', [userId]);
     await client.query('DELETE FROM password_reset_tokens WHERE user_id = $1', [userId]);
     await client.query(
       'DELETE FROM user_follows WHERE follower_id = $1 OR following_id = $1', [userId]);

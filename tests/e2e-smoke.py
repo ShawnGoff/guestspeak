@@ -186,6 +186,16 @@ if "id" in oq:
 else:
     print(f"  (could not seed a notification: {str(oq)[:90]})")
 
+# Push subscription routes. The endpoint is fake but well-formed: the point is
+# that the handler and its SQL run, not that a real device is reached.
+hit("push VAPID key", "GET", "/notifications/push/key", H)
+FAKE_ENDPOINT = f"https://fcm.googleapis.com/fcm/send/smoke-{stamp}"
+hit("push subscribe", "POST", "/notifications/push", H,
+    {"endpoint": FAKE_ENDPOINT, "keys": {"p256dh": "BEl62iUYgUivxIkv69yViEuiBIa1McQwFnuAqTNGVUmIOJnRFSTMHkPxWCPPXOB9F7BqTUUZDFOJVGxqTOaFTxk", "auth": "tBHItJI5svbpez7KI4CCXg=="}})
+hit("push subscribe again (idempotent)", "POST", "/notifications/push", H,
+    {"endpoint": FAKE_ENDPOINT, "keys": {"p256dh": "BEl62iUYgUivxIkv69yViEuiBIa1McQwFnuAqTNGVUmIOJnRFSTMHkPxWCPPXOB9F7BqTUUZDFOJVGxqTOaFTxk", "auth": "tBHItJI5svbpez7KI4CCXg=="}})
+hit("push unsubscribe", "DELETE", "/notifications/push", H, {"endpoint": FAKE_ENDPOINT})
+
 hit("list notifications", "GET", "/notifications", O)
 hit("mark all read", "PATCH", "/notifications/read", O)
 nid = sql(f"SELECT id FROM notifications WHERE user_id='{other_id}' LIMIT 1")

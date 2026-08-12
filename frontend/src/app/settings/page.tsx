@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 import { isLoggedIn, clearAuth } from '@/lib/auth';
 import AppNav from '@/components/AppNav';
+import PushToggle from '@/components/PushToggle';
 
 interface MeResponse {
   id: string;
@@ -252,6 +253,8 @@ export default function SettingsPage() {
                 </button>
               </form>
             </div>
+
+            <PushToggle />
 
             {/* Account deletion. Required in-app by App Store Review Guideline
                 5.1.1(v), and the route a GDPR erasure request takes. */}

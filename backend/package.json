@@ -23,6 +23,7 @@
     "nodemailer": "^9.0.1",
     "pg": "^8.11.5",
     "slugify": "^1.6.6",
+    "web-push": "^3.6.7",
     "zod": "^3.23.8"
   },
   "devDependencies": {
@@ -34,6 +35,7 @@
     "@types/node": "^20.14.0",
     "@types/nodemailer": "^8.0.1",
     "@types/pg": "^8.11.6",
+    "@types/web-push": "^3.6.4",
     "tsx": "^4.15.0",
     "typescript": "^5.4.5"
   }
