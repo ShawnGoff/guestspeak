@@ -4,8 +4,9 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
-import { isLoggedIn } from '@/lib/auth';
+import { isLoggedIn, clearAuth } from '@/lib/auth';
 import AppNav from '@/components/AppNav';
+import PushToggle from '@/components/PushToggle';
 
 interface MeResponse {
   id: string;
@@ -32,6 +33,12 @@ export default function SettingsPage() {
   const [confirmPw, setConfirmPw]   = useState('');
   const [pwSaving, setPwSaving]     = useState(false);
   const [pwMsg, setPwMsg]           = useState<{ ok: boolean; text: string } | null>(null);
+
+  // Account deletion
+  const [showDelete, setShowDelete] = useState(false);
+  const [deletePw, setDeletePw]     = useState('');
+  const [deleting, setDeleting]     = useState(false);
+  const [deleteErr, setDeleteErr]   = useState<string | null>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -65,6 +72,23 @@ export default function SettingsPage() {
   }
 
   // ── Change password ───────────────────────────────────────────────────────
+
+  // ── Delete account ────────────────────────────────────────────────────────
+
+  async function deleteAccount(e: React.FormEvent) {
+    e.preventDefault();
+    setDeleting(true); setDeleteErr(null);
+    try {
+      await api.delete('/auth/me', { password: deletePw });
+      // Clear local auth before navigating: the token is already dead server-side,
+      // and leaving it behind would bounce the next request through /login.
+      clearAuth();
+      router.push('/?deleted=1');
+    } catch (err: any) {
+      setDeleteErr(err.message ?? 'Could not delete your account.');
+      setDeleting(false);
+    }
+  }
 
   async function changePassword(e: React.FormEvent) {
     e.preventDefault();
@@ -228,6 +252,61 @@ export default function SettingsPage() {
                   {pwSaving ? 'Updating…' : 'Update password'}
                 </button>
               </form>
+            </div>
+
+            <PushToggle />
+
+            {/* Account deletion. Required in-app by App Store Review Guideline
+                5.1.1(v), and the route a GDPR erasure request takes. */}
+            <div className="card p-6 border-red-500/30">
+              <h2 className="text-xs font-bold text-red-400 uppercase tracking-widest mb-1">Delete account</h2>
+              <p className="text-sm text-purple-200/75 mb-4">
+                This cannot be undone. Your email, username and profile are erased and
+                you are signed out everywhere.
+              </p>
+              <p className="text-sm text-purple-200/60 mb-4">
+                Sessions you hosted stay up so the questions people asked in them are
+                not lost, but they will no longer show your name.
+              </p>
+
+              {!showDelete ? (
+                <button
+                  type="button"
+                  onClick={() => setShowDelete(true)}
+                  className="px-5 py-2.5 text-sm font-semibold rounded-lg border border-red-500/40 text-red-400 hover:bg-red-500/10 transition-colors"
+                >
+                  Delete my account
+                </button>
+              ) : (
+                <form onSubmit={deleteAccount} className="space-y-4">
+                  <SettingsField
+                    label="Confirm your password"
+                    type="password"
+                    value={deletePw}
+                    onChange={setDeletePw}
+                    placeholder="Your current password"
+                  />
+
+                  {deleteErr && <p className="text-sm font-medium text-red-400">{deleteErr}</p>}
+
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="submit"
+                      disabled={deleting || !deletePw}
+                      className="px-5 py-2.5 text-sm font-semibold rounded-lg bg-red-500/90 text-white hover:bg-red-500 disabled:opacity-40 transition-colors"
+                    >
+                      {deleting ? 'Deleting…' : 'Permanently delete'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setShowDelete(false); setDeletePw(''); setDeleteErr(null); }}
+                      className="text-sm text-purple-200/75 hover:text-white transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </form>
+              )}
             </div>
           </>
         )}

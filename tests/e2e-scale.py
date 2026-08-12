@@ -1,0 +1,150 @@
+"""Checks for the scale work: feed_mode switching, the feed cache and its
+invalidation, moderator credit exemption, and the guest regen ceiling.
+
+Uses LIVE_FEED_MAX_PARTICIPANTS=2 so the polling threshold can be crossed with
+three guests instead of four hundred.
+"""
+import json, subprocess, time, urllib.request, urllib.error
+
+API = "http://localhost:3098/api"
+DB = "aa_e2e3"
+
+def call(method, path, token=None, body=None):
+    req = urllib.request.Request(API + path, method=method)
+    req.add_header("Content-Type", "application/json")
+    if token:
+        req.add_header("Authorization", "Bearer " + token)
+    data = json.dumps(body or {}).encode()
+    try:
+        with urllib.request.urlopen(req, data if method != "GET" else None, timeout=15) as r:
+            raw = r.read()
+            try:
+                return r.status, json.loads(raw or b"{}")
+            except Exception:
+                return r.status, {"text": raw.decode(errors="replace")}
+    except urllib.error.HTTPError as e:
+        raw = e.read()
+        try:
+            return e.code, json.loads(raw or b"{}")
+        except Exception:
+            return e.code, {"text": raw.decode(errors="replace")}
+
+def sql(q):
+    return subprocess.run(["psql", DB, "-tAc", q],
+                          capture_output=True, text=True, check=True).stdout.strip()
+
+results = []
+def check(label, got, want):
+    good = got == want
+    results.append(good)
+    print(f"  [{'PASS' if good else 'FAIL'}] {label}: got {got!r}, want {want!r}")
+
+def section(t): print(f"\n=== {t} ===")
+
+stamp = str(int(time.time()))
+_, h = call("POST", "/auth/register", body={
+    "email": f"sh{stamp}@t.com", "username": f"sh{stamp}", "password": "password123"})
+host = h["token"]
+
+def guest(sid, name):
+    _, g = call("POST", "/auth/guest")
+    call("POST", f"/sessions/{sid}/join", g["token"], {"guest_username": name})
+    return g["token"]
+
+# ── 1. feed_mode threshold ───────────────────────────────────────────────────
+section("1. FEED MODE — flips to polling past the threshold (set to 2)")
+_, s = call("POST", "/sessions", host,
+            {"title": "Scale", "visibility": "public", "credits_per_user": 6})
+sid, slug = s["id"], s["slug"]
+call("POST", f"/sessions/{sid}/go-live", host)
+
+g1 = guest(sid, "g_one")
+_, sess = call("GET", f"/sessions/{slug}")
+check("small session is live", sess.get("feed_mode"), "live")
+check("poll interval advertised", isinstance(sess.get("poll_interval_ms"), int), True)
+
+g2 = guest(sid, "g_two")
+g3 = guest(sid, "g_three")
+_, sess = call("GET", f"/sessions/{slug}")
+check("past threshold -> polling", sess.get("feed_mode"), "polling")
+
+# host keeps the live stream regardless of size
+_, hsess = call("GET", f"/sessions/{slug}", host)
+check("host keeps live feed", hsess.get("feed_mode"), "live")
+
+# SSE must refuse audience connections past the cap and say why
+req = urllib.request.Request(f"{API}/sessions/{sid}/stream?token={g1}")
+try:
+    urllib.request.urlopen(req, timeout=8).close()
+    code, payload = 200, {}
+except urllib.error.HTTPError as e:
+    code, payload = e.code, json.loads(e.read() or b"{}")
+check("SSE refuses audience past cap", code, 409)
+check("SSE tells client to poll", payload.get("feed_mode"), "polling")
+
+# ── 2. Feed cache + invalidation ─────────────────────────────────────────────
+section("2. FEED CACHE — serves repeats, invalidates on moderation")
+_, q = call("POST", "/questions", g1, {"session_id": sid, "body": "Cached question one"})
+time.sleep(2.5)  # let the 2s TTL lapse so the first read is fresh
+
+_, r1 = call("GET", f"/questions?sessionId={sid}")
+_, r2 = call("GET", f"/questions?sessionId={sid}")
+check("repeat read is consistent", r1["data"][0]["id"], r2["data"][0]["id"])
+check("question visible to audience", len(r1["data"]), 1)
+
+# hide it — the cache must drop immediately, not after the TTL
+call("PATCH", f"/questions/{q['id']}/status", host, {"status": "hidden"})
+_, r3 = call("GET", f"/questions?sessionId={sid}")
+check("hidden question gone immediately (cache invalidated)", len(r3["data"]), 0)
+
+# moderator view is never cached and still sees it
+_, rh = call("GET", f"/questions?sessionId={sid}", host)
+check("host still sees hidden question", len(rh["data"]), 1)
+
+# ── 3. Moderator credit exemption ────────────────────────────────────────────
+section("3. MOD CREDITS — session staff are not charged")
+_, mod = call("POST", "/auth/register", body={
+    "email": f"mod{stamp}@t.com", "username": f"mod{stamp}", "password": "password123"})
+mod_id = sql(f"SELECT id FROM users WHERE username='mod{stamp}'")
+call("POST", f"/sessions/{sid}/moderators", host,
+     {"user_id": mod_id, "can_mark_answered": True, "can_star": True, "can_hide": True})
+call("POST", f"/sessions/{sid}/join", mod["token"], {})
+
+before = sql(f"SELECT credits_remaining FROM session_participants "
+             f"WHERE session_id='{sid}' AND user_id='{mod_id}'")
+# more posts than the credit budget, and faster than the burst limit allows
+codes = []
+for i in range(8):
+    c, _ = call("POST", "/questions", mod["token"],
+                {"session_id": sid, "body": f"Moderator question number {i}"})
+    codes.append(c)
+after = sql(f"SELECT credits_remaining FROM session_participants "
+            f"WHERE session_id='{sid}' AND user_id='{mod_id}'")
+check("all 8 mod posts accepted", codes, [201] * 8)
+check("mod credits untouched", after, before)
+
+# ── 4. Guest regen ceiling ───────────────────────────────────────────────────
+section("4. GUEST REGEN — ceiling of 2, and never reduces a larger balance")
+gt = guest(sid, "regen_guy")
+# a guest sitting above the cap must not be pulled down to it
+call("POST", f"/sessions/{sid}/heartbeat", gt)
+check("balance above cap left alone",
+      sql(f"SELECT credits_remaining FROM session_participants "
+          f"WHERE session_id='{sid}' AND guest_username='regen_guy'"), "6")
+
+# drop to zero, then let regen run twice
+sql(f"UPDATE session_participants SET credits_remaining=0, last_credit_at=NULL "
+    f"WHERE session_id='{sid}' AND guest_username='regen_guy'")
+call("POST", f"/sessions/{sid}/heartbeat", gt)
+sql(f"UPDATE session_participants SET last_credit_at=NULL "
+    f"WHERE session_id='{sid}' AND guest_username='regen_guy'")
+_, hb = call("POST", f"/sessions/{sid}/heartbeat", gt)
+sql(f"UPDATE session_participants SET last_credit_at=NULL "
+    f"WHERE session_id='{sid}' AND guest_username='regen_guy'")
+_, hb3 = call("POST", f"/sessions/{sid}/heartbeat", gt)
+
+check("regen stops at the ceiling of 2", hb3.get("credits_remaining"), 2)
+check("regen reported exhausted", hb3.get("regen_exhausted"), True)
+
+print(f"\nRESULT: {sum(results)}/{len(results)} passed",
+      "— ALL PASS" if all(results) else "— FAILURES PRESENT")

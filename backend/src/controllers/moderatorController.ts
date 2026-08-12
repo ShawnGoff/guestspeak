@@ -79,7 +79,9 @@ export async function addModerator(req: Request, res: Response, next: NextFuncti
     }
 
     // Verify the target user exists
-    const userResult = await pool.query('SELECT id FROM users WHERE id = $1 AND is_guest = false', [data.user_id]);
+    const userResult = await pool.query(
+      'SELECT id FROM users WHERE id = $1 AND is_guest = false AND deleted_at IS NULL',
+      [data.user_id]);
     if (!userResult.rows[0]) throw new AppError(404, 'User not found');
 
     const result = await pool.query(

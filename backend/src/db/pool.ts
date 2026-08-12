@@ -1,4 +1,5 @@
 import { Pool } from 'pg';
+import { envIntMin } from '../lib/env';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -31,9 +32,32 @@ function sslConfig() {
   return { rejectUnauthorized: false };
 }
 
+/**
+ * Simultaneous database connections. This is the server's throughput ceiling,
+ * not a per-user limit: one question costs roughly eight sequential queries and
+ * one echo about six, so each in-flight request holds a connection for several
+ * round trips. When all are busy, further queries queue and then fail at
+ * connectionTimeoutMillis.
+ *
+ * Configurable because the correct value is a property of the database, not the
+ * code, and has to be found by measurement:
+ *
+ *   - Set it to what the far end will actually accept. In production that is
+ *     Supabase's transaction pooler (port 6543), whose client-connection ceiling
+ *     depends on the plan. Overshooting produces refused connections, which is
+ *     worse than queuing — queuing degrades, refusal errors.
+ *   - A local PostgreSQL usually allows 100 total, so the default stays well
+ *     under that. Raise it via the environment for large events instead of
+ *     hardcoding a number that breaks every developer machine.
+ *   - More connections is not automatically faster. The backend is a single Node
+ *     process, and past the point where PostgreSQL is saturated, extra
+ *     connections add contention rather than throughput.
+ */
+const POOL_MAX = envIntMin('DB_POOL_MAX', 50, 1);
+
 export const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  max: 20,
+  max: POOL_MAX,
   idleTimeoutMillis: 30_000,
   connectionTimeoutMillis: 2_000,
   // Supabase (and most managed Postgres) requires SSL in production.

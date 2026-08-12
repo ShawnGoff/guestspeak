@@ -286,7 +286,9 @@ export async function addMember(req: Request, res: Response, next: NextFunction)
       await requireOrgOwner(id, req.user!.userId);
     }
 
-    const userCheck = await pool.query('SELECT id FROM users WHERE id = $1 AND is_guest = false', [user_id]);
+    const userCheck = await pool.query(
+      'SELECT id FROM users WHERE id = $1 AND is_guest = false AND deleted_at IS NULL',
+      [user_id]);
     if (!userCheck.rows[0]) throw new AppError(404, 'User not found');
 
     const result = await pool.query(

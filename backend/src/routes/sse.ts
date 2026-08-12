@@ -3,6 +3,7 @@ import { addClient, removeClient, clientCount } from '../sse/broadcaster';
 import { optionalAuthSSE } from '../middleware/auth';
 import { resolveCallerRole } from '../db/permissions';
 import { feedModeFor } from '../lib/feedPolicy';
+import { envIntMin } from '../lib/env';
 import { pool } from '../db/pool';
 
 const ELEVATED_ROLES: readonly string[] = ['host', 'org_owner', 'org_admin', 'moderator'];
@@ -66,7 +67,7 @@ router.get('/:id/stream', optionalAuthSSE, async (req: Request, res: Response, n
     // stream anyway — a stale cached bundle, or anything not using our client,
     // would reopen exactly the fan-out the threshold exists to prevent.
     // Elevated callers are exempt: only ever a handful, and they need immediacy.
-    const SSE_CAP = parseInt(process.env.SSE_MAX_CLIENTS_PER_SESSION ?? '500', 10);
+    const SSE_CAP = envIntMin('SSE_MAX_CLIENTS_PER_SESSION', 500, 1);
     const tooLarge = feedModeFor(participant_count, elevated) === 'polling';
 
     if (!elevated && (tooLarge || clientCount(id) >= SSE_CAP)) {

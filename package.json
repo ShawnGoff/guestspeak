@@ -9,7 +9,8 @@
   ],
   "scripts": {
     "dev": "concurrently \"npm run dev --workspace=backend\" \"npm run dev --workspace=frontend\"",
-    "build": "npm run build --workspace=shared && npm run build --workspace=backend && npm run build --workspace=frontend"
+    "build": "npm run build --workspace=shared && npm run build --workspace=backend && npm run build --workspace=frontend",
+    "test": "bash tests/run.sh"
   },
   "devDependencies": {
     "concurrently": "^8.2.0"

@@ -93,7 +93,8 @@ export async function login(req: Request, res: Response, next: NextFunction) {
 
     const result = await pool.query(
       `SELECT id, email, username, is_guest, password_hash, token_version FROM users
-       WHERE (email = $1 OR LOWER(username) = LOWER($1)) AND is_guest = false`,
+       WHERE (email = $1 OR LOWER(username) = LOWER($1))
+         AND is_guest = false AND deleted_at IS NULL`,
       [email],
     );
 
@@ -181,6 +182,129 @@ export async function updateMe(req: Request, res: Response, next: NextFunction) 
     await client.query('ROLLBACK').catch(() => {});
     if (err?.code === '23505') next(new AppError(409, 'That join code prefix is already taken'));
     else next(err);
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * DELETE /api/auth/me — delete the caller's account.
+ *
+ * Required by App Store Review Guideline 5.1.1(v) and by GDPR erasure requests.
+ *
+ * Implemented as anonymisation, not DELETE. See migration 028 for the full
+ * reasoning: a real DELETE fails on sessions.host_id (RESTRICT), and cascading
+ * instead would destroy questions written by other people. Keeping the row and
+ * stripping every personal field erases the person while leaving the room's
+ * content — and other users' moderation history — intact.
+ *
+ * Requires the current password. A deletion this irreversible should not be
+ * reachable with a stolen token alone.
+ */
+export async function deleteAccount(req: Request, res: Response, next: NextFunction) {
+  const client = await pool.connect();
+  try {
+    const { password } = z.object({ password: z.string().min(1) }).parse(req.body);
+    const userId = req.user!.userId;
+
+    const userResult = await client.query(
+      `SELECT password_hash, deleted_at FROM users WHERE id = $1`,
+      [userId],
+    );
+    const user = userResult.rows[0];
+    if (!user || user.deleted_at) throw new AppError(404, 'Account not found');
+
+    const valid = await bcrypt.compare(password, user.password_hash ?? '');
+    if (!valid) throw new AppError(400, 'Password is incorrect');
+
+    // Organisations they solely own need resolving first. Deleting an org that
+    // other people belong to as a side effect of one member leaving would be a
+    // surprise; deleting a solo org they are the only member of is not. So the
+    // solo case is handled silently and the shared case is refused with
+    // instructions, which is what GitHub does and what avoids trapping anyone.
+    const soleOwned = await client.query(
+      `SELECT o.id, o.name,
+              (SELECT COUNT(*) FROM organization_members m2
+                WHERE m2.org_id = o.id AND m2.user_id <> $1)::int AS other_members
+       FROM organizations o
+       JOIN organization_members om ON om.org_id = o.id AND om.user_id = $1
+       WHERE om.role = 'owner'
+         AND NOT EXISTS (
+           SELECT 1 FROM organization_members m3
+           WHERE m3.org_id = o.id AND m3.user_id <> $1 AND m3.role = 'owner'
+         )`,
+      [userId],
+    );
+
+    const shared = soleOwned.rows.filter(r => r.other_members > 0);
+    if (shared.length > 0) {
+      const names = shared.map(r => r.name).join(', ');
+      throw new AppError(
+        409,
+        `You are the only owner of ${names}. Transfer ownership or delete ` +
+        `${shared.length === 1 ? 'it' : 'them'} before deleting your account.`,
+      );
+    }
+
+    await client.query('BEGIN');
+
+    // Solo organisations go with them. Sessions survive: organizations.id is
+    // ON DELETE SET NULL from sessions.org_id, so the Q&A stays, unaffiliated.
+    for (const org of soleOwned.rows) {
+      await client.query('DELETE FROM organizations WHERE id = $1', [org.id]);
+    }
+
+    // The byline snapshot added in migration 027 stores the username on every
+    // question at post time. Nulling users.username alone would leave the name
+    // on public display, so the snapshot has to be scrubbed too.
+    await client.query(
+      `UPDATE questions SET author_display_name = NULL WHERE author_id = $1`,
+      [userId],
+    );
+
+    // Guest display names recorded against their participation.
+    await client.query(
+      `UPDATE session_participants SET guest_username = NULL WHERE user_id = $1`,
+      [userId],
+    );
+
+    // Relationships and anything addressed to them personally. These would
+    // cascade on a real DELETE; since the row survives, remove them explicitly.
+    await client.query('DELETE FROM notifications WHERE user_id = $1', [userId]);
+    // Would cascade on a real DELETE; since the row survives anonymisation, a
+    // deleted account would otherwise keep receiving push on their devices.
+    await client.query('DELETE FROM push_subscriptions WHERE user_id = $1', [userId]);
+    await client.query('DELETE FROM password_reset_tokens WHERE user_id = $1', [userId]);
+    await client.query(
+      'DELETE FROM user_follows WHERE follower_id = $1 OR following_id = $1', [userId]);
+    await client.query('DELETE FROM org_followers WHERE user_id = $1', [userId]);
+    await client.query('DELETE FROM organization_members WHERE user_id = $1', [userId]);
+    await client.query('DELETE FROM session_moderators WHERE user_id = $1', [userId]);
+
+    // Strip the person. Every one of these columns is nullable, and PostgreSQL
+    // allows repeated NULLs under a UNIQUE index, so the username and email are
+    // released for reuse and deleted accounts never collide with each other.
+    // Bumping token_version invalidates every issued token immediately.
+    await client.query(
+      `UPDATE users
+       SET email             = NULL,
+           username          = NULL,
+           password_hash     = NULL,
+           code_prefix       = NULL,
+           ip_address        = NULL,
+           is_platform_admin = false,
+           token_version     = token_version + 1,
+           deleted_at        = NOW(),
+           updated_at        = NOW()
+       WHERE id = $1`,
+      [userId],
+    );
+
+    await client.query('COMMIT');
+    res.json({ deleted: true });
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    next(err);
   } finally {
     client.release();
   }

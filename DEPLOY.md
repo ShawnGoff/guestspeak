@@ -87,7 +87,9 @@ INSERT INTO schema_migrations (filename) VALUES
   ('024_question_burst_limit.sql'),
   ('025_anon_credits.sql'),
   ('026_session_reports.sql'),
-  ('027_question_author_snapshot.sql')
+  ('027_question_author_snapshot.sql'),
+  ('028_account_deletion.sql'),
+  ('029_push_subscriptions.sql')
 ON CONFLICT (filename) DO NOTHING;
 ```
 
@@ -161,7 +163,8 @@ Then replace the `multer.diskStorage` logic with `supabase.storage.from('avatars
 
 ## Post-deploy checklist
 
-- [ ] All 12 migrations ran successfully in Supabase
+- [ ] `npm run migrate` reports all migrations applied
+- [ ] `SELECT count(*) FROM schema_migrations;` matches the file count in `database/migrations`
 - [ ] `earthdistance` and `cube` extensions enabled
 - [ ] Health check returns 200: `curl https://your-api.railway.app/health`
 - [ ] Register a test account, create a session, go live
@@ -169,31 +172,56 @@ Then replace the `multer.diskStorage` logic with `supabase.storage.from('avatars
 - [ ] Avatar upload works (or Supabase Storage wired up)
 - [ ] Org follower notification email arrives when session goes live
 - [ ] SSE updates appear in real time (session page)
+- [ ] Replica count is 1, **or** `REDIS_URL` is set (see Scaling limits)
+- [ ] Hiding a question as host survives a page reload
+- [ ] A session link in a private window reaches the session, not `/login`
+- [ ] Guest credit meter ticks, and the sign-up prompt fires when regen runs out
 
 ---
 
 ## Scaling limits
 
-**The backend must run as a single instance.** Keep Railway's replica count at 1.
+### Running more than one replica
 
-SSE subscribers are held in an in-process `Map` (`src/sse/broadcaster.ts`). With
-more than one replica, a question posted on replica A never reaches the audience
-connected to replica B. Nothing errors and nothing is logged — the live feed just
-silently goes stale for part of the room, which is the worst way for this to fail.
+**Set `REDIS_URL` before raising Railway's replica count above 1.**
 
-Everything else is already replica-safe: the auto-go-live scheduler uses a single
-atomic `UPDATE … RETURNING`, so only one replica ever claims a given session.
+SSE connections live in the memory of whichever replica the client reached. Sends
+go through a Redis pub/sub bus (`src/sse/bus.ts`) so every replica receives every
+event and writes to the sockets it happens to hold. Without Redis the bus calls
+straight through to local delivery — correct for a single instance, and silently
+wrong for more than one.
 
-To scale out, the broadcaster needs a shared pub/sub (Redis) so every replica
-receives every event. Two things change:
+The failure mode is worth understanding, because it does not look like a failure.
+A client connected to replica A never receives events produced on replica B. The
+connection is open and healthy, heartbeats fine, and reports no error. The feed
+simply goes quiet for part of the audience, and the client-side fallback never
+triggers because nothing failed.
 
-1. `broadcast` / `broadcastByRole` / `broadcastTo` publish to a Redis channel
-   instead of writing directly to sockets.
-2. Each replica subscribes and writes to *its own* connected clients.
+It also hits *small* sessions hardest. Above `LIVE_FEED_MAX_PARTICIPANTS` the
+audience polls instead of streaming, so large sessions are unaffected — but a
+fifty-person meetup has everyone on SSE, and half of them stop seeing questions.
 
-Per-session connection capacity is capped by `SSE_MAX_CLIENTS_PER_SESSION`
-(default 500). A single Node process handles a few thousand idle SSE connections
-comfortably; raise the cap before you raise the replica count.
+`tests/e2e-replicas.py` covers this: it runs two replicas against one Redis and
+one database, writes exclusively through one, and asserts listeners on both see
+the event. With `REDIS_URL` unset, eight of its sixteen assertions fail — that is
+the bug, reproducible on demand.
+
+Everything else is already replica-safe:
+
+- the auto-go-live scheduler uses a single atomic `UPDATE … RETURNING`, so only
+  one replica ever claims a session
+- the feed cache is read-only derived data; each replica keeps its own copy and
+  both go stale by at most one TTL
+- rate-limit counters are per process and advisory, not a security boundary, so
+  N replicas weaken them proportionally
+
+Two caveats when running multiple replicas:
+
+- `SSE_MAX_CLIENTS_PER_SESSION` is counted per replica, so the effective cap is
+  N times the configured value
+- `DB_POOL_MAX` is also per replica. Supabase's pooler enforces a fixed client
+  ceiling (200 on Nano), and a deploy briefly runs old and new containers at
+  once — size the pool so `2 × N × DB_POOL_MAX` stays under it
 
 ### Very large sessions (thousands of attendees)
 
