@@ -47,6 +47,7 @@ SUITES=(
   "aa_smoke 3096 e2e-smoke.py    "
   "aa_e2e2  3099 e2e-security.py "
   "aa_e2e3  3098 e2e-scale.py    LIVE_FEED_MAX_PARTICIPANTS=2"
+  "aa_del   3095 e2e-deletion.py "
 )
 
 for entry in "${SUITES[@]}"; do

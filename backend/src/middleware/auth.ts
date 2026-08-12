@@ -43,11 +43,13 @@ async function verifyToken(token: string): Promise<JwtPayload | null> {
   if (payload.isGuest || payload.v === undefined) return payload;
 
   const result = await pool.query(
-    'SELECT token_version FROM users WHERE id = $1',
+    'SELECT token_version, deleted_at FROM users WHERE id = $1',
     [payload.userId],
   );
   const row = result.rows[0];
   if (!row || row.token_version !== payload.v) return null;
+  // A deleted account must not authenticate even if a token somehow survives.
+  if (row.deleted_at) return null;
 
   return payload;
 }

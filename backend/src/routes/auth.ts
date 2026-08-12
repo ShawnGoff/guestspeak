@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { register, login, guestToken, getMe, updateMe, searchUsers, checkUsername, forgotPassword, resetPassword } from '../controllers/authController';
+import { register, login, guestToken, getMe, updateMe, deleteAccount, searchUsers, checkUsername, forgotPassword, resetPassword } from '../controllers/authController';
 import { loginLimiter, registerLimiter, guestLimiter, checkUsernameLimiter } from '../middleware/rateLimit';
 import { requireAuth, requireRegistered } from '../middleware/auth';
 
@@ -20,6 +20,9 @@ router.get('/me', requireRegistered, getMe);
 
 // PATCH /api/auth/me
 router.patch('/me', requireRegistered, updateMe);
+
+// DELETE /api/auth/me — permanent account deletion (requires password)
+router.delete('/me', requireRegistered, deleteAccount);
 
 // POST /api/auth/forgot-password
 router.post('/forgot-password', loginLimiter, forgotPassword);
