@@ -72,3 +72,28 @@ Two things the test has to get right, both learned the hard way:
 - **The client can be the bottleneck.** Python threads with blocking HTTP
   saturate well before the server does, so figures above ~30 concurrent are a
   floor on server capacity, not a ceiling.
+
+## Cross-replica test
+
+Not part of `npm test` — it needs Redis and two backends.
+
+```bash
+redis-server --port 6399 --daemonize yes
+createdb aa_replica
+(cd backend && DATABASE_URL=postgresql://localhost/aa_replica npm run migrate)
+for p in 3081 3082; do
+  (cd backend && DATABASE_URL=postgresql://localhost/aa_replica JWT_SECRET=replica_secret \
+     PORT=$p GUEST_IP_TOKEN_CAP=0 REDIS_URL=redis://localhost:6399 npm run dev &)
+done
+python3 tests/e2e-replicas.py
+```
+
+Listeners connect to **both** replicas, writes go through **one**, and every
+assertion is that the other replica's listener saw it. Also checks that role
+targeting survives the bus, that direct (mute) events reach only their target,
+and that nothing is delivered twice — the publishing replica must not write
+locally as well, since Redis echoes a publish back to its sender.
+
+Re-run it with `REDIS_URL` unset and 8 of the 16 assertions fail. That is the
+bug this exists to prevent, reproducible on demand, and worth doing once so the
+failure is a thing you have seen rather than a paragraph you have read.

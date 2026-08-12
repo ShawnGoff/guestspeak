@@ -1,4 +1,5 @@
 import { Response } from 'express';
+import { initBus, publish, type BusMessage } from './bus';
 
 export type SSEEventType =
   | 'question:new'
@@ -29,19 +30,13 @@ interface ClientEntry {
 }
 
 /**
- * Map of sessionId → set of active SSE client entries.
+ * Map of sessionId → the SSE clients connected to THIS replica.
  *
- * ⚠️  THIS IS PROCESS-LOCAL. The backend must run as a SINGLE instance.
- *
- * With two or more replicas, a question posted on replica A is broadcast only
- * to the clients holding an SSE connection to replica A — everyone connected to
- * replica B sees nothing until they refresh. There is no error, no log line, and
- * nothing in the UI: the feed just silently stops being live for a fraction of
- * the audience, which is the worst possible failure mode during a live session.
- *
- * Before scaling the backend horizontally, this Map has to move behind a shared
- * pub/sub (Redis) so every replica receives every event. Until then, keep
- * Railway's replica count at 1. See DEPLOY.md → "Scaling limits".
+ * Process-local by nature: an open socket belongs to whichever process is
+ * holding it. What used to make that a single-instance constraint was sending
+ * directly to this Map; sends now go through the bus (see ./bus), so every
+ * replica receives every event and writes to whichever sockets it happens to
+ * hold. Set REDIS_URL before raising the replica count.
  */
 const clients = new Map<string, Set<ClientEntry>>();
 
@@ -65,21 +60,16 @@ export function removeClient(sessionId: string, res: Response) {
   if (set.size === 0) clients.delete(sessionId);
 }
 
+// ─── Sending ─────────────────────────────────────────────────────────────────
+//
+// Every send publishes to the bus rather than writing to sockets directly, and
+// delivery happens when the message comes back from the bus. With Redis
+// configured that reaches all replicas; without it the bus calls straight
+// through and behaviour is identical to before.
+
 /** Send an event to every connected client in the session. */
 export function broadcast(sessionId: string, event: SSEEvent) {
-  const set = clients.get(sessionId);
-  if (!set) return;
-
-  const payload = encode(event);
-
-  for (const entry of set) {
-    try {
-      entry.res.write(payload);
-    } catch {
-      // Client disconnected mid-write; will be cleaned up by 'close' handler
-      set.delete(entry);
-    }
-  }
+  publish({ mode: 'all', sessionId, event });
 }
 
 /**
@@ -94,19 +84,7 @@ export function broadcastByRole(
   elevatedEvent: SSEEvent,
   audienceEvent: SSEEvent,
 ) {
-  const set = clients.get(sessionId);
-  if (!set) return;
-
-  const elevatedPayload = encode(elevatedEvent);
-  const audiencePayload = encode(audienceEvent);
-
-  for (const entry of set) {
-    try {
-      entry.res.write(entry.elevated ? elevatedPayload : audiencePayload);
-    } catch {
-      set.delete(entry);
-    }
-  }
+  publish({ mode: 'byRole', sessionId, event: elevatedEvent, audienceEvent });
 }
 
 /**
@@ -116,16 +94,66 @@ export function broadcastByRole(
  * approve it, live, without being shown to the room before it is approved.
  */
 export function broadcastElevated(sessionId: string, event: SSEEvent) {
-  const set = clients.get(sessionId);
+  publish({ mode: 'elevated', sessionId, event });
+}
+
+/**
+ * Send an event only to the specific participant identified by userId or
+ * guestToken. Used for moderation events (mute, remove) that should not be
+ * visible to other attendees.
+ */
+export function broadcastTo(
+  sessionId: string,
+  userId: string | null,
+  guestToken: string | null,
+  event: SSEEvent,
+) {
+  publish({ mode: 'direct', sessionId, event, userId, guestToken });
+}
+
+// ─── Delivery ────────────────────────────────────────────────────────────────
+
+/**
+ * Write a bus message to this replica's own sockets.
+ *
+ * The only place events reach clients. A replica holding no clients for the
+ * session drops the message, which is the common case once several replicas
+ * are running.
+ */
+function deliver(msg: BusMessage): void {
+  const set = clients.get(msg.sessionId);
   if (!set) return;
 
-  const payload = encode(event);
+  const primary = encode(msg.event as SSEEvent);
+  const audience = msg.mode === 'byRole' ? encode(msg.audienceEvent as SSEEvent) : null;
 
   for (const entry of set) {
-    if (!entry.elevated) continue;
+    let payload: string | null = null;
+
+    switch (msg.mode) {
+      case 'all':
+        payload = primary;
+        break;
+      case 'elevated':
+        payload = entry.elevated ? primary : null;
+        break;
+      case 'byRole':
+        payload = entry.elevated ? primary : audience;
+        break;
+      case 'direct':
+        payload =
+          (msg.userId && entry.userId === msg.userId) ||
+          (msg.guestToken && entry.guestToken === msg.guestToken)
+            ? primary
+            : null;
+        break;
+    }
+
+    if (!payload) continue;
     try {
       entry.res.write(payload);
     } catch {
+      // Client disconnected mid-write; the 'close' handler also cleans up.
       set.delete(entry);
     }
   }
@@ -135,34 +163,9 @@ function encode(event: SSEEvent): string {
   return `event: ${event.type}\ndata: ${JSON.stringify(event.data)}\n\n`;
 }
 
-/**
- * Send an event only to the specific participant identified by userId or guestToken.
- * Use this for moderation events (mute, remove) that should not be visible to
- * other attendees.
- */
-export function broadcastTo(
-  sessionId: string,
-  userId: string | null,
-  guestToken: string | null,
-  event: SSEEvent,
-) {
-  const set = clients.get(sessionId);
-  if (!set) return;
-
-  const payload = encode(event);
-
-  for (const entry of set) {
-    const matches =
-      (userId && entry.userId === userId) ||
-      (guestToken && entry.guestToken === guestToken);
-    if (!matches) continue;
-    try {
-      entry.res.write(payload);
-    } catch {
-      set.delete(entry);
-    }
-  }
-}
+// Start listening as soon as this module loads, so events arriving from other
+// replicas have somewhere to go before the first client connects.
+initBus(deliver);
 
 export function clientCount(sessionId: string): number {
   return clients.get(sessionId)?.size ?? 0;
