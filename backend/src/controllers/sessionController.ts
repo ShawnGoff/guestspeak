@@ -10,6 +10,7 @@ import { createNotificationsForUsers } from './notificationController';
 import { rejectIfBanned } from '../lib/wordFilter';
 import { sendSessionLive } from '../lib/mailer';
 import { feedModeFor, FEED_POLL_INTERVAL_MS } from '../lib/feedPolicy';
+import { envIntMin } from '../lib/env';
 
 const CreateSessionSchema = z.object({
   title: z.string().min(1).max(255),
@@ -496,7 +497,7 @@ export async function joinSession(req: Request, res: Response, next: NextFunctio
     // a farming loop and a filling arena look the same from here. Ballot-stuffing
     // defence for events that large has to come from requiring sign-in to Echo,
     // not from this check.
-    const IP_TOKEN_CAP = parseInt(process.env.GUEST_IP_TOKEN_CAP ?? '2000', 10);
+    const IP_TOKEN_CAP = envIntMin('GUEST_IP_TOKEN_CAP', 2000, 0);
     if (IP_TOKEN_CAP > 0 && !userId && guestToken && ipAddress) {
       const existing = await pool.query(
         `SELECT COUNT(DISTINCT guest_token)::int AS cnt

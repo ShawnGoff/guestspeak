@@ -38,15 +38,27 @@ run_suite () { # $1=db  $2=port  $3=script  $4=extra env
   if [ "$errs" -ne 0 ]; then FAILED=1; fi
 }
 
-run_suite aa_e2e  3099 e2e-verify.py   ""
-run_suite aa_smoke 3096 e2e-smoke.py   ""
-run_suite aa_e2e2 3099 e2e-security.py ""
-run_suite aa_e2e3 3098 e2e-scale.py    "LIVE_FEED_MAX_PARTICIPANTS=2"
+# db | port | script | extra server env
+# Adding a suite here is the only edit needed — teardown reads the same list, so
+# the two cannot drift. They already did once: a new suite left its database
+# behind because the cleanup block named the other three by hand.
+SUITES=(
+  "aa_e2e   3099 e2e-verify.py   "
+  "aa_smoke 3096 e2e-smoke.py    "
+  "aa_e2e2  3099 e2e-security.py "
+  "aa_e2e3  3098 e2e-scale.py    LIVE_FEED_MAX_PARTICIPANTS=2"
+)
+
+for entry in "${SUITES[@]}"; do
+  read -r db port script extra <<< "$entry"
+  run_suite "$db" "$port" "$script" "${extra:-}"
+done
 
 pkill -f "src/index.ts" 2>/dev/null; sleep 2
-dropdb --if-exists aa_e2e 2>/dev/null
-dropdb --if-exists aa_e2e2 2>/dev/null
-dropdb --if-exists aa_e2e3 2>/dev/null
+for entry in "${SUITES[@]}"; do
+  read -r db _ <<< "$entry"
+  dropdb --if-exists "$db" 2>/dev/null
+done
 
 echo ""
 if [ "$FAILED" = "0" ]; then echo "OVERALL: ALL SUITES PASSED"; else echo "OVERALL: FAILURES PRESENT"; fi

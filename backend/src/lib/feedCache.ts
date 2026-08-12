@@ -15,7 +15,9 @@
  * a question must see the result immediately, not up to a TTL later.
  */
 
-const DEFAULT_TTL_MS = parseInt(process.env.FEED_CACHE_TTL_MS ?? '2000', 10);
+import { envIntMin } from './env';
+
+const DEFAULT_TTL_MS = envIntMin('FEED_CACHE_TTL_MS', 2000, 0);
 
 interface Entry {
   value: unknown;
