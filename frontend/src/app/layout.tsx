@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
+import ServiceWorker from '@/components/ServiceWorker';
 
 const SITE_URL = 'https://guestspeak-frontend.vercel.app';
 
@@ -28,6 +29,17 @@ export const metadata: Metadata = {
     index: true,
     follow: true,
   },
+  // iOS does not read the web app manifest for these. Without them an installed
+  // GuestSpeak opens in a Safari chrome rather than standalone, and shows the
+  // wrong icon on the Home Screen.
+  appleWebApp: {
+    capable: true,
+    title: 'GuestSpeak',
+    statusBarStyle: 'black-translucent',
+  },
+  icons: {
+    apple: '/icons/apple-touch-icon.png',
+  },
 };
 
 export const viewport: Viewport = {
@@ -38,7 +50,10 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        {children}
+        <ServiceWorker />
+      </body>
     </html>
   );
 }

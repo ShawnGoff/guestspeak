@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Offline — GuestSpeak</title>
+  <style>
+    :root { color-scheme: dark; }
+    body {
+      margin: 0; min-height: 100vh;
+      display: flex; align-items: center; justify-content: center;
+      background: #1A0A2E; color: #fff; text-align: center; padding: 2rem;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+    .card { max-width: 22rem; }
+    .mark { width: 64px; height: 64px; margin: 0 auto 1.5rem; display: block; }
+    h1 { font-size: 1.35rem; margin: 0 0 .6rem; font-weight: 800; }
+    p { color: rgba(233, 213, 255, .75); font-size: .95rem; line-height: 1.55; margin: 0 0 1.75rem; }
+    button {
+      background: #F5921E; color: #1A0A2E; border: 0; cursor: pointer;
+      font: inherit; font-weight: 700; padding: .75rem 1.5rem; border-radius: .75rem;
+    }
+    button:hover { background: #FFB74D; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <svg class="mark" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <rect width="64" height="64" rx="14" fill="#251340"/>
+      <path d="M12 18C12 14.686 14.686 12 18 12H46C49.314 12 52 14.686 52 18V38C52 41.314 49.314 44 46 44H34L24 52V44H18C14.686 44 12 41.314 12 38V18Z" fill="#F5921E"/>
+      <circle cx="22" cy="28" r="3.5" fill="#251340"/>
+      <circle cx="32" cy="28" r="3.5" fill="#251340"/>
+      <circle cx="42" cy="28" r="3.5" fill="#251340"/>
+    </svg>
+    <h1>You're offline</h1>
+    <p>
+      GuestSpeak needs a connection — sessions are live, so there is nothing
+      useful to show from cache. Reconnect and try again.
+    </p>
+    <button onclick="location.reload()">Try again</button>
+  </div>
+</body>
+</html>
