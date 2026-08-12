@@ -1960,22 +1960,19 @@ function RegenUpgradeModal({ slug, onDismiss }: { slug: string; onDismiss: () =>
   const [error, setError]       = useState<string | null>(null);
   const [success, setSuccess]   = useState(false);
 
-  // Extract guest_token from the current JWT payload (client-side, no verification needed)
-  const guestToken = (() => {
-    try {
-      const jwt = localStorage.getItem('aa_token') ?? '';
-      const payload = JSON.parse(atob(jwt.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
-      return payload.guestToken as string | undefined;
-    } catch { return undefined; }
-  })();
-
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!email || !username || !password) return;
     setLoading(true); setError(null);
     try {
+      // The guest's own JWT goes up in the Authorization header (api attaches it),
+      // and the server reads the guest token from there. It is deliberately NOT
+      // sent in the body: the server used to trust a body parameter, which let
+      // anyone who had seen a guest's token — it travels in the SSE query string
+      // and a JWT payload is plain base64 — register and claim that guest's
+      // questions and participant row.
       const result = await api.post<{ token: string; user: any }>('/auth/register', {
-        email, username, password, ...(guestToken && { guest_token: guestToken }),
+        email, username, password,
       });
       saveAuth(result.token, result.user);
       setSuccess(true);

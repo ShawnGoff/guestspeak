@@ -11,12 +11,18 @@ import { rejectIfBanned } from '../lib/wordFilter';
 /** Single source of truth — changing a password must not weaken its hash. */
 const BCRYPT_ROUNDS = 12;
 
+/**
+ * A real bcrypt hash of a value nothing can match, compared against when no user
+ * row is found so that a failed login costs the same time either way. Generated
+ * once at module load rather than per request — the point is a constant-cost
+ * comparison, not a constant-cost hash.
+ */
+const DUMMY_HASH = bcrypt.hashSync('login-timing-equaliser-not-a-password', BCRYPT_ROUNDS);
+
 const RegisterSchema = z.object({
   email: z.string().email(),
   username: z.string().min(3).max(50).regex(/^[a-zA-Z0-9_]+$/),
   password: z.string().min(8),
-  // Optional: guest_token to migrate participant/question records to the new account
-  guest_token: z.string().optional(),
 });
 
 const UpdateMeSchema = z.object({
@@ -38,7 +44,23 @@ const LoginSchema = z.object({
 export async function register(req: Request, res: Response, next: NextFunction) {
   const client = await pool.connect();
   try {
-    const { email, username, password, guest_token } = RegisterSchema.parse(req.body);
+    const { email, username, password } = RegisterSchema.parse(req.body);
+
+    // The guest identity being upgraded is taken from the caller's own token,
+    // never from the request body.
+    //
+    // Accepting it as a parameter meant anyone who learned a guest_token could
+    // register and absorb that guest: their questions were reassigned to the
+    // new account and their participant row taken over. And guest tokens are
+    // not secret in practice — the guest JWT carries one in its payload, JWT
+    // payloads are base64 rather than encrypted, and the SSE endpoint puts that
+    // token in a URL query string, where it reaches every access log and proxy
+    // along the way.
+    //
+    // Reading it from the verified token instead makes the migration require
+    // proof of possession: you can only claim a guest identity you are able to
+    // authenticate as.
+    const guest_token = req.user?.isGuest ? req.user.guestToken : undefined;
     await rejectIfBanned(username);
     const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
 
@@ -99,10 +121,17 @@ export async function login(req: Request, res: Response, next: NextFunction) {
     );
 
     const user = result.rows[0];
-    if (!user) throw new AppError(401, 'Invalid credentials');
 
-    const valid = await bcrypt.compare(password, user.password_hash);
-    if (!valid) throw new AppError(401, 'Invalid credentials');
+    // Always run the comparison, even with no matching row.
+    //
+    // Returning early on a missing user made this endpoint an account oracle:
+    // a real address costs a full bcrypt verification (~100ms at cost 12) while
+    // an unknown one returns almost instantly, so the response time alone says
+    // whether an account exists. forgot-password deliberately answers
+    // identically either way to avoid exactly that; leaking it here undoes the
+    // effort. Comparing against a dummy hash keeps both paths the same shape.
+    const valid = await bcrypt.compare(password, user?.password_hash ?? DUMMY_HASH);
+    if (!user || !valid) throw new AppError(401, 'Invalid credentials');
 
     const token = signToken({ userId: user.id, isGuest: false, v: user.token_version });
     const { password_hash: _, token_version: _tv, ...safeUser } = user;

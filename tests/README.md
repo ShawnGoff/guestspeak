@@ -97,3 +97,30 @@ locally as well, since Redis echoes a publish back to its sender.
 Re-run it with `REDIS_URL` unset and 8 of the 16 assertions fail. That is the
 bug this exists to prevent, reproducible on demand, and worth doing once so the
 failure is a thing you have seen rather than a paragraph you have read.
+
+## Security probes
+
+`security-probe.py` runs as part of `npm test`. Unlike the other suites it does
+not assert that features work — it performs attacks and asserts each one is
+refused. A `VULNERABLE` line is a real finding.
+
+Covers privilege escalation (self-verifying an org, self-promoting to platform
+admin, reassigning a session's host, featuring your own session), the anonymity
+guarantee (feed, host view and CSV export must never name an anonymous author),
+credit-economy bypasses (re-joining to refill, hammering the heartbeat), the
+private-session boundary, cross-account access, and guest identity absorption.
+
+Two real vulnerabilities were found this way and are now regression-covered:
+
+- **Guest identity absorption.** `POST /auth/register` accepted a `guest_token`
+  in the request body and migrated that guest's questions, participant row and
+  credits to the new account. Guest tokens are not secret in practice — a guest
+  JWT carries one in its payload, JWT payloads are base64 rather than encrypted,
+  and the SSE endpoint puts that JWT in a URL query string where it reaches
+  access logs and proxies. The token is now read from the caller's own verified
+  JWT, so migrating a guest identity requires being able to authenticate as it.
+- **Login account oracle.** Login returned before running bcrypt when no user
+  matched, so an unknown address answered in ~1ms against ~100ms for a real one
+  — the response time alone revealed whether an account existed. That is exactly
+  what forgot-password goes to the trouble of hiding. Login now compares against
+  a dummy hash so both paths cost the same; measured 210ms vs 209ms afterwards.

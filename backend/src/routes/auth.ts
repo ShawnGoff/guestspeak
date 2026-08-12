@@ -1,12 +1,14 @@
 import { Router } from 'express';
 import { register, login, guestToken, getMe, updateMe, deleteAccount, searchUsers, checkUsername, forgotPassword, resetPassword } from '../controllers/authController';
 import { loginLimiter, registerLimiter, guestLimiter, checkUsernameLimiter } from '../middleware/rateLimit';
-import { requireAuth, requireRegistered } from '../middleware/auth';
+import { requireAuth, requireRegistered, optionalAuth } from '../middleware/auth';
 
 const router = Router();
 
 // POST /api/auth/register
-router.post('/register', registerLimiter, register);
+// optionalAuth so a guest upgrading to an account is identified by their own
+// token; the guest identity to migrate is never read from the request body.
+router.post('/register', registerLimiter, optionalAuth, register);
 
 // POST /api/auth/login
 router.post('/login', loginLimiter, login);
