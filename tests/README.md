@@ -45,3 +45,30 @@ whole class of never-executed-SQL bugs stays closed.
   anything the backend logged — that should always be `0`, including on runs
   where every assertion passes, since a swallowed 500 is exactly what these
   suites exist to catch.
+
+## Load test
+
+```bash
+# not part of `npm test` — it takes a minute and needs its own server
+createdb aa_load
+(cd backend && DATABASE_URL=postgresql://localhost/aa_load npm run migrate)
+(cd backend && DATABASE_URL=postgresql://localhost/aa_load JWT_SECRET=loadtest_secret \
+   PORT=3095 GUEST_IP_TOKEN_CAP=0 DB_POOL_MAX=15 LIVE_FEED_MAX_PARTICIPANTS=100000 npm run dev &)
+python3 tests/loadtest.py
+```
+
+`DB_POOL_MAX=15` is deliberate: that is how many real PostgreSQL connections
+Supavisor maintains on a Nano instance, so it is the production wall. Local
+PostgreSQL is far faster than Nano, so absolute throughput does not transfer —
+the *shape* of the curve and the failure behaviour do.
+
+Two things the test has to get right, both learned the hard way:
+
+- **Every request must do real work.** A vote is unique per (participant,
+  question); reusing a pair returns 409 from a constraint violation, which is
+  nothing like the write it stands in for. An early run was 90% 409s and the
+  throughput figure it produced was meaningless. Votes are now cleared between
+  levels and each worker walks a disjoint slice of the pair space.
+- **The client can be the bottleneck.** Python threads with blocking HTTP
+  saturate well before the server does, so figures above ~30 concurrent are a
+  floor on server capacity, not a ceiling.
