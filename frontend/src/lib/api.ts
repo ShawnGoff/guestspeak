@@ -19,16 +19,45 @@ function getToken(): string | null {
   return localStorage.getItem('aa_token');
 }
 
+/**
+ * Records every failed API call.
+ *
+ * Callers routinely swallow rejections — `.catch(() => {})` on a background
+ * refresh is often the right call for the UI, since one failed poll should not
+ * blow up the page. But swallowing it at the call site meant the failure left no
+ * trace anywhere: the credit heartbeat returned 500 on every request for months
+ * behind a bare catch, and nobody could have known.
+ *
+ * Logging here separates the two concerns. The UI still degrades quietly; the
+ * failure is still visible. This is also the single place to forward errors to
+ * a monitoring service when one is added — the call sites need not change again.
+ */
+function reportFailure(method: string, path: string, status: number, message?: string) {
+  const line = `[api] ${method} ${path} -> ${status}${message ? `: ${message}` : ''}`;
+  if (status >= 500 || status === 0) console.error(line);
+  else console.warn(line);
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const token = getToken();
-  const res = await fetch(`${API}${path}`, {
-    ...init,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...init?.headers,
-    },
-  });
+  const method = init?.method ?? 'GET';
+
+  let res: Response;
+  try {
+    res = await fetch(`${API}${path}`, {
+      ...init,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...init?.headers,
+      },
+    });
+  } catch (err) {
+    // The request never completed — offline, DNS, CORS, connection refused.
+    // There is no status to inspect, so this would otherwise vanish entirely.
+    reportFailure(method, path, 0, err instanceof Error ? err.message : String(err));
+    throw err;
+  }
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
 
@@ -46,6 +75,8 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
         window.location.href = `/login?next=${encodeURIComponent(window.location.pathname)}`;
       }
     }
+
+    reportFailure(method, path, res.status, body.error);
     throw Object.assign(new Error(body.error ?? 'Request failed'), { status: res.status });
   }
   return res.json();
