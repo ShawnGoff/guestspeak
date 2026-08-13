@@ -22,15 +22,15 @@ export default function AboutPage() {
           </p>
 
           <p>
-            Instead of a chaotic open-floor format or an ignored suggestion box, GuestSpeak gives every attendee a voice — and lets the crowd surface the best questions naturally. Attendees submit questions and add <span className="text-brand-orange font-medium">Echoes</span> to ones they want answered. The most-echoed questions rise to the top so hosts can prioritize what the room actually cares about.
+            Instead of a chaotic open-floor format or an ignored suggestion box, GuestSpeak gives every attendee a voice — and lets the crowd surface the best questions naturally. Attendees submit questions and add <span className="text-brand-orange font-medium">Echoes</span> to ones they want answered. The most-echoed questions rise to the top so hosts can prioritize what their audience actually cares about — whether that audience is in the room, listening live, or sending questions in ahead of the show.
           </p>
 
           <h2 className="text-xl font-semibold text-white pt-4">How it works</h2>
           <p>
-            Hosts create a session and share a join code or link. Guests join in seconds — nothing to download, no account needed. Each attendee gets a small number of credits to spend on questions and Echoes, which keeps participation thoughtful rather than spammy. Credits replenish over time, so the room keeps its voice from the first question to the last.
+            Hosts create a session and share a join code or link. Guests join in seconds — nothing to download, no account needed. Each attendee gets a small number of credits to spend on questions and Echoes, which keeps participation thoughtful rather than spammy. Credits replenish over time, so the conversation keeps its voice from the first question to the last.
           </p>
 
-          <h2 className="text-xl font-semibold text-white pt-4">Built for real rooms</h2>
+          <h2 className="text-xl font-semibold text-white pt-4">Built for rooms, broadcasts and shows</h2>
           <p>
             GuestSpeak works equally well in-person and online. Hosts can embed a live stream so remote attendees watch and participate on the same page as in-person guests. Sessions can be public (discoverable) or unlisted (join-code only). Hosts control the pace — pinning top questions, marking questions answered, and closing submissions when the time is right.
           </p>

@@ -252,18 +252,18 @@ function Hero() {
             {/* Eyebrow */}
             <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-brand-purple/50 bg-brand-purple/10 text-brand-amber text-sm font-medium mb-6">
               <span className="w-1.5 h-1.5 rounded-full bg-brand-amber animate-pulse-slow" />
-              Live Q&amp;A for real rooms
+              Q&amp;A for rooms, streams and shows
             </div>
 
             {/* Headline */}
             <h1 className="text-5xl sm:text-6xl xl:text-7xl font-extrabold leading-[1.05] mb-6">
-              <span className="text-white">Bring the whole room</span>
+              <span className="text-white">Bring your audience</span>
               <br />
               <span className="text-orange-gradient">into the conversation.</span>
             </h1>
 
             <p className="text-lg sm:text-xl text-purple-200/90 mb-10 max-w-xl lg:max-w-none">
-              Your audience asks, adds Echoes to what resonates, and the best questions rise to the top — live, in any browser, no account needed to join.
+              Your audience asks, adds Echoes to what resonates, and the best questions rise to the top — whether they&apos;re in the room, tuned in live, or sending questions days ahead. Any browser, no account needed to join.
             </p>
 
             {/* CTAs */}
@@ -358,14 +358,14 @@ const HOW_IT_WORKS = [
   {
     step: '02',
     icon: <QuestionIcon />,
-    title: 'The room asks questions',
+    title: 'Your audience asks',
     desc: 'Anyone can ask, instantly. Everyone gets a handful of asks per session, so people bring the questions they really mean.',
   },
   {
     step: '03',
     icon: <EchoIconLg />,
     title: 'The best questions rise',
-    desc: 'Attendees add Echoes to the questions they want answered. Whatever resonates with the room climbs to the top — no shouting required.',
+    desc: 'Attendees add Echoes to the questions they want answered. Whatever resonates climbs to the top — no shouting required.',
   },
 ];
 
@@ -378,7 +378,7 @@ function HowItWorks() {
           Simple for everyone
         </h2>
         <p className="text-purple-200/80 text-center text-lg mb-16 max-w-xl mx-auto">
-          Hosts see what the room actually wants to talk about. Three steps, that&apos;s it.
+          Hosts see what their audience actually wants to talk about. Three steps, that&apos;s it.
         </p>
 
         <div className="grid md:grid-cols-3 gap-6">
@@ -424,7 +424,7 @@ const FEATURES = [
   {
     icon: <CreditIcon />,
     title: 'Quality over quantity',
-    desc: 'Everyone gets a few questions and Echoes to spend, so people post what they mean — and the room\'s real priorities shine through.',
+    desc: 'Everyone gets a few questions and Echoes to spend, so people post what they mean — and the real priorities shine through.',
   },
   {
     icon: <MobileIcon />,
@@ -447,7 +447,7 @@ function Features() {
           Everything you need,<br />nothing you don&apos;t
         </h2>
         <p className="text-purple-200/80 text-center text-lg mb-16 max-w-xl mx-auto">
-          Built for AMAs, panels, classrooms, town halls — anywhere the room has questions.
+          Built for AMAs, panels, radio shows, podcasts, classrooms, town halls — live in the room or listening from anywhere.
         </p>
 
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -559,7 +559,7 @@ function CTA() {
           <div className="absolute top-0 left-1/2 -translate-x-1/2 w-64 h-40 bg-brand-orange/10 blur-3xl pointer-events-none" />
 
           <h2 className="relative text-4xl sm:text-5xl font-extrabold mb-4">
-            <span className="text-orange-gradient">Ready to hear the room?</span>
+            <span className="text-orange-gradient">Ready to hear your audience?</span>
           </h2>
           <p className="relative text-purple-200/90 text-lg mb-8">
             Your first session takes under a minute to set up. Free, forever.

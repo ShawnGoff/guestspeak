@@ -7,23 +7,23 @@ const SITE_URL = 'https://guestspeak-frontend.vercel.app';
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
-    default: 'GuestSpeak — Live Q&A for events',
+    default: 'GuestSpeak — Audience Q&A for events, broadcasts and shows',
     template: '%s — GuestSpeak',
   },
-  description: 'Real-time audience Q&A for live events. Submit questions, add Echoes to the ones you want answered most. No account required.',
+  description: 'Audience Q&A for live events, broadcasts and shows. Your audience submits questions and adds Echoes to the ones they want answered most — live, or ahead of time. No account required.',
   keywords: ['live Q&A', 'audience questions', 'event Q&A', 'conference Q&A', 'live events'],
   authors: [{ name: 'GuestSpeak', url: SITE_URL }],
   openGraph: {
     type: 'website',
     siteName: 'GuestSpeak',
     title: 'GuestSpeak — Live Q&A for events',
-    description: 'Real-time audience Q&A for live events. No account required.',
+    description: 'Audience Q&A for live events, broadcasts and shows. No account required.',
     url: SITE_URL,
   },
   twitter: {
     card: 'summary_large_image',
     title: 'GuestSpeak — Live Q&A for events',
-    description: 'Real-time audience Q&A for live events. No account required.',
+    description: 'Audience Q&A for live events, broadcasts and shows. No account required.',
   },
   robots: {
     index: true,
