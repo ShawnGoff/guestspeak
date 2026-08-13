@@ -4,7 +4,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import path from 'path';
 import router from './routes';
-import { errorHandler } from './middleware/errorHandler';
+import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 import { apiLimiter } from './middleware/rateLimit';
 import { startScheduler } from './scheduler';
 
@@ -47,6 +47,9 @@ app.get('/health', (_req, res) => res.json({ status: 'ok' }));
 
 // All API routes
 app.use('/api', router);
+
+// Unmatched API routes answer in JSON rather than Express's default HTML page.
+app.use('/api', notFoundHandler);
 
 // Error handler must be last
 app.use(errorHandler);
