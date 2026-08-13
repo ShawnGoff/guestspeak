@@ -38,6 +38,20 @@ export function errorHandler(
     return;
   }
 
+  // PostgreSQL 22P02 (invalid_text_representation): a value could not be parsed
+  // as its column type — most often a path or query parameter that is not a
+  // valid UUID. The caller sent something malformed, so it is a 400.
+  //
+  // Handled centrally rather than by validating an id in every handler: this
+  // covers every current route and every future one, and getting it wrong is
+  // silent. Anyone could trigger a 500 with `?sessionId=x` without
+  // authenticating, which both misreports the fault and would bury genuine 500s
+  // once errors are forwarded to a monitoring service.
+  if ((err as { code?: string }).code === '22P02') {
+    res.status(400).json({ error: 'Malformed identifier in request' });
+    return;
+  }
+
   console.error(err);
   res.status(500).json({ error: 'Internal server error' });
 }

@@ -124,3 +124,29 @@ Two real vulnerabilities were found this way and are now regression-covered:
   — the response time alone revealed whether an account existed. That is exactly
   what forgot-password goes to the trouble of hiding. Login now compares against
   a dummy hash so both paths cost the same; measured 210ms vs 209ms afterwards.
+
+## Probing a deployed environment
+
+```bash
+python3 tests/prod-probe.py https://your-api.up.railway.app
+```
+
+Checks the boundaries that depend on the environment being configured correctly,
+which the local suites cannot see: RLS is on in production and not locally,
+traffic arrives through a proxy so rate limiters see a forwarded IP, and CORS,
+HSTS and CSP come from real configuration rather than a test fixture.
+
+It touches a live database, so it is built to leave nothing behind:
+
+- sessions are created **unlisted or private, never public**, so nothing appears
+  in Discover or in anyone's feed
+- everything created is removed in a `finally` block — sessions deleted, then
+  both accounts deleted through the real endpoint
+- read-only environment checks run first, so a failure part-way still cleans up
+- it writes only to its own data, and takes no moderation action on real sessions
+
+Registration is rate limited to 10 per 15 minutes per IP, so wait between runs.
+
+Dry-run it against localhost first. That is how the malformed-identifier 500 was
+found — `?sessionId=not-a-uuid` returned a server error to any unauthenticated
+caller, and would have buried real 500s once monitoring was added.
