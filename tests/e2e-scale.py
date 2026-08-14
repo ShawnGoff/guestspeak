@@ -133,13 +133,16 @@ check("balance above cap left alone",
           f"WHERE session_id='{sid}' AND guest_username='regen_guy'"), "6")
 
 # drop to zero, then let regen run twice
-sql(f"UPDATE session_participants SET credits_remaining=0, last_credit_at=NULL "
+# Backdate joined_at as well as clearing last_credit_at. A null last_credit_at
+# no longer means "due now" — the regen clock falls back to joined_at, so that
+# a guest who spends everything and reloads cannot claim a credit instantly.
+sql(f"UPDATE session_participants SET credits_remaining=0, last_credit_at=NULL, joined_at=NOW() - INTERVAL '11 minutes' "
     f"WHERE session_id='{sid}' AND guest_username='regen_guy'")
 call("POST", f"/sessions/{sid}/heartbeat", gt)
-sql(f"UPDATE session_participants SET last_credit_at=NULL "
+sql(f"UPDATE session_participants SET last_credit_at=NULL, joined_at=NOW() - INTERVAL '11 minutes' "
     f"WHERE session_id='{sid}' AND guest_username='regen_guy'")
 _, hb = call("POST", f"/sessions/{sid}/heartbeat", gt)
-sql(f"UPDATE session_participants SET last_credit_at=NULL "
+sql(f"UPDATE session_participants SET last_credit_at=NULL, joined_at=NOW() - INTERVAL '11 minutes' "
     f"WHERE session_id='{sid}' AND guest_username='regen_guy'")
 _, hb3 = call("POST", f"/sessions/{sid}/heartbeat", gt)
 
@@ -148,3 +151,8 @@ check("regen reported exhausted", hb3.get("regen_exhausted"), True)
 
 print(f"\nRESULT: {sum(results)}/{len(results)} passed",
       "— ALL PASS" if all(results) else "— FAILURES PRESENT")
+# Signal failure to the runner. Printing "FAILURES PRESENT" and exiting 0
+# meant run.sh reported ALL SUITES PASSED with failing assertions in the
+# output — the summary was only ever as honest as whoever read the lines
+# above it.
+raise SystemExit(0 if all(results) else 1)

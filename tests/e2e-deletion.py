@@ -148,3 +148,8 @@ check("cannot be added as a moderator", code, 404)
 
 print(f"\nRESULT: {sum(results)}/{len(results)} passed",
       "— ALL PASS" if all(results) else "— FAILURES PRESENT")
+# Signal failure to the runner. Printing "FAILURES PRESENT" and exiting 0
+# meant run.sh reported ALL SUITES PASSED with failing assertions in the
+# output — the summary was only ever as honest as whoever read the lines
+# above it.
+raise SystemExit(0 if all(results) else 1)

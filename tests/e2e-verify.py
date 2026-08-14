@@ -105,3 +105,8 @@ after = credits_of("asker_c", sid2)
 check("no refund for approved-then-hidden", after, before)
 
 print("\nRESULT:", "ALL PASS" if ok else "FAILURES PRESENT")
+# Signal failure to the runner. Printing "FAILURES PRESENT" and exiting 0
+# meant run.sh reported ALL SUITES PASSED with failing assertions in the
+# output — the summary was only ever as honest as whoever read the lines
+# above it.
+raise SystemExit(0 if ok else 1)

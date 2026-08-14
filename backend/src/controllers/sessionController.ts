@@ -576,6 +576,13 @@ const CREDIT_REGEN_MINUTES = 10;
  * The ceiling is enforced in the WHERE clause, not just via LEAST, so a guest
  * who still holds more than the cap (a host may start everyone at up to 6) is
  * simply skipped rather than having their balance pulled down to it.
+ *
+ * The clock runs from joined_at until the first credit is granted. Treating a
+ * NULL last_credit_at as "eligible now" handed out a free credit on the first
+ * heartbeat: someone who spent everything and reloaded got one back instantly,
+ * and could do it again for their second refill, burning the whole guest
+ * allowance in seconds. The ten-minute rhythm is the point — it is what makes
+ * running out mean something, and what the sign-up prompt is timed against.
  */
 export async function heartbeat(req: Request, res: Response, next: NextFunction) {
   try {
@@ -598,7 +605,7 @@ export async function heartbeat(req: Request, res: Response, next: NextFunction)
          WHERE session_id = $2
            AND user_id    = $3
            AND credits_remaining < $1
-           AND (last_credit_at IS NULL OR last_credit_at < NOW() - INTERVAL '${CREDIT_REGEN_MINUTES} minutes')`,
+           AND COALESCE(last_credit_at, joined_at) < NOW() - INTERVAL '${CREDIT_REGEN_MINUTES} minutes'`,
         [USER_CREDIT_CAP, id, userId],
       );
       const cur = await pool.query(
@@ -609,7 +616,7 @@ export async function heartbeat(req: Request, res: Response, next: NextFunction)
                   -- was due immediately, and it would ask again, forever.
                   WHEN credits_remaining >= $3 THEN ${CREDIT_REGEN_MINUTES} * 60
                   ELSE GREATEST(0, EXTRACT(EPOCH FROM (
-                    COALESCE(last_credit_at, NOW() - INTERVAL '${CREDIT_REGEN_MINUTES} minutes')
+                    COALESCE(last_credit_at, joined_at)
                     + INTERVAL '${CREDIT_REGEN_MINUTES} minutes' - NOW()
                   ))::int)
                 END AS next_credit_secs
@@ -629,7 +636,7 @@ export async function heartbeat(req: Request, res: Response, next: NextFunction)
            AND guest_token = $3
            AND regen_count < $1
            AND credits_remaining < $4
-           AND (last_credit_at IS NULL OR last_credit_at < NOW() - INTERVAL '${CREDIT_REGEN_MINUTES} minutes')`,
+           AND COALESCE(last_credit_at, joined_at) < NOW() - INTERVAL '${CREDIT_REGEN_MINUTES} minutes'`,
         [GUEST_REGEN_LIMIT, id, guestToken, GUEST_CREDIT_CAP],
       );
       const cur = await pool.query(
@@ -641,7 +648,7 @@ export async function heartbeat(req: Request, res: Response, next: NextFunction)
                   WHEN credits_remaining >= $3 OR regen_count >= $4
                     THEN ${CREDIT_REGEN_MINUTES} * 60
                   ELSE GREATEST(0, EXTRACT(EPOCH FROM (
-                    COALESCE(last_credit_at, NOW() - INTERVAL '${CREDIT_REGEN_MINUTES} minutes')
+                    COALESCE(last_credit_at, joined_at)
                     + INTERVAL '${CREDIT_REGEN_MINUTES} minutes' - NOW()
                   ))::int)
                 END AS next_credit_secs

@@ -8,6 +8,14 @@ BACKEND="$ROOT/backend"
 SECRET="test_secret_local_e2e_only"
 FAILED=0
 
+stop_server () {  # $1 = port
+  # By port, never by process name. `pkill -f "src/index.ts"` also matches a
+  # developer's own `tsx watch src/index.ts`, so running the suite killed the
+  # dev server they were working in — repeatedly, and silently.
+  lsof -ti:"$1" 2>/dev/null | xargs -r kill 2>/dev/null
+  sleep 2
+}
+
 start_api () {  # $1=db  $2=port  $3=extra env
   ( cd "$BACKEND" && env DATABASE_URL="postgresql://localhost/$1" JWT_SECRET="$SECRET" \
       PORT="$2" NODE_ENV=development GUEST_IP_TOKEN_CAP=0 $3 \
@@ -20,7 +28,7 @@ start_api () {  # $1=db  $2=port  $3=extra env
 }
 
 run_suite () { # $1=db  $2=port  $3=script  $4=extra env
-  pkill -f "src/index.ts" 2>/dev/null; sleep 2
+  stop_server "$2"
   dropdb --if-exists "$1" 2>/dev/null
   createdb "$1"
   ( cd "$BACKEND" && DATABASE_URL="postgresql://localhost/$1" npm run migrate >/dev/null 2>&1 )
@@ -56,9 +64,9 @@ for entry in "${SUITES[@]}"; do
   run_suite "$db" "$port" "$script" "${extra:-}"
 done
 
-pkill -f "src/index.ts" 2>/dev/null; sleep 2
 for entry in "${SUITES[@]}"; do
-  read -r db _ <<< "$entry"
+  read -r db port _ <<< "$entry"
+  stop_server "$port"
   dropdb --if-exists "$db" 2>/dev/null
 done
 

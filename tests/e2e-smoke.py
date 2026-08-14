@@ -264,3 +264,8 @@ print(f"\n=== RESULT: {len(calls)} endpoints called, {len(failures)} returned 5x
 for f in failures:
     print(f"  FAIL {f[1]} {f[2]} -> {f[3]}  {f[4]}")
 print("ALL CLEAR" if not failures else "FAILURES PRESENT")
+# Signal failure to the runner. Printing "FAILURES PRESENT" and exiting 0
+# meant run.sh reported ALL SUITES PASSED with failing assertions in the
+# output — the summary was only ever as honest as whoever read the lines
+# above it.
+raise SystemExit(0 if not failures else 1)
