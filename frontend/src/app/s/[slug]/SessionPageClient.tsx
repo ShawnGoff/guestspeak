@@ -1471,12 +1471,17 @@ function CreditDisplay({ credits, max, nextCreditSecs, creditCap, regenCap, isRe
       )}
       {showGuestTier && (
         <span className="text-xs text-purple-200/85 whitespace-nowrap">
-          <span className="text-brand-amber font-semibold">{credits}/{regenTo}</span> free ·{' '}
           <Link
             href={`/register${slug ? `?next=${encodeURIComponent(`/s/${slug}`)}` : ''}`}
             className="text-brand-orange font-semibold hover:text-brand-amber transition-colors"
           >
-            Sign up for more
+            {/* The offer is that replenishment never stops, not a quantity.
+                Guests already start with the host's full allowance, so naming a
+                number ("2/2 free", "unlock all 6") either duplicated the count
+                beside it or described something they already had. What actually
+                runs out is refills: a guest gets two and then none, ever.
+                Wording matches the upgrade modal's "unlimited replenishment". */}
+            Sign up for unlimited credits
           </Link>
         </span>
       )}
