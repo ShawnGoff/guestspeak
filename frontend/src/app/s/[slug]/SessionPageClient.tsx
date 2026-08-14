@@ -18,7 +18,7 @@ interface SessionPageProps {
   params: { slug: string };
 }
 
-type SortOption = 'echoes' | 'recent' | 'answered' | 'starred';
+type SortOption = 'echoes' | 'recent' | 'answered' | 'starred' | 'hidden';
 
 /** Seconds between credit regen ticks — mirrors CREDIT_REGEN_MINUTES on the server. */
 const REGEN_SECS = 10 * 60;
@@ -691,8 +691,22 @@ export default function SessionPageClient({ params }: SessionPageProps) {
   const canMute   = isOwnerLevel || !!(session?.mod_permissions?.can_mute);
   const canRemove = isOwnerLevel || !!(session?.mod_permissions?.can_remove);
 
+  // The Hidden tab only exists for staff in host view. Dropping either — turning
+  // host view off, or losing the role — must not strand them on a tab that is no
+  // longer rendered, showing an empty feed and no way back.
+  useEffect(() => {
+    if (sort === 'hidden' && !(isMod && hostView)) setSort('echoes');
+  }, [sort, isMod, hostView]);
+
   const displayedQuestions = [...questions].filter(q => {
-    if (q.status === 'hidden' && !(isMod && hostView)) return false;
+    // Hidden questions are only ever visible to session staff, and only on the
+    // Hidden tab. They used to sit inline in every tab for a moderator, which
+    // meant something removed from the audience's view still appeared at the top
+    // of the host's feed labelled "TOP QUESTION" — the opposite of what hiding
+    // is for, and easy to mistake for the hide not having worked.
+    if (q.status === 'hidden') return isMod && hostView && sort === 'hidden';
+    if (sort === 'hidden') return false;
+
     // Starred/Answered tabs are filters, not just sort orders
     if (sort === 'starred'  && !searchQuery && q.status !== 'starred')  return false;
     if (sort === 'answered' && !searchQuery && q.status !== 'answered') return false;
@@ -918,7 +932,12 @@ export default function SessionPageClient({ params }: SessionPageProps) {
           )}
 
           {/* Sort tabs */}
-          <SortTabs sort={sort} onChange={setSort} />
+          <SortTabs
+            sort={sort}
+            onChange={setSort}
+            showHidden={isMod && hostView}
+            hiddenCount={questions.filter(q => q.status === 'hidden').length}
+          />
 
           <div className="space-y-3 mt-4">
             {/* Featured top question */}
@@ -945,16 +964,18 @@ export default function SessionPageClient({ params }: SessionPageProps) {
             {listQuestions.length === 0 && !featuredQuestion && (
               <div className="text-center py-16 text-purple-200/85">
                 <p className="text-4xl mb-3">
-                  {sort === 'starred' ? '★' : sort === 'answered' ? '✓' : '❓'}
+                  {sort === 'starred' ? '★' : sort === 'answered' ? '✓' : sort === 'hidden' ? '🚫' : '❓'}
                 </p>
                 <p className="font-medium">
                   {sort === 'starred'  ? 'No starred questions yet.'   :
                    sort === 'answered' ? 'No answered questions yet.'  :
+                   sort === 'hidden'   ? 'Nothing hidden.'             :
                    'No questions yet.'}
                 </p>
                 <p className="text-sm mt-1">
                   {sort === 'starred'  ? 'Star a question to save it here.' :
                    sort === 'answered' ? 'Questions appear here once marked answered.' :
+                   sort === 'hidden'   ? 'Questions you hide are kept here, out of the audience\u2019s view.' :
                    'Be the first to ask something.'}
                 </p>
               </div>
@@ -1457,10 +1478,20 @@ const SORT_TABS: { value: SortOption; label: string }[] = [
   { value: 'starred',  label: '★ Starred' },
 ];
 
-function SortTabs({ sort, onChange }: { sort: SortOption; onChange: (s: SortOption) => void }) {
+function SortTabs({ sort, onChange, showHidden = false, hiddenCount = 0 }: {
+  sort: SortOption;
+  onChange: (s: SortOption) => void;
+  /** Session staff only — the audience must not learn that hidden content exists. */
+  showHidden?: boolean;
+  hiddenCount?: number;
+}) {
+  const tabs = showHidden
+    ? [...SORT_TABS, { value: 'hidden' as SortOption, label: `🚫 Hidden${hiddenCount ? ` (${hiddenCount})` : ''}` }]
+    : SORT_TABS;
+
   return (
     <div className="flex border-b border-brand-border/60 overflow-x-auto gap-0">
-      {SORT_TABS.map(tab => (
+      {tabs.map(tab => (
         <button
           key={tab.value}
           onClick={() => onChange(tab.value)}
