@@ -750,9 +750,12 @@ export default function SessionPageClient({ params }: SessionPageProps) {
         isMod={isMod}
         hostView={hostView}
         participantCount={participantCount}
-        nextCreditSecs={!isMod && !regenExhausted ? nextCreditSecs : undefined}
+        nextCreditSecs={isMod ? undefined : nextCreditSecs}
         creditCap={CREDIT_CAP}
         regenCap={REGEN_CAP}
+        isRegistered={isRegistered}
+        regenExhausted={regenExhausted}
+        slug={params.slug}
         onToggleHostView={() => setHostView(v => !v)}
         onReport={!isMod ? () => setShowReport(true) : undefined}
       />
@@ -1192,7 +1195,7 @@ export default function SessionPageClient({ params }: SessionPageProps) {
 
 // ─── Session header ───────────────────────────────────────────────────────────
 
-function SessionHeader({ session, isLiveSoon, credits, isMod, hostView, participantCount, nextCreditSecs, creditCap, regenCap, onToggleHostView, onReport }: {
+function SessionHeader({ session, isLiveSoon, credits, isMod, hostView, participantCount, nextCreditSecs, creditCap, regenCap, isRegistered, regenExhausted, slug, onToggleHostView, onReport }: {
   session: Session;
   isLiveSoon: boolean;
   credits: number;
@@ -1202,6 +1205,9 @@ function SessionHeader({ session, isLiveSoon, credits, isMod, hostView, particip
   nextCreditSecs?: number;
   creditCap?: number;
   regenCap?: number;
+  isRegistered?: boolean;
+  regenExhausted?: boolean;
+  slug?: string;
   onToggleHostView: () => void;
   onReport?: () => void;
 }) {
@@ -1237,7 +1243,7 @@ function SessionHeader({ session, isLiveSoon, credits, isMod, hostView, particip
         </div>
 
         <div className="flex-shrink-0 flex flex-col items-end gap-2">
-          {!isMod && <CreditDisplay credits={credits} max={session.credits_per_user} nextCreditSecs={nextCreditSecs} creditCap={creditCap} regenCap={regenCap} />}
+          {!isMod && <CreditDisplay credits={credits} max={session.credits_per_user} nextCreditSecs={nextCreditSecs} creditCap={creditCap} regenCap={regenCap} isRegistered={isRegistered} regenExhausted={regenExhausted} slug={slug} />}
           {isMod && (
             <button
               onClick={onToggleHostView}
@@ -1419,18 +1425,37 @@ function HostControlBar({ session, closing, reopening, deleting, onGoLive, onClo
 
 // ─── Credit display ───────────────────────────────────────────────────────────
 
-function CreditDisplay({ credits, max, nextCreditSecs, creditCap, regenCap }: {
+function CreditDisplay({ credits, max, nextCreditSecs, creditCap, regenCap, isRegistered, regenExhausted, slug }: {
   credits: number;
   max: number;
   nextCreditSecs?: number;
   creditCap?: number;
   regenCap?: number;
+  isRegistered?: boolean;
+  regenExhausted?: boolean;
+  slug?: string;
 }) {
   const cap = creditCap ?? max;
-  // Show countdown whenever any credit has been spent — as soon as you use one, you see when it comes back.
-  const showCountdown = nextCreditSecs !== undefined && credits < cap;
+  const regenTo = regenCap ?? cap;
+
+  // The countdown appears only when a credit is genuinely on its way.
+  //
+  // It used to appear whenever any credit had been spent, measured against the
+  // host's per-user setting rather than the ceiling regeneration actually
+  // refills to. For a guest those differ — a host may grant 6, but regeneration
+  // stops at 2 — so a guest sitting on 5 credits was shown "+1 in 10:00" for a
+  // credit that was never coming, and the timer appeared to restart on every
+  // reload because the server keeps reporting a full interval when nothing is
+  // pending.
+  const regenPending = credits < regenTo && !regenExhausted;
+  const showCountdown = nextCreditSecs !== undefined && regenPending;
   const mins = Math.floor((nextCreditSecs ?? 0) / 60);
   const secs = String((nextCreditSecs ?? 0) % 60).padStart(2, '0');
+
+  // Guests see the free tier stated plainly once they are at or below it. The
+  // empty dots above regenTo are deliberate — they show what an account unlocks
+  // — but on their own they read as credits that are simply missing.
+  const showGuestTier = !isRegistered && credits <= regenTo && !showCountdown;
 
   return (
     <div className="flex items-center gap-1.5">
@@ -1443,6 +1468,17 @@ function CreditDisplay({ credits, max, nextCreditSecs, creditCap, regenCap }: {
       <span className={`text-xs font-bold ${credits > 0 ? 'text-brand-amber' : 'text-purple-200/85'}`}>{credits}</span>
       {showCountdown && (
         <span className="text-xs text-purple-200/90 tabular-nums">+1 in {mins}:{secs}</span>
+      )}
+      {showGuestTier && (
+        <span className="text-xs text-purple-200/85 whitespace-nowrap">
+          <span className="text-brand-amber font-semibold">{credits}/{regenTo}</span> free ·{' '}
+          <Link
+            href={`/register${slug ? `?next=${encodeURIComponent(`/s/${slug}`)}` : ''}`}
+            className="text-brand-orange font-semibold hover:text-brand-amber transition-colors"
+          >
+            Sign up for more
+          </Link>
+        </span>
       )}
     </div>
   );
