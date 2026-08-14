@@ -31,6 +31,18 @@ API = BASE + "/api"
 
 results, notes = [], []
 
+def headers_of(resp):
+    """Lower-case every header name.
+
+    HTTP/2 requires lower-case header names, so a production response returns
+    `strict-transport-security` where a local HTTP/1.1 one returns
+    `Strict-Transport-Security`. dict() over the raw headers keeps whatever the
+    server sent and lookups are case-sensitive, which made these checks pass on
+    localhost and fail against a deployed host for no reason but the protocol.
+    """
+    return {k.lower(): v for k, v in dict(resp.headers).items()}
+
+
 def call(method, path, token=None, body=None, origin=None):
     req = urllib.request.Request(API + path, method=method)
     req.add_header("Content-Type", "application/json")
@@ -43,15 +55,15 @@ def call(method, path, token=None, body=None, origin=None):
         with urllib.request.urlopen(req, data, timeout=30) as r:
             raw = r.read()
             try:
-                return r.status, json.loads(raw or b"{}"), dict(r.headers)
+                return r.status, json.loads(raw or b"{}"), headers_of(r)
             except json.JSONDecodeError:
-                return r.status, {"text": raw.decode(errors="replace")}, dict(r.headers)
+                return r.status, {"text": raw.decode(errors="replace")}, headers_of(r)
     except urllib.error.HTTPError as e:
         raw = e.read()
         try:
-            return e.code, json.loads(raw or b"{}"), dict(e.headers)
+            return e.code, json.loads(raw or b"{}"), headers_of(e)
         except Exception:
-            return e.code, {"text": raw.decode(errors="replace")[:200]}, dict(e.headers)
+            return e.code, {"text": raw.decode(errors="replace")[:200]}, headers_of(e)
     except Exception as e:
         return 0, {"error": f"{type(e).__name__}: {e}"}, {}
 
@@ -68,22 +80,21 @@ print(f"probing {BASE}\n")
 
 # ── Read-only: environment configuration ─────────────────────────────────────
 print("=== environment (creates nothing) ===")
-code, body, hdrs = call("GET", "/../health")
 code, body, hdrs = call("GET", "/auth/me")
 check("unauthenticated request is refused", code == 401, f"got {code}")
 
 _, _, h = call("GET", "/auth/me", origin="https://evil-attacker-site.example")
-acao = h.get("Access-Control-Allow-Origin", "")
+acao = h.get("access-control-allow-origin", "")
 check("CORS does not echo a hostile origin",
       "evil-attacker-site" not in acao,
       f"Access-Control-Allow-Origin was {acao!r} — any site could read authenticated responses")
 check("CORS returns a configured origin", acao.startswith("http"), f"got {acao!r}")
 
-hsts = h.get("Strict-Transport-Security", "")
+hsts = h.get("strict-transport-security", "")
 check("HSTS is set", "max-age" in hsts, f"got {hsts!r}")
-check("x-powered-by is stripped", "X-Powered-By" not in h,
-      f"leaks {h.get('X-Powered-By')!r}")
-check("CSP is set on the API", "Content-Security-Policy" in h, "no CSP header")
+check("x-powered-by is stripped", "x-powered-by" not in h,
+      f"leaks {h.get('x-powered-by')!r}")
+check("CSP is set on the API", "content-security-policy" in h, "no CSP header")
 
 code, body, _ = call("POST", "/auth/login", body=None)
 code, body, _ = call("GET", "/nope-does-not-exist")

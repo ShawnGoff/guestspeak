@@ -150,3 +150,11 @@ Registration is rate limited to 10 per 15 minutes per IP, so wait between runs.
 Dry-run it against localhost first. That is how the malformed-identifier 500 was
 found — `?sessionId=not-a-uuid` returned a server error to any unauthenticated
 caller, and would have buried real 500s once monitoring was added.
+
+One trap worth knowing, because it bit this script: **HTTP/2 header names are
+lower-case**. A local HTTP/1.1 server returns `Strict-Transport-Security`, a
+deployed one returns `strict-transport-security`, and a case-sensitive dict
+lookup silently finds neither. Header checks passed on localhost and reported
+three false failures against production until `headers_of()` normalised them.
+If a check passes locally and fails deployed, suspect the harness before the
+server.
