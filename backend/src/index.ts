@@ -1,4 +1,9 @@
 import 'dotenv/config';
+
+// Before any other import: the SDK instruments modules as they load.
+import { initSentry } from './lib/sentry';
+initSentry();
+
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';

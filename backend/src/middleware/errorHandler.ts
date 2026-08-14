@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { ZodError } from 'zod';
+import { captureServerError } from '../lib/sentry';
 
 export class AppError extends Error {
   constructor(
@@ -52,7 +53,11 @@ export function errorHandler(
     return;
   }
 
+  // Anything reaching here is a genuine server fault: every client mistake is
+  // classified above and returned as a 4xx. Reporting only from this branch is
+  // what keeps the error tracker meaningful — a malformed id is not an incident.
   console.error(err);
+  captureServerError(err, { method: _req.method, path: _req.originalUrl.split('?')[0] });
   res.status(500).json({ error: 'Internal server error' });
 }
 
