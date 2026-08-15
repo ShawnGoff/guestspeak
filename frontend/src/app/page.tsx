@@ -423,8 +423,8 @@ const FEATURES = [
   },
   {
     icon: <CreditIcon />,
-    title: 'Quality over quantity',
-    desc: 'Everyone gets a few questions and Echoes to spend, so people post what they mean — and the real priorities shine through.',
+    title: 'Paced, not rationed',
+    desc: 'Everyone holds a few questions and Echoes at a time and earns one back every ten minutes. Enough friction that people post what they mean — and no ceiling on anyone who stays all day.',
   },
   {
     icon: <MobileIcon />,

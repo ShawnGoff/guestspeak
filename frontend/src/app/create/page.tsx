@@ -270,7 +270,7 @@ export default function CreateSessionPage() {
           <Section title="Credits per person">
             <FormField
               label={`${credits} credit${credits !== 1 ? 's' : ''} — each question or Echo costs 1`}
-              hint="Starting credits per attendee (1–6). Everyone earns +1 credit every 10 minutes — guests cap out after 2 bonus credits; signed-in users keep earning up to the session cap."
+              hint="How many credits each attendee holds at once (1–6). Everyone earns +1 every 10 minutes back up to that number — guests stop after 2 refills; signed-in users keep earning all session."
             >
               <div className="flex items-center gap-4">
                 <input
