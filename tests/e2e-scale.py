@@ -149,6 +149,58 @@ _, hb3 = call("POST", f"/sessions/{sid}/heartbeat", gt)
 check("regen stops at the ceiling of 2", hb3.get("credits_remaining"), 2)
 check("regen reported exhausted", hb3.get("regen_exhausted"), True)
 
+# ── 5. Regen clock baseline ──────────────────────────────────────────────────
+# The regression this exists for: spend everything, reload, and get a credit
+# back instantly. Every check above backdates the clock before asking, which
+# grants under the old rule and the new one alike — so none of them would have
+# caught it coming back. This one leaves joined_at where it is.
+section("5. REGEN CLOCK — a fresh join cannot mint a credit by reloading")
+gt_fresh = guest(sid, "fresh_guy")
+sql(f"UPDATE session_participants SET credits_remaining=0 "
+    f"WHERE session_id='{sid}' AND guest_username='fresh_guy'")
+_, f1 = call("POST", f"/sessions/{sid}/heartbeat", gt_fresh)
+_, f2 = call("POST", f"/sessions/{sid}/heartbeat", gt_fresh)
+check("no credit on the first reload", f1.get("credits_remaining"), 0)
+check("nor on the second", f2.get("credits_remaining"), 0)
+check("regen budget untouched",
+      sql(f"SELECT regen_count FROM session_participants "
+          f"WHERE session_id='{sid}' AND guest_username='fresh_guy'"), "0")
+check("countdown is a real wait, not zero", f1.get("next_credit_secs", 0) > 0, True)
+
+# ── 6. Regen ceiling honours the host's setting ──────────────────────────────
+# credits_per_user used to be an opening balance only: regen walked guests to 2
+# and registered users to 6 no matter what the host asked for. A host who runs a
+# tight room means it.
+section("6. REGEN CEILING — clamped to the host's credits_per_user")
+_, tight = call("POST", "/sessions", host,
+                {"title": "Tight", "visibility": "public", "credits_per_user": 1})
+tid = tight["id"]
+call("POST", f"/sessions/{tid}/go-live", host)
+eligible = ("last_credit_at=NULL, joined_at=NOW() - INTERVAL '11 minutes'")
+
+gt_tight = guest(tid, "tight_guest")
+sql(f"UPDATE session_participants SET credits_remaining=0, {eligible} "
+    f"WHERE session_id='{tid}' AND guest_username='tight_guest'")
+call("POST", f"/sessions/{tid}/heartbeat", gt_tight)
+sql(f"UPDATE session_participants SET {eligible} "
+    f"WHERE session_id='{tid}' AND guest_username='tight_guest'")
+_, g_hb = call("POST", f"/sessions/{tid}/heartbeat", gt_tight)
+check("guest regen stops at the host's 1", g_hb.get("credits_remaining"), 1)
+check("guest told the clamped cap", g_hb.get("regen_cap"), 1)
+
+_, tu = call("POST", "/auth/register", body={
+    "email": f"tu{stamp}@t.com", "username": f"tu{stamp}", "password": "password123"})
+call("POST", f"/sessions/{tid}/join", tu["token"])
+tuid = tu["user"]["id"]
+sql(f"UPDATE session_participants SET credits_remaining=0, {eligible} "
+    f"WHERE session_id='{tid}' AND user_id='{tuid}'")
+call("POST", f"/sessions/{tid}/heartbeat", tu["token"])
+sql(f"UPDATE session_participants SET {eligible} "
+    f"WHERE session_id='{tid}' AND user_id='{tuid}'")
+_, u_hb = call("POST", f"/sessions/{tid}/heartbeat", tu["token"])
+check("registered regen stops at the host's 1", u_hb.get("credits_remaining"), 1)
+check("registered told the clamped cap", u_hb.get("regen_cap"), 1)
+
 print(f"\nRESULT: {sum(results)}/{len(results)} passed",
       "— ALL PASS" if all(results) else "— FAILURES PRESENT")
 # Signal failure to the runner. Printing "FAILURES PRESENT" and exiting 0

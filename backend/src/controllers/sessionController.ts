@@ -577,6 +577,13 @@ const CREDIT_REGEN_MINUTES = 10;
  * who still holds more than the cap (a host may start everyone at up to 6) is
  * simply skipped rather than having their balance pulled down to it.
  *
+ * Both ceilings are clamped to the host's credits_per_user. Without the clamp
+ * that setting was only an opening balance: a host who deliberately ran a tight
+ * room at 1 credit each still watched regen walk registered users to 6 and
+ * guests to 2. Credits are a rate limit, not a budget — you hold up to N and
+ * earn one back every interval, all session long — and N is the host's number,
+ * so it has to bound the refill and not just the first hand-out.
+ *
  * The clock runs from joined_at until the first credit is granted. Treating a
  * NULL last_credit_at as "eligible now" handed out a free credit on the first
  * heartbeat: someone who spent everything and reloaded got one back instantly,
@@ -595,72 +602,87 @@ export async function heartbeat(req: Request, res: Response, next: NextFunction)
     let credits_remaining: number;
     let regen_exhausted = false;
     let next_credit_secs: number = CREDIT_REGEN_MINUTES * 60;
+    let regen_cap: number = USER_CREDIT_CAP;
 
     if (userId) {
       // Registered users: ceiling-based regen up to USER_CREDIT_CAP
       await pool.query(
-        `UPDATE session_participants
-         SET credits_remaining = LEAST(credits_remaining + 1, $1),
+        `UPDATE session_participants p
+         SET credits_remaining = LEAST(p.credits_remaining + 1, LEAST($1, s.credits_per_user)),
              last_credit_at    = NOW()
-         WHERE session_id = $2
-           AND user_id    = $3
-           AND credits_remaining < $1
-           AND COALESCE(last_credit_at, joined_at) < NOW() - INTERVAL '${CREDIT_REGEN_MINUTES} minutes'`,
+         FROM sessions s
+         WHERE s.id = p.session_id
+           AND p.session_id = $2
+           AND p.user_id    = $3
+           AND p.credits_remaining < LEAST($1, s.credits_per_user)
+           AND COALESCE(p.last_credit_at, p.joined_at) < NOW() - INTERVAL '${CREDIT_REGEN_MINUTES} minutes'`,
         [USER_CREDIT_CAP, id, userId],
       );
       const cur = await pool.query(
-        `SELECT credits_remaining,
+        `SELECT p.credits_remaining,
+                LEAST($3, s.credits_per_user) AS regen_cap,
                 CASE
                   -- Nothing is pending while the balance is at the ceiling, so
                   -- report a full interval. Reporting 0 told the client a credit
                   -- was due immediately, and it would ask again, forever.
-                  WHEN credits_remaining >= $3 THEN ${CREDIT_REGEN_MINUTES} * 60
+                  WHEN p.credits_remaining >= LEAST($3, s.credits_per_user)
+                    THEN ${CREDIT_REGEN_MINUTES} * 60
                   ELSE GREATEST(0, EXTRACT(EPOCH FROM (
-                    COALESCE(last_credit_at, joined_at)
+                    COALESCE(p.last_credit_at, p.joined_at)
                     + INTERVAL '${CREDIT_REGEN_MINUTES} minutes' - NOW()
                   ))::int)
                 END AS next_credit_secs
-         FROM session_participants WHERE session_id = $1 AND user_id = $2`,
+         FROM session_participants p
+         JOIN sessions s ON s.id = p.session_id
+         WHERE p.session_id = $1 AND p.user_id = $2`,
         [id, userId, USER_CREDIT_CAP],
       );
       credits_remaining = cur.rows[0]?.credits_remaining ?? 0;
       next_credit_secs  = cur.rows[0]?.next_credit_secs ?? next_credit_secs;
+      regen_cap         = cur.rows[0]?.regen_cap ?? USER_CREDIT_CAP;
     } else {
       // Guests: lifetime cap of GUEST_REGEN_LIMIT regen credits — after that, sign up to get more
       await pool.query(
-        `UPDATE session_participants
-         SET credits_remaining = LEAST(credits_remaining + 1, $4),
+        `UPDATE session_participants p
+         SET credits_remaining = LEAST(p.credits_remaining + 1, LEAST($4, s.credits_per_user)),
              last_credit_at    = NOW(),
-             regen_count       = regen_count + 1
-         WHERE session_id  = $2
-           AND guest_token = $3
-           AND regen_count < $1
-           AND credits_remaining < $4
-           AND COALESCE(last_credit_at, joined_at) < NOW() - INTERVAL '${CREDIT_REGEN_MINUTES} minutes'`,
+             regen_count       = p.regen_count + 1
+         FROM sessions s
+         WHERE s.id = p.session_id
+           AND p.session_id  = $2
+           AND p.guest_token = $3
+           AND p.regen_count < $1
+           AND p.credits_remaining < LEAST($4, s.credits_per_user)
+           AND COALESCE(p.last_credit_at, p.joined_at) < NOW() - INTERVAL '${CREDIT_REGEN_MINUTES} minutes'`,
         [GUEST_REGEN_LIMIT, id, guestToken, GUEST_CREDIT_CAP],
       );
       const cur = await pool.query(
-        `SELECT credits_remaining, regen_count,
+        `SELECT p.credits_remaining, p.regen_count,
+                LEAST($3, s.credits_per_user) AS regen_cap,
                 CASE
                   -- No credit is pending when the guest is at the ceiling or has
                   -- spent their lifetime regen budget. Reporting 0 in those cases
                   -- made the client ask again immediately, in a loop.
-                  WHEN credits_remaining >= $3 OR regen_count >= $4
+                  WHEN p.credits_remaining >= LEAST($3, s.credits_per_user)
+                    OR p.regen_count >= $4
                     THEN ${CREDIT_REGEN_MINUTES} * 60
                   ELSE GREATEST(0, EXTRACT(EPOCH FROM (
-                    COALESCE(last_credit_at, joined_at)
+                    COALESCE(p.last_credit_at, p.joined_at)
                     + INTERVAL '${CREDIT_REGEN_MINUTES} minutes' - NOW()
                   ))::int)
                 END AS next_credit_secs
-         FROM session_participants WHERE session_id = $1 AND guest_token = $2`,
+         FROM session_participants p
+         JOIN sessions s ON s.id = p.session_id
+         WHERE p.session_id = $1 AND p.guest_token = $2`,
         [id, guestToken, GUEST_CREDIT_CAP, GUEST_REGEN_LIMIT],
       );
       credits_remaining = cur.rows[0]?.credits_remaining ?? 0;
       regen_exhausted   = (cur.rows[0]?.regen_count ?? 0) >= GUEST_REGEN_LIMIT;
       next_credit_secs  = cur.rows[0]?.next_credit_secs ?? next_credit_secs;
+      regen_cap         = cur.rows[0]?.regen_cap ?? GUEST_CREDIT_CAP;
     }
 
-    res.json({ credits_remaining, regen_exhausted, next_credit_secs });
+    res.json({ credits_remaining, regen_exhausted, next_credit_secs, regen_cap });
   } catch (err) {
     next(err);
   }

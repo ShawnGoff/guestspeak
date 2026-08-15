@@ -75,10 +75,16 @@ export default function SessionPageClient({ params }: SessionPageProps) {
 
   // Credit regen countdown (seconds until next credit)
   // CREDIT_CAP: dot display — always the host's setting.
-  // REGEN_CAP:  the ceiling the heartbeat will regen to.
-  //             Guests cap at 2 (sign-up incentive); registered users cap at 6.
+  // REGEN_CAP:  the ceiling the heartbeat will regen to. The server reports it,
+  //             because it owns both halves: the per-tier cap (2 for guests as a
+  //             sign-up incentive, 6 for registered) clamped by the host's
+  //             credits_per_user. Duplicating that formula here is how the
+  //             countdown ends up promising a credit that is never coming, so
+  //             the local expression below is only a stand-in for the first
+  //             heartbeat and must stay in step with the server's.
   const CREDIT_CAP  = session?.credits_per_user ?? 3;
-  const REGEN_CAP   = isRegistered ? 6 : 2;
+  const [serverRegenCap, setServerRegenCap] = useState<number>();
+  const REGEN_CAP   = serverRegenCap ?? Math.min(isRegistered ? 6 : 2, CREDIT_CAP);
   // Narrowed out of `session` so effects can depend on the id alone rather than
   // re-running every time any other session field changes.
   const sessionId     = session?.id;
@@ -379,12 +385,13 @@ export default function SessionPageClient({ params }: SessionPageProps) {
     const now = Date.now();
     if (now - lastHeartbeatRef.current < MIN_HEARTBEAT_INTERVAL_MS) return;
     lastHeartbeatRef.current = now;
-    api.post<{ credits_remaining: number; regen_exhausted?: boolean; next_credit_secs?: number }>(
+    api.post<{ credits_remaining: number; regen_exhausted?: boolean; next_credit_secs?: number; regen_cap?: number }>(
       `/sessions/${sessionId}/heartbeat`, {}
     ).then(r => {
       setCredits(r.credits_remaining);
       // Seed the timer from the server's authoritative value so refreshes don't reset the countdown
       if (r.next_credit_secs !== undefined) setNextCreditSecs(r.next_credit_secs);
+      if (r.regen_cap !== undefined) setServerRegenCap(r.regen_cap);
       if (r.regen_exhausted) {
         setRegenExhausted((prev: boolean) => {
           if (!prev) setShowRegenModal(true);
