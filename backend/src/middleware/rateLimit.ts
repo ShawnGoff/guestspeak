@@ -14,22 +14,31 @@ const JWT_SECRET = process.env.JWT_SECRET ?? '';
  * a token to escape their own bucket.
  */
 export function callerKey(req: Request): string {
-  const header = req.headers.authorization;
-  const raw = header?.startsWith('Bearer ') ? header.slice(7) : null;
-
-  if (raw && JWT_SECRET) {
-    try {
-      const payload = jwt.verify(raw, JWT_SECRET) as { userId?: string; guestToken?: string };
-      // Guests are keyed on their guest token, which is capped separately by
-      // guestLimiter and by the per-session IP cap in joinSession.
-      const subject = payload.guestToken ?? payload.userId;
-      if (subject) return `sub:${subject}`;
-    } catch {
-      // Fall through to IP for invalid/expired tokens.
-    }
+  const payload = verifiedPayload(req);
+  if (payload) {
+    // Guests are keyed on their guest token, which is capped separately by
+    // guestLimiter and by the per-session IP cap in joinSession.
+    const subject = payload.guestToken ?? payload.userId;
+    if (subject) return `sub:${subject}`;
   }
 
   return `ip:${normalizeIp(req.ip)}`;
+}
+
+/**
+ * The caller's verified token payload, or null when there isn't a valid one.
+ * HMAC only — no DB round-trip, so this is safe to call on the hot path.
+ */
+function verifiedPayload(req: Request): { userId?: string; guestToken?: string } | null {
+  const header = req.headers.authorization;
+  const raw = header?.startsWith('Bearer ') ? header.slice(7) : null;
+  if (!raw || !JWT_SECRET) return null;
+
+  try {
+    return jwt.verify(raw, JWT_SECRET) as { userId?: string; guestToken?: string };
+  } catch {
+    return null; // invalid/expired tokens fall back to IP keying
+  }
 }
 
 /**
@@ -114,10 +123,39 @@ export const checkUsernameLimiter = rateLimit({
  */
 export const authLimiter = loginLimiter;
 
-/** Question submission — prevent credit farming via rapid posts */
+/**
+ * Question submission — prevent credit farming via rapid posts.
+ *
+ * Two tiers, decided from the token alone so this stays a HMAC check with no
+ * DB round-trip:
+ *
+ *   guests and anonymous callers → 10/min. A guest identity is free to mint,
+ *     so the limiter is doing real work here.
+ *   registered accounts          → 60/min.
+ *
+ * The higher tier is not a hole. An ordinary registered participant is already
+ * bound far below it by the credit economy — they hold at most a handful of
+ * credits and regain one per CREDIT_REGEN_MINUTES — so the limiter was never
+ * what stopped them. The only callers who can actually reach 60 are the ones
+ * exempt from credits: hosts, org owners/admins, and moderators. Leaving them
+ * on 10 meant a host seeding a prepared queue — the podcast case, questions
+ * lined up well before the show — stopped at ten with a message accusing them
+ * of spamming their own session.
+ *
+ * It stays a limit rather than an exemption because this route is optionalAuth
+ * and a stolen host token should not be able to flood a room faster than a
+ * human can respond.
+ */
+const QUESTION_LIMIT_ACCOUNT = 60;
+const QUESTION_LIMIT_ANON    = 10;
+
 export const questionLimiter = rateLimit({
   windowMs: 60_000,
-  max: 10,
+  limit: (req: Request) => {
+    const payload = verifiedPayload(req);
+    const isAccount = Boolean(payload?.userId) && !payload?.guestToken;
+    return isAccount ? QUESTION_LIMIT_ACCOUNT : QUESTION_LIMIT_ANON;
+  },
   keyGenerator: callerKey,
   standardHeaders: true,
   legacyHeaders: false,
