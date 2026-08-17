@@ -10,6 +10,7 @@ import {
   spotlightQuestion,
   addHostReply,
   approveQuestion,
+  updateQuestionBody,
 } from '../controllers/questionController';
 import { requireAuth, optionalAuth } from '../middleware/auth';
 import { questionLimiter, flagLimiter } from '../middleware/rateLimit';
@@ -45,5 +46,9 @@ router.patch('/:id/reply', requireAuth, addHostReply);
 
 // PATCH /api/questions/:id/approve — host/mod approves a pending question
 router.patch('/:id/approve', requireAuth, approveQuestion);
+
+// Author-only correction window. Registered last so the more specific
+// /:id/<action> routes above always win the match.
+router.patch('/:id', optionalAuth, questionLimiter, updateQuestionBody);
 
 export default router;

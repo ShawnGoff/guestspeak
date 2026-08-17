@@ -979,3 +979,85 @@ function transitionToPermColumn(currentStatus: string, nextStatus: string): stri
   };
   return map[nextStatus] ?? 'can_hide'; // fail closed on an unmapped status
 }
+
+/** How long after posting an author may still fix their own wording. */
+const EDIT_WINDOW_SECONDS = 60;
+
+const EditQuestionSchema = z.object({
+  body: z.string().min(1).max(300),
+});
+
+/**
+ * PATCH /api/questions/:id
+ *
+ * Lets the author correct their own question for EDIT_WINDOW_SECONDS after
+ * posting. Nobody else can, including the host: rewriting someone's question
+ * puts words in their mouth, and a host who dislikes the wording can hide it.
+ *
+ * The window is enforced in the UPDATE rather than checked first. A read then a
+ * write leaves a gap where a question can be echoed, approved, or hidden in
+ * between, and the whole point of the deadline is that it is the moment the
+ * words stop being the author's alone.
+ *
+ * Hidden questions are excluded outright. A removed question is not a draft to
+ * revise, and an author must not be able to quietly rewrite one and have it
+ * restored later as something else.
+ */
+export async function updateQuestionBody(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { id } = req.params;
+    const { body } = EditQuestionSchema.parse(req.body);
+    const userId = req.user?.isGuest === false ? req.user.userId : null;
+    const guestToken = req.user?.guestToken ?? null;
+
+    if (!userId && !guestToken) throw new AppError(401, 'Authentication required');
+
+    // Same masking createQuestion applies. Without it the edit window is a way
+    // round the filter: post something clean, then rewrite it into whatever the
+    // list exists to catch.
+    const cleanBody = await filterText(body);
+
+    const result = await pool.query(
+      `UPDATE questions
+          SET body = $1, edited_at = NOW(), updated_at = NOW()
+        WHERE id = $2
+          AND status <> 'hidden'
+          AND created_at > NOW() - INTERVAL '${EDIT_WINDOW_SECONDS} seconds'
+          AND (author_id = $3 OR author_guest_token = $4)
+        RETURNING session_id`,
+      [cleanBody, id, userId, guestToken],
+    );
+
+    // Nothing matched. Work out which rule stopped it so the message is worth
+    // reading — "not found" for someone else's question would be a lie, and
+    // "too late" for a question that never existed would be confusing.
+    if (result.rowCount === 0) {
+      const q = await pool.query(
+        `SELECT author_id, author_guest_token, status,
+                created_at <= NOW() - INTERVAL '${EDIT_WINDOW_SECONDS} seconds' AS expired
+           FROM questions WHERE id = $1`,
+        [id],
+      );
+      const row = q.rows[0];
+      if (!row) throw new AppError(404, 'Question not found');
+      const isAuthor = (userId && row.author_id === userId)
+        || (guestToken && row.author_guest_token === guestToken);
+      if (!isAuthor) throw new AppError(403, 'You can only edit your own question');
+      if (row.status === 'hidden') throw new AppError(409, 'That question is no longer available');
+      if (row.expired) {
+        throw new AppError(409, `Questions can only be edited for ${EDIT_WINDOW_SECONDS} seconds after posting`);
+      }
+      throw new AppError(409, 'That question can no longer be edited');
+    }
+
+    const { session_id } = result.rows[0];
+    const publicQuestion = await fetchPublicQuestion(id, session_id);
+
+    invalidateSession(session_id);
+    broadcast(session_id, { type: 'question:updated', data: publicQuestion });
+
+    res.json(publicQuestion);
+  } catch (err) {
+    next(err);
+  }
+}

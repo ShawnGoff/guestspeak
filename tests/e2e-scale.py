@@ -304,6 +304,61 @@ check("and costs nothing either",
       sql(f"SELECT credits_remaining FROM session_participants "
           f"WHERE session_id='{psid}' AND guest_username='eager'"), "6")
 
+# ── 10. The author's edit window ─────────────────────────────────────────────
+section("10. EDIT — author only, and only for the first minute")
+_, ws = call("POST", "/sessions", host,
+             {"title": "Edit window", "visibility": "public", "credits_per_user": 6})
+wsid = ws["id"]
+call("POST", f"/sessions/{wsid}/go-live", host)
+_, wa = call("POST", "/auth/register", body={
+    "email": f"wa{stamp}@t.com", "username": f"wa{stamp}", "password": "password123"})
+call("POST", f"/sessions/{wsid}/join", wa["token"])
+_, wq = call("POST", "/questions", wa["token"],
+             {"session_id": wsid, "body": "Teh original question with a typo"})
+wqid = wq["id"]
+
+code, edited = call("PATCH", f"/questions/{wqid}", wa["token"],
+                    {"body": "The original question, typo fixed"})
+check("author can fix their own wording", code, 200)
+check("the new body is stored", edited.get("body"), "The original question, typo fixed")
+check("and it is marked as edited",
+      sql(f"SELECT edited_at IS NOT NULL FROM questions WHERE id='{wqid}'"), "t")
+
+gt_snoop = guest(wsid, "not_the_author")
+code2, _ = call("PATCH", f"/questions/{wqid}", gt_snoop, {"body": "Someone else rewriting it"})
+check("a stranger cannot edit it", code2, 403)
+code3, _ = call("PATCH", f"/questions/{wqid}", host, {"body": "The host rewriting it"})
+check("nor can the host", code3, 403)
+check("body survived both attempts",
+      sql(f"SELECT body FROM questions WHERE id='{wqid}'"), "The original question, typo fixed")
+
+# past the deadline
+sql(f"UPDATE questions SET created_at = NOW() - INTERVAL '2 minutes' WHERE id='{wqid}'")
+code4, _ = call("PATCH", f"/questions/{wqid}", wa["token"], {"body": "A late rewrite attempt"})
+check("the window closes after a minute", code4, 409)
+
+# a hidden question is not a draft
+_, hq = call("POST", "/questions", wa["token"], {"session_id": wsid, "body": "This one gets hidden"})
+call("PATCH", f"/questions/{hq['id']}/status", host, {"status": "hidden"})
+code5, _ = call("PATCH", f"/questions/{hq['id']}", wa["token"], {"body": "Quietly rewritten while hidden"})
+check("a hidden question cannot be rewritten", code5, 409)
+
+# createQuestion masks banned words before storing. An edit path that skipped
+# that would be a way round the filter: post clean, then rewrite. The word is
+# read from the seeded list rather than written here.
+banned = sql("SELECT word FROM banned_words LIMIT 1")
+if banned:
+    # Third question from this author inside ten seconds trips the burst
+    # cooldown, which has nothing to do with what is being tested here.
+    sql(f"UPDATE session_participants SET last_question_at = NULL, question_burst = 0 "
+        f"WHERE session_id='{wsid}' AND user_id='{wa['user']['id']}'")
+    fcode, fq = call("POST", "/questions", wa["token"],
+                     {"session_id": wsid, "body": "A clean question for the filter check"})
+    check("filter-check question posted", fcode, 201)
+    call("PATCH", f"/questions/{fq['id']}", wa["token"], {"body": f"Now containing {banned} in it"})
+    check("the edit window is not a filter bypass",
+          banned in sql(f"SELECT body FROM questions WHERE id='{fq['id']}'"), False)
+
 print(f"\nRESULT: {sum(results)}/{len(results)} passed",
       "— ALL PASS" if all(results) else "— FAILURES PRESENT")
 # Signal failure to the runner. Printing "FAILURES PRESENT" and exiting 0
