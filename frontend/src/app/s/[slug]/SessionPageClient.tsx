@@ -84,6 +84,7 @@ export default function SessionPageClient({ params }: SessionPageProps) {
   //             heartbeat and must stay in step with the server's.
   const CREDIT_CAP  = session?.credits_per_user ?? 3;
   const [serverRegenCap, setServerRegenCap] = useState<number>();
+  const [regenPaused, setRegenPaused] = useState(false);
   const REGEN_CAP   = serverRegenCap ?? Math.min(isRegistered ? 6 : 2, CREDIT_CAP);
   // Narrowed out of `session` so effects can depend on the id alone rather than
   // re-running every time any other session field changes.
@@ -385,13 +386,14 @@ export default function SessionPageClient({ params }: SessionPageProps) {
     const now = Date.now();
     if (now - lastHeartbeatRef.current < MIN_HEARTBEAT_INTERVAL_MS) return;
     lastHeartbeatRef.current = now;
-    api.post<{ credits_remaining: number; regen_exhausted?: boolean; next_credit_secs?: number; regen_cap?: number }>(
+    api.post<{ credits_remaining: number; regen_exhausted?: boolean; next_credit_secs?: number; regen_cap?: number; regen_paused?: boolean }>(
       `/sessions/${sessionId}/heartbeat`, {}
     ).then(r => {
       setCredits(r.credits_remaining);
       // Seed the timer from the server's authoritative value so refreshes don't reset the countdown
       if (r.next_credit_secs !== undefined) setNextCreditSecs(r.next_credit_secs);
       if (r.regen_cap !== undefined) setServerRegenCap(r.regen_cap);
+      if (r.regen_paused !== undefined) setRegenPaused(r.regen_paused);
       if (r.regen_exhausted) {
         setRegenExhausted((prev: boolean) => {
           if (!prev) setShowRegenModal(true);
@@ -762,6 +764,7 @@ export default function SessionPageClient({ params }: SessionPageProps) {
         regenCap={REGEN_CAP}
         isRegistered={isRegistered}
         regenExhausted={regenExhausted}
+        regenPaused={regenPaused}
         slug={params.slug}
         onToggleHostView={() => setHostView(v => !v)}
         onReport={!isMod ? () => setShowReport(true) : undefined}
@@ -1202,7 +1205,7 @@ export default function SessionPageClient({ params }: SessionPageProps) {
 
 // ─── Session header ───────────────────────────────────────────────────────────
 
-function SessionHeader({ session, isLiveSoon, credits, isMod, hostView, participantCount, nextCreditSecs, creditCap, regenCap, isRegistered, regenExhausted, slug, onToggleHostView, onReport }: {
+function SessionHeader({ session, isLiveSoon, credits, isMod, hostView, participantCount, nextCreditSecs, creditCap, regenCap, isRegistered, regenExhausted, regenPaused, slug, onToggleHostView, onReport }: {
   session: Session;
   isLiveSoon: boolean;
   credits: number;
@@ -1214,6 +1217,7 @@ function SessionHeader({ session, isLiveSoon, credits, isMod, hostView, particip
   regenCap?: number;
   isRegistered?: boolean;
   regenExhausted?: boolean;
+  regenPaused?: boolean;
   slug?: string;
   onToggleHostView: () => void;
   onReport?: () => void;
@@ -1250,7 +1254,7 @@ function SessionHeader({ session, isLiveSoon, credits, isMod, hostView, particip
         </div>
 
         <div className="flex-shrink-0 flex flex-col items-end gap-2">
-          {!isMod && <CreditDisplay credits={credits} max={session.credits_per_user} nextCreditSecs={nextCreditSecs} creditCap={creditCap} regenCap={regenCap} isRegistered={isRegistered} regenExhausted={regenExhausted} slug={slug} />}
+          {!isMod && <CreditDisplay credits={credits} max={session.credits_per_user} nextCreditSecs={nextCreditSecs} creditCap={creditCap} regenCap={regenCap} isRegistered={isRegistered} regenExhausted={regenExhausted} regenPaused={regenPaused} slug={slug} />}
           {isMod && (
             <button
               onClick={onToggleHostView}
@@ -1432,7 +1436,7 @@ function HostControlBar({ session, closing, reopening, deleting, onGoLive, onClo
 
 // ─── Credit display ───────────────────────────────────────────────────────────
 
-function CreditDisplay({ credits, max, nextCreditSecs, creditCap, regenCap, isRegistered, regenExhausted, slug }: {
+function CreditDisplay({ credits, max, nextCreditSecs, creditCap, regenCap, isRegistered, regenExhausted, regenPaused, slug }: {
   credits: number;
   max: number;
   nextCreditSecs?: number;
@@ -1440,6 +1444,7 @@ function CreditDisplay({ credits, max, nextCreditSecs, creditCap, regenCap, isRe
   regenCap?: number;
   isRegistered?: boolean;
   regenExhausted?: boolean;
+  regenPaused?: boolean;
   slug?: string;
 }) {
   const cap = creditCap ?? max;
@@ -1454,7 +1459,10 @@ function CreditDisplay({ credits, max, nextCreditSecs, creditCap, regenCap, isRe
   // credit that was never coming, and the timer appeared to restart on every
   // reload because the server keeps reporting a full interval when nothing is
   // pending.
-  const regenPending = credits < regenTo && !regenExhausted;
+  // Before the show starts there is nothing on its way: the opening allocation
+  // is all there is until the host goes live, so a countdown here would be
+  // promising a credit that cannot arrive.
+  const regenPending = credits < regenTo && !regenExhausted && !regenPaused;
   const showCountdown = nextCreditSecs !== undefined && regenPending;
   const mins = Math.floor((nextCreditSecs ?? 0) / 60);
   const secs = String((nextCreditSecs ?? 0) % 60).padStart(2, '0');

@@ -264,7 +264,30 @@ export async function goLive(req: Request, res: Response, next: NextFunction) {
     await requireHostOrOrgAdmin(id, req.user!.userId);
 
     const result = await pool.query(
-      `UPDATE sessions SET status = 'live' WHERE id = $1 RETURNING *`,
+      `UPDATE sessions SET status = 'live', went_live_at = NOW() WHERE id = $1 RETURNING *`,
+      [id],
+    );
+
+    // Everyone starts the show level.
+    //
+    // Regeneration is paused until now, so anyone who queued questions in the
+    // run-up would otherwise walk in holding whatever they had left while
+    // someone who ignored the pre-show window starts full — penalising the
+    // early participation the queue exists to encourage.
+    //
+    // Stamping last_credit_at is the other half of the job. Without it the
+    // regen clock still falls back to joined_at, which for a session opened a
+    // week ago is long past the interval, so the first heartbeat after go-live
+    // would hand a credit to the entire audience at once. Setting it here means
+    // the first refill lands ten minutes into the show, for everybody,
+    // deliberately.
+    await pool.query(
+      `UPDATE session_participants p
+          SET credits_remaining = s.credits_per_user,
+              last_credit_at    = NOW()
+         FROM sessions s
+        WHERE s.id = p.session_id
+          AND p.session_id = $1`,
       [id],
     );
 
@@ -603,6 +626,7 @@ export async function heartbeat(req: Request, res: Response, next: NextFunction)
     let regen_exhausted = false;
     let next_credit_secs: number = CREDIT_REGEN_MINUTES * 60;
     let regen_cap: number = USER_CREDIT_CAP;
+    let regen_paused = false;
 
     if (userId) {
       // Registered users: ceiling-based regen up to USER_CREDIT_CAP
@@ -612,6 +636,7 @@ export async function heartbeat(req: Request, res: Response, next: NextFunction)
              last_credit_at    = NOW()
          FROM sessions s
          WHERE s.id = p.session_id
+           AND s.status = 'live'
            AND p.session_id = $2
            AND p.user_id    = $3
            AND p.credits_remaining < LEAST($1, s.credits_per_user)
@@ -621,11 +646,15 @@ export async function heartbeat(req: Request, res: Response, next: NextFunction)
       const cur = await pool.query(
         `SELECT p.credits_remaining,
                 LEAST($3, s.credits_per_user) AS regen_cap,
+                s.status <> 'live' AS regen_paused,
                 CASE
                   -- Nothing is pending while the balance is at the ceiling, so
                   -- report a full interval. Reporting 0 told the client a credit
-                  -- was due immediately, and it would ask again, forever.
-                  WHEN p.credits_remaining >= LEAST($3, s.credits_per_user)
+                  -- was due immediately, and it would ask again, forever. Before
+                  -- go-live nothing is pending either — the allocation is all
+                  -- there is until the show starts.
+                  WHEN s.status <> 'live'
+                    OR p.credits_remaining >= LEAST($3, s.credits_per_user)
                     THEN ${CREDIT_REGEN_MINUTES} * 60
                   ELSE GREATEST(0, EXTRACT(EPOCH FROM (
                     COALESCE(p.last_credit_at, p.joined_at)
@@ -640,6 +669,7 @@ export async function heartbeat(req: Request, res: Response, next: NextFunction)
       credits_remaining = cur.rows[0]?.credits_remaining ?? 0;
       next_credit_secs  = cur.rows[0]?.next_credit_secs ?? next_credit_secs;
       regen_cap         = cur.rows[0]?.regen_cap ?? USER_CREDIT_CAP;
+      regen_paused      = cur.rows[0]?.regen_paused ?? false;
     } else {
       // Guests: lifetime cap of GUEST_REGEN_LIMIT regen credits — after that, sign up to get more
       await pool.query(
@@ -649,6 +679,7 @@ export async function heartbeat(req: Request, res: Response, next: NextFunction)
              regen_count       = p.regen_count + 1
          FROM sessions s
          WHERE s.id = p.session_id
+           AND s.status = 'live'
            AND p.session_id  = $2
            AND p.guest_token = $3
            AND p.regen_count < $1
@@ -659,11 +690,14 @@ export async function heartbeat(req: Request, res: Response, next: NextFunction)
       const cur = await pool.query(
         `SELECT p.credits_remaining, p.regen_count,
                 LEAST($3, s.credits_per_user) AS regen_cap,
+                s.status <> 'live' AS regen_paused,
                 CASE
                   -- No credit is pending when the guest is at the ceiling or has
                   -- spent their lifetime regen budget. Reporting 0 in those cases
-                  -- made the client ask again immediately, in a loop.
-                  WHEN p.credits_remaining >= LEAST($3, s.credits_per_user)
+                  -- made the client ask again immediately, in a loop. Before
+                  -- go-live nothing is pending either.
+                  WHEN s.status <> 'live'
+                    OR p.credits_remaining >= LEAST($3, s.credits_per_user)
                     OR p.regen_count >= $4
                     THEN ${CREDIT_REGEN_MINUTES} * 60
                   ELSE GREATEST(0, EXTRACT(EPOCH FROM (
@@ -680,9 +714,10 @@ export async function heartbeat(req: Request, res: Response, next: NextFunction)
       regen_exhausted   = (cur.rows[0]?.regen_count ?? 0) >= GUEST_REGEN_LIMIT;
       next_credit_secs  = cur.rows[0]?.next_credit_secs ?? next_credit_secs;
       regen_cap         = cur.rows[0]?.regen_cap ?? GUEST_CREDIT_CAP;
+      regen_paused      = cur.rows[0]?.regen_paused ?? false;
     }
 
-    res.json({ credits_remaining, regen_exhausted, next_credit_secs, regen_cap });
+    res.json({ credits_remaining, regen_exhausted, next_credit_secs, regen_cap, regen_paused });
   } catch (err) {
     next(err);
   }

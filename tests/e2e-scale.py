@@ -201,6 +201,40 @@ _, u_hb = call("POST", f"/sessions/{tid}/heartbeat", tu["token"])
 check("registered regen stops at the host's 1", u_hb.get("credits_remaining"), 1)
 check("registered told the clamped cap", u_hb.get("regen_cap"), 1)
 
+# ── 7. Regen pauses until the show is live ───────────────────────────────────
+# A podcast may open a session weeks out. Regen used to run through that whole
+# window, so a listener who joined early could spend, wait ten minutes, and
+# spend again — roughly a thousand times before anyone said a word. The opening
+# allocation is the bound now; the clock only starts at go-live.
+section("7. PRE-SHOW — the allocation is the bound until go-live")
+_, pre = call("POST", "/sessions", host,
+              {"title": "Next week", "visibility": "public", "credits_per_user": 6})
+pid = pre["id"]
+check("session starts upcoming", sql(f"SELECT status FROM sessions WHERE id='{pid}'"), "upcoming")
+
+gt_pre = guest(pid, "early_bird")
+sql(f"UPDATE session_participants SET credits_remaining=0, last_credit_at=NULL, "
+    f"joined_at=NOW() - INTERVAL '7 days' WHERE session_id='{pid}' AND guest_username='early_bird'")
+_, p1 = call("POST", f"/sessions/{pid}/heartbeat", gt_pre)
+check("a week of waiting mints nothing", p1.get("credits_remaining"), 0)
+check("client told regen is paused", p1.get("regen_paused"), True)
+check("and given no countdown to promise one", p1.get("next_credit_secs"), 600)
+
+call("POST", f"/sessions/{pid}/go-live", host)
+check("went_live_at stamped",
+      sql(f"SELECT went_live_at IS NOT NULL FROM sessions WHERE id='{pid}'"), "t")
+check("everyone topped up to the host's allocation",
+      sql(f"SELECT credits_remaining FROM session_participants "
+          f"WHERE session_id='{pid}' AND guest_username='early_bird'"), "6")
+
+# The stale joined_at must not make the whole audience eligible at once the
+# instant the show starts — go-live stamps last_credit_at for exactly this.
+sql(f"UPDATE session_participants SET credits_remaining=0 "
+    f"WHERE session_id='{pid}' AND guest_username='early_bird'")
+_, p2 = call("POST", f"/sessions/{pid}/heartbeat", gt_pre)
+check("no thundering herd at go-live", p2.get("credits_remaining"), 0)
+check("regen running again once live", p2.get("regen_paused"), False)
+
 print(f"\nRESULT: {sum(results)}/{len(results)} passed",
       "— ALL PASS" if all(results) else "— FAILURES PRESENT")
 # Signal failure to the runner. Printing "FAILURES PRESENT" and exiting 0
