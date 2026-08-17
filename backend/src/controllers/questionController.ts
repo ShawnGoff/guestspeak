@@ -361,6 +361,21 @@ export async function updateQuestionStatus(req: Request, res: Response, next: Ne
     // explanation. Scoped to pending -> hidden: hiding an already-published
     // question moderates content the author did get airtime for, and must not
     // pay them back.
+    // Echoers are deliberately not refunded, here or anywhere. This is a
+    // decision, not a gap — the absence of code is easy to mistake for one.
+    //
+    // The rule above is that a credit comes back when the spend never reached
+    // the audience. An echo on a published question did reach it: it moved the
+    // ranking and shaped what the host saw, and the question being removed
+    // later does not undo the signal it already sent. Refunding would also hand
+    // every echoer a credit back the instant a host moderates something, which
+    // is a burst of new questions arriving exactly while they deal with a
+    // problem — and un-hiding would have to charge it all again, against people
+    // who may have spent it by then.
+    //
+    // The question simply disappears from the feed, and the people who echoed
+    // it are not told. That is what every other site does with a removed post,
+    // and the loss here is one credit that comes back on the next regen tick.
     if (current_status === 'pending' && status === 'hidden') {
       await refundQuestionCredit(session_id, author_id, author_guest_token, post_anonymously);
     }
