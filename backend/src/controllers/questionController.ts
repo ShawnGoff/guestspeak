@@ -397,7 +397,8 @@ export async function addEcho(req: Request, res: Response, next: NextFunction) {
     if (!userId && !guestToken) throw new AppError(401, 'Authentication required to Echo');
 
     const qResult = await pool.query(
-      `SELECT q.session_id, q.author_id, q.author_guest_token, s.status
+      `SELECT q.session_id, q.author_id, q.author_guest_token,
+              q.status AS question_status, s.status
        FROM questions q
        JOIN sessions s ON s.id = q.session_id
        WHERE q.id = $1`,
@@ -405,13 +406,24 @@ export async function addEcho(req: Request, res: Response, next: NextFunction) {
     );
     if (!qResult.rows[0]) throw new AppError(404, 'Question not found');
 
-    const { session_id, author_id, author_guest_token, status } = qResult.rows[0];
+    const { session_id, author_id, author_guest_token, question_status, status } = qResult.rows[0];
 
     // A closed session is closed to echoing too. Submission already returned 410
     // here, but echoes did not check at all, so vote counts kept moving after the
     // host ended the session — shifting the ranking underneath a host who had
     // already read the top questions, and drifting from the CSV they exported.
     if (status === 'closed') throw new AppError(410, 'Session is closed');
+
+    // Only what the audience can actually see can be echoed. This checked the
+    // session's status but never the question's, so a credit could be spent on
+    // a question that was hidden or still waiting for approval — invisible in
+    // the feed, but echoable by id. The realistic version is not an attack: a
+    // listener's feed goes stale, the host hides something, and their next tap
+    // buys a vote on a question nobody will ever see. Rejection refunds the
+    // author and has no idea the echoers exist.
+    if (question_status === 'hidden' || question_status === 'pending') {
+      throw new AppError(409, 'That question is no longer available');
+    }
 
     // Prevent self-echo
     if (userId && userId === author_id) throw new AppError(409, 'You cannot Echo your own question');

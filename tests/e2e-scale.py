@@ -267,6 +267,43 @@ check("refund does not push them past it",
       sql(f"SELECT credits_remaining FROM session_participants "
           f"WHERE session_id='{aid}' AND user_id='{auid}'"), "6")
 
+# ── 9. Echoes only reach what the audience can see ───────────────────────────
+# addEcho checked the session's status but never the question's, so a credit
+# could be spent on a hidden or still-unapproved question — invisible in the
+# feed, echoable by id. The realistic path is a stale feed: the host hides
+# something and the next tap buys a vote on a question nobody will see.
+section("9. ECHO — cannot be spent on a hidden or unapproved question")
+_, es = call("POST", "/sessions", host,
+             {"title": "Echo gate", "visibility": "public", "credits_per_user": 6})
+esid = es["id"]
+call("POST", f"/sessions/{esid}/go-live", host)
+_, ea = call("POST", "/auth/register", body={
+    "email": f"ea{stamp}@t.com", "username": f"ea{stamp}", "password": "password123"})
+call("POST", f"/sessions/{esid}/join", ea["token"])
+_, eq = call("POST", "/questions", ea["token"],
+             {"session_id": esid, "body": "A question about to be hidden"})
+gt_echo = guest(esid, "stale_feed")
+call("PATCH", f"/questions/{eq['id']}/status", host, {"status": "hidden"})
+code, _ = call("POST", f"/questions/{eq['id']}/echo", gt_echo)
+check("echoing a hidden question is refused", code, 409)
+check("and costs the listener nothing",
+      sql(f"SELECT credits_remaining FROM session_participants "
+          f"WHERE session_id='{esid}' AND guest_username='stale_feed'"), "6")
+
+_, ps = call("POST", "/sessions", host, {"title": "Echo pending", "visibility": "public",
+                                         "credits_per_user": 6, "requires_approval": True})
+psid = ps["id"]
+call("POST", f"/sessions/{psid}/go-live", host)
+call("POST", f"/sessions/{psid}/join", ea["token"])
+_, pq = call("POST", "/questions", ea["token"],
+             {"session_id": psid, "body": "A question awaiting approval still"})
+gt_pend = guest(psid, "eager")
+code2, _ = call("POST", f"/questions/{pq['id']}/echo", gt_pend)
+check("echoing an unapproved question is refused", code2, 409)
+check("and costs nothing either",
+      sql(f"SELECT credits_remaining FROM session_participants "
+          f"WHERE session_id='{psid}' AND guest_username='eager'"), "6")
+
 print(f"\nRESULT: {sum(results)}/{len(results)} passed",
       "— ALL PASS" if all(results) else "— FAILURES PRESENT")
 # Signal failure to the runner. Printing "FAILURES PRESENT" and exiting 0
