@@ -152,6 +152,8 @@ export interface Question {
   host_replied_at?: string;
   created_at: string;
   updated_at: string;
+  /** Set only when the author corrected their own wording inside the edit window. */
+  edited_at?: string | null;
 }
 
 // ─── Votes / Flags / Moderators ──────────────────────────────────────────────

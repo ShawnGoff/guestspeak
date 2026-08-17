@@ -20,6 +20,9 @@ interface SessionPageProps {
 
 type SortOption = 'echoes' | 'recent' | 'answered' | 'starred' | 'hidden';
 
+/** Seconds an author may still fix their own wording — mirrors EDIT_WINDOW_SECONDS. */
+const EDIT_WINDOW_SECS = 60;
+
 /** Seconds between credit regen ticks — mirrors CREDIT_REGEN_MINUTES on the server. */
 const REGEN_SECS = 10 * 60;
 
@@ -54,6 +57,12 @@ export default function SessionPageClient({ params }: SessionPageProps) {
   const [error, setError]                   = useState<string | null>(null);
   const [echoedIds, setEchoedIds]           = useState<Set<string>>(new Set());
   const [myQuestionIds, setMyQuestionIds]   = useState<Set<string>>(new Set());
+  // Which questions are mine is client-side only, and the edit window is short
+  // enough that an accidental reload would otherwise eat it. Persisted per
+  // session so the button survives a refresh. It is only a hint — the server
+  // enforces authorship, so a stale entry just earns a 403.
+  const [myIdsHydrated, setMyIdsHydrated]   = useState(false);
+  const [nowTs, setNowTs]                   = useState(() => Date.now());
   const [loading, setLoading]               = useState(true);
 
   // Host/mod overlay
@@ -109,6 +118,51 @@ export default function SessionPageClient({ params }: SessionPageProps) {
 
   const similarTimer = useRef<ReturnType<typeof setTimeout>>();
   const sseRef = useRef<EventSource | null>(null);
+
+  // ─── Author edit window ────────────────────────────────────────────────────
+
+  const mineKey = `askaway:mine:${params.slug}`;
+
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem(mineKey);
+      if (raw) setMyQuestionIds(new Set(JSON.parse(raw) as string[]));
+    } catch { /* private mode, quota, corrupt value — the hint is optional */ }
+    setMyIdsHydrated(true);
+  }, [mineKey]);
+
+  useEffect(() => {
+    // Guarded on hydration, and it has to be state rather than a ref. Both
+    // effects run in the same commit on mount, so a ref flipped by the reader
+    // above is already true when this runs — and it would then write the empty
+    // initial set straight over what was just read. State defers this until the
+    // hydrated value has actually landed.
+    if (!myIdsHydrated) return;
+    try {
+      sessionStorage.setItem(mineKey, JSON.stringify([...myQuestionIds]));
+    } catch { /* nothing to do — the button just will not survive a reload */ }
+  }, [myQuestionIds, myIdsHydrated, mineKey]);
+
+  /** Seconds left to edit a question, or 0 when it is not mine or too late. */
+  const editSecondsLeft = useCallback((q: Question) => {
+    if (!myQuestionIds.has(q.id) || q.status === 'hidden') return 0;
+    const elapsed = (nowTs - Date.parse(q.created_at)) / 1000;
+    return Math.max(0, Math.ceil(EDIT_WINDOW_SECS - elapsed));
+  }, [myQuestionIds, nowTs]);
+
+  // Ticks only while something of mine is still editable, so a long feed is not
+  // re-rendering every second for the whole show.
+  useEffect(() => {
+    const anyEditable = questions.some(q => editSecondsLeft(q) > 0);
+    if (!anyEditable) return;
+    const t = setInterval(() => setNowTs(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, [questions, editSecondsLeft]);
+
+  const editQuestion = useCallback(async (id: string, body: string) => {
+    const updated = await api.patch<Question>(`/questions/${id}`, { body });
+    setQuestions(prev => prev.map(q => (q.id === id ? { ...q, ...updated } : q)));
+  }, []);
 
   // The SSE effect must not re-run when `sort` changes — that would drop and
   // rebuild the live connection every time the user flips the sort tabs. A ref
@@ -970,6 +1024,8 @@ export default function SessionPageClient({ params }: SessionPageProps) {
                 onReply={() => { setReplyTarget(featuredQuestion); setReplyText(featuredQuestion.host_reply ?? ''); }}
                 onMute={canMute && featuredQuestion.participant_id && !myQuestionIds.has(featuredQuestion.id) ? () => muteAuthor(featuredQuestion.participant_id!, !!featuredQuestion.author_is_muted) : undefined}
                 onRemove={canRemove && featuredQuestion.participant_id && !myQuestionIds.has(featuredQuestion.id) ? () => removeAuthor(featuredQuestion.participant_id!) : undefined}
+                editSecondsLeft={editSecondsLeft(featuredQuestion)}
+                onEditSave={(body) => editQuestion(featuredQuestion.id, body)}
               />
             )}
 
@@ -1010,6 +1066,8 @@ export default function SessionPageClient({ params }: SessionPageProps) {
                 onReply={() => { setReplyTarget(q); setReplyText(q.host_reply ?? ''); }}
                 onMute={canMute && q.participant_id && !myQuestionIds.has(q.id) ? () => muteAuthor(q.participant_id!, !!q.author_is_muted) : undefined}
                 onRemove={canRemove && q.participant_id && !myQuestionIds.has(q.id) ? () => removeAuthor(q.participant_id!) : undefined}
+                editSecondsLeft={editSecondsLeft(q)}
+                onEditSave={(body) => editQuestion(q.id, body)}
               />
             ))}
           </div>
@@ -1564,20 +1622,118 @@ function SortTabs({ sort, onChange, showHidden = false, hiddenCount = 0 }: {
   );
 }
 
+// ─── Inline edit (shared by both question cards) ──────────────────────────────
+
+/**
+ * The author's correction window. Both cards need identical behaviour and
+ * different body styling, so the logic lives here and each card decides where
+ * to put the form.
+ */
+function useInlineEdit(
+  question: Question,
+  editSecondsLeft: number,
+  onEditSave?: (body: string) => Promise<void>,
+) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft]     = useState(question.body);
+  const [saving, setSaving]   = useState(false);
+  const [error, setError]     = useState<string | null>(null);
+
+  // The deadline can pass mid-edit. Close the form rather than leave a Save
+  // button that can only fail — the server refuses it either way.
+  useEffect(() => {
+    if (editing && editSecondsLeft === 0) setEditing(false);
+  }, [editing, editSecondsLeft]);
+
+  const save = async () => {
+    const next = draft.trim();
+    if (!next || next === question.body) { setEditing(false); return; }
+    setSaving(true);
+    setError(null);
+    try {
+      await onEditSave!(next);
+      setEditing(false);
+    } catch (err: any) {
+      setError(err?.message ?? 'Could not save that change');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return {
+    editing, saving, error, draft, setDraft, save,
+    secondsLeft: editSecondsLeft,
+    canEdit: editSecondsLeft > 0 && !!onEditSave,
+    start:  () => { setDraft(question.body); setError(null); setEditing(true); },
+    cancel: () => { setDraft(question.body); setError(null); setEditing(false); },
+  };
+}
+
+type InlineEdit = ReturnType<typeof useInlineEdit>;
+
+function InlineEditForm({ edit }: { edit: InlineEdit }) {
+  return (
+    <div>
+      <textarea
+        value={edit.draft}
+        onChange={e => edit.setDraft(e.target.value.slice(0, 300))}
+        rows={3}
+        autoFocus
+        disabled={edit.saving}
+        className="w-full bg-brand-bg/60 border border-brand-orange/40 rounded-lg p-2 text-white text-sm leading-relaxed resize-none focus:outline-none focus:border-brand-orange disabled:opacity-60"
+      />
+      <div className="flex items-center gap-2 mt-2 flex-wrap">
+        <button
+          onClick={edit.save}
+          disabled={edit.saving}
+          className="text-xs font-semibold px-3 py-2 rounded-lg bg-brand-orange text-white hover:bg-brand-amber transition-colors disabled:opacity-60"
+        >
+          {edit.saving ? 'Saving…' : 'Save'}
+        </button>
+        <button
+          onClick={edit.cancel}
+          disabled={edit.saving}
+          className="text-xs font-semibold px-3 py-2 rounded-lg border border-brand-border/60 text-purple-200/90 hover:text-white transition-colors disabled:opacity-60"
+        >
+          Cancel
+        </button>
+        <span className="text-xs text-purple-200/70 tabular-nums">{edit.secondsLeft}s left</span>
+        <span className="text-xs text-purple-200/50 ml-auto">{edit.draft.length}/300</span>
+      </div>
+      {edit.error && <p className="text-xs text-red-300 mt-1.5">{edit.error}</p>}
+    </div>
+  );
+}
+
+function EditAffordance({ edit }: { edit: InlineEdit }) {
+  if (!edit.canEdit || edit.editing) return null;
+  return (
+    <button
+      onClick={edit.start}
+      className="text-xs font-semibold text-brand-orange/80 hover:text-brand-amber transition-colors"
+    >
+      Edit · {edit.secondsLeft}s
+    </button>
+  );
+}
+
 // ─── Featured top question card ───────────────────────────────────────────────
 
 function FeaturedQuestionCard({ question, isEchoed, isMine, creditsLeft, onEcho,
   hostView, onStar, onAnswered, onHide, onPin, onSpotlight, onReply,
-  onMute, onRemove }: {
+  onMute, onRemove, editSecondsLeft = 0, onEditSave }: {
   question: Question & { is_pinned?: boolean; is_spotlighted?: boolean };
   isEchoed: boolean; isMine: boolean; creditsLeft: number;
   onEcho: () => void; hostView: boolean;
   onStar: () => void; onAnswered: () => void; onHide: () => void;
   onPin: () => void; onSpotlight: () => void; onReply: () => void;
   onMute?: () => void; onRemove?: () => void;
+  editSecondsLeft?: number;
+  onEditSave?: (body: string) => Promise<void>;
 }) {
   const canEcho = !isEchoed && !isMine && creditsLeft > 0 && question.status !== 'hidden';
   const isSpotlighted = !!question.is_spotlighted;
+  const edit = useInlineEdit(question, editSecondsLeft, onEditSave);
 
   return (
     <div className={`rounded-2xl border p-5 shadow-[0_0_30px_rgba(245,146,30,0.12)] ${
@@ -1597,12 +1753,16 @@ function FeaturedQuestionCard({ question, isEchoed, isMine, creditsLeft, onEcho,
       <div className="flex gap-4 sm:gap-6">
         {/* Body */}
         <div className="flex-1 min-w-0">
-          <p className="text-base sm:text-lg font-bold text-white leading-snug mb-3">{question.body}</p>
+          {edit.editing
+            ? <div className="mb-3"><InlineEditForm edit={edit} /></div>
+            : <p className="text-base sm:text-lg font-bold text-white leading-snug mb-3">{question.body}</p>}
           <div className="flex items-center gap-2 flex-wrap">
             {question.status === 'answered' && (
               <span className="text-xs font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/25 px-2 py-0.5 rounded-full">✓ ANSWERED</span>
             )}
             {isMine && <span className="text-xs text-brand-orange/60 font-medium">Your question</span>}
+            {question.edited_at && <span className="text-xs text-purple-200/50 italic">edited</span>}
+            <EditAffordance edit={edit} />
             {question.author_username && (
               <span className={`text-xs ${question.post_anonymously ? 'text-purple-300/50 italic' : 'text-purple-200/85'}`}>
                 {question.author_username}
@@ -1660,7 +1820,7 @@ function FeaturedQuestionCard({ question, isEchoed, isMine, creditsLeft, onEcho,
 
 function QuestionCard({ question, isEchoed, isMine, creditsLeft, onEcho,
   hostView, onStar, onAnswered, onHide, onPin, onSpotlight, onReply,
-  onMute, onRemove }: {
+  onMute, onRemove, editSecondsLeft = 0, onEditSave }: {
   question: Question & { is_pinned?: boolean; is_spotlighted?: boolean };
   isEchoed: boolean;
   isMine: boolean;
@@ -1675,8 +1835,11 @@ function QuestionCard({ question, isEchoed, isMine, creditsLeft, onEcho,
   onReply: () => void;
   onMute?: () => void;
   onRemove?: () => void;
+  editSecondsLeft?: number;
+  onEditSave?: (body: string) => Promise<void>;
 }) {
   const canEcho = !isEchoed && !isMine && creditsLeft > 0 && question.status !== 'hidden';
+  const edit = useInlineEdit(question, editSecondsLeft, onEditSave);
   const isSpotlighted = !!question.is_spotlighted;
   const isPinned = !!question.is_pinned;
 
@@ -1698,11 +1861,15 @@ function QuestionCard({ question, isEchoed, isMine, creditsLeft, onEcho,
       <div className="p-4 flex gap-3 items-start">
         {/* Body + meta */}
         <div className="flex-1 min-w-0">
-          <p className="text-white text-sm leading-relaxed break-words">{question.body}</p>
+          {edit.editing
+            ? <InlineEditForm edit={edit} />
+            : <p className="text-white text-sm leading-relaxed break-words">{question.body}</p>}
 
           <div className="flex items-center gap-2 mt-2 flex-wrap">
             {isPinned && <span className="text-xs text-brand-orange font-semibold">📌 Pinned</span>}
             {isMine && <span className="text-xs text-brand-orange/60 font-medium">Your question</span>}
+            {question.edited_at && <span className="text-xs text-purple-200/50 italic">edited</span>}
+            <EditAffordance edit={edit} />
             {question.status === 'starred'  && <span className="text-xs text-yellow-400 font-semibold">★ Starred</span>}
             {question.status === 'answered' && <span className="text-xs text-emerald-400 font-semibold">✓ Answered</span>}
             {question.author_username && (
