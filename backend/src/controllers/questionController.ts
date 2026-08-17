@@ -891,11 +891,18 @@ async function refundQuestionCredit(
     return;
   }
 
+  // Clamped to the host's ceiling. A question sits in the approval queue for as
+  // long as a moderator takes to reach it, and regeneration keeps running in the
+  // meantime — so an author could be back at the cap by the time their question
+  // is rejected, and an unclamped refund pushed them past it. Measured at 7 in a
+  // 6-credit session. Being at the cap already means nothing was lost.
   await pool.query(
-    `UPDATE session_participants
-     SET credits_remaining = credits_remaining + 1,
-         actions_used      = GREATEST(actions_used - 1, 0)
-     WHERE session_id = $1 AND ${col} = $2`,
+    `UPDATE session_participants p
+     SET credits_remaining = LEAST(p.credits_remaining + 1, s.credits_per_user),
+         actions_used      = GREATEST(p.actions_used - 1, 0)
+     FROM sessions s
+     WHERE s.id = p.session_id
+       AND p.session_id = $1 AND p.${col} = $2`,
     [sessionId, val],
   );
 }

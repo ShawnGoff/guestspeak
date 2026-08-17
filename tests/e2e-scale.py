@@ -235,6 +235,38 @@ _, p2 = call("POST", f"/sessions/{pid}/heartbeat", gt_pre)
 check("no thundering herd at go-live", p2.get("credits_remaining"), 0)
 check("regen running again once live", p2.get("regen_paused"), False)
 
+# ── 8. Rejection refund respects the ceiling ─────────────────────────────────
+# A question waits in the approval queue for as long as a moderator takes, and
+# regen keeps running while it waits. An author back at the cap by the time
+# theirs is rejected was pushed past it — 7 credits in a 6-credit session.
+section("8. REFUND — a rejected question's credit cannot exceed the ceiling")
+_, ap = call("POST", "/sessions", host, {"title": "Approval", "visibility": "public",
+                                         "credits_per_user": 6, "requires_approval": True})
+aid = ap["id"]
+call("POST", f"/sessions/{aid}/go-live", host)
+stamp2 = stamp + "b"
+_, au = call("POST", "/auth/register", body={
+    "email": f"ru{stamp2}@t.com", "username": f"ru{stamp2}", "password": "password123"})
+call("POST", f"/sessions/{aid}/join", au["token"])
+auid = au["user"]["id"]
+_, aq = call("POST", "/questions", au["token"],
+             {"session_id": aid, "body": "A question awaiting moderator approval"})
+check("question held for approval",
+      sql(f"SELECT status FROM questions WHERE id='{aq['id']}'"), "pending")
+
+# regen refills them back to the ceiling while it waits
+sql(f"UPDATE session_participants SET last_credit_at=NOW() - INTERVAL '11 minutes' "
+    f"WHERE session_id='{aid}' AND user_id='{auid}'")
+call("POST", f"/sessions/{aid}/heartbeat", au["token"])
+check("author back at the ceiling before the verdict",
+      sql(f"SELECT credits_remaining FROM session_participants "
+          f"WHERE session_id='{aid}' AND user_id='{auid}'"), "6")
+
+call("PATCH", f"/questions/{aq['id']}/status", host, {"status": "hidden"})
+check("refund does not push them past it",
+      sql(f"SELECT credits_remaining FROM session_participants "
+          f"WHERE session_id='{aid}' AND user_id='{auid}'"), "6")
+
 print(f"\nRESULT: {sum(results)}/{len(results)} passed",
       "— ALL PASS" if all(results) else "— FAILURES PRESENT")
 # Signal failure to the runner. Printing "FAILURES PRESENT" and exiting 0
