@@ -359,6 +359,40 @@ if banned:
     check("the edit window is not a filter bypass",
           banned in sql(f"SELECT body FROM questions WHERE id='{fq['id']}'"), False)
 
+# ── 11. The patient idler ────────────────────────────────────────────────────
+# The regen clock fell back to joined_at until the first credit was granted.
+# That is right for someone who spends straight away and wrong for someone who
+# does not: sit at the ceiling past the interval, spend everything, and the
+# fallback is already stale — so the next heartbeat hands a credit straight
+# back. Waiting while you have nothing to regenerate toward is not waiting.
+section("11. PATIENT IDLE — the clock starts when a refill becomes owed")
+_, ps2 = call("POST", "/sessions", host,
+              {"title": "Patience", "visibility": "public", "credits_per_user": 6})
+psid2 = ps2["id"]
+call("POST", f"/sessions/{psid2}/go-live", host)
+_, bait = call("POST", "/questions", host,
+               {"session_id": psid2, "body": "Something for the idler to echo"})
+gt_idle = guest(psid2, "idler")
+W_IDLE = f"WHERE session_id='{psid2}' AND guest_username='idler'"
+
+# Held at the guest ceiling, never spent, long past the interval.
+sql(f"UPDATE session_participants SET credits_remaining=2, last_credit_at=NULL, "
+    f"joined_at=NOW() - INTERVAL '25 minutes' {W_IDLE}")
+_, idle0 = call("POST", f"/sessions/{psid2}/heartbeat", gt_idle)
+check("nothing owed while sitting at the ceiling", idle0.get("credits_remaining"), 2)
+check("so the clock has not started",
+      sql(f"SELECT last_credit_at IS NULL FROM session_participants {W_IDLE}"), "t")
+
+# First drop below the ceiling — this is the moment a refill becomes owed.
+ecode, _ = call("POST", f"/questions/{bait['id']}/echo", gt_idle)
+check("echo accepted", ecode, 200)
+check("clock starts on dropping below the ceiling",
+      sql(f"SELECT last_credit_at IS NOT NULL FROM session_participants {W_IDLE}"), "t")
+
+_, idle1 = call("POST", f"/sessions/{psid2}/heartbeat", gt_idle)
+check("no instant refill for having waited beforehand", idle1.get("credits_remaining"), 1)
+check("and the countdown is a real wait", idle1.get("next_credit_secs", 0) > 500, True)
+
 print(f"\nRESULT: {sum(results)}/{len(results)} passed",
       "— ALL PASS" if all(results) else "— FAILURES PRESENT")
 # Signal failure to the runner. Printing "FAILURES PRESENT" and exiting 0

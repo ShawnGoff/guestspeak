@@ -11,6 +11,9 @@ import { rejectIfBanned } from '../lib/wordFilter';
 import { sendSessionLive } from '../lib/mailer';
 import { feedModeFor, FEED_POLL_INTERVAL_MS } from '../lib/feedPolicy';
 import { envIntMin } from '../lib/env';
+import {
+  GUEST_REGEN_LIMIT, GUEST_CREDIT_CAP, USER_CREDIT_CAP, CREDIT_REGEN_MINUTES,
+} from '../lib/credits';
 
 const CreateSessionSchema = z.object({
   title: z.string().min(1).max(255),
@@ -581,10 +584,6 @@ export async function joinSession(req: Request, res: Response, next: NextFunctio
   }
 }
 
-const GUEST_REGEN_LIMIT  = 2;   // Guests get at most 2 regen credits lifetime per session, then must sign up
-const GUEST_CREDIT_CAP   = 2;   // …and regen never takes a guest above this ceiling
-const USER_CREDIT_CAP    = 6;   // Signed-in users regen up to this ceiling
-const CREDIT_REGEN_MINUTES = 10;
 
 /**
  * POST /api/sessions/:id/heartbeat

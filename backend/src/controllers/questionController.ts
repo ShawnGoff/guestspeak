@@ -7,6 +7,7 @@ import { resolveCallerRole, requireHostOrOrgAdmin, type CallerRole } from '../db
 import { filterText } from '../lib/wordFilter';
 import { createNotificationsForUsers } from './notificationController';
 import { fetchPublicQuestion } from '../lib/questionHelpers';
+import { spendCredit } from '../lib/credits';
 import { cacheKey, getCached, setCached, invalidateSession } from '../lib/feedCache';
 type SortOption = 'echoes' | 'recent' | 'answered' | 'starred';
 
@@ -465,16 +466,11 @@ export async function addEcho(req: Request, res: Response, next: NextFunction) {
 
       // Deduct credit — rolls back everything if user is out
       if (!isElevated) {
-        const spendResult = await client.query(
-          `UPDATE session_participants
-           SET credits_remaining = credits_remaining - 1, actions_used = actions_used + 1
-           WHERE session_id = $1 AND ${col} = $2 AND credits_remaining > 0
-           RETURNING credits_remaining`,
-          [session_id, val],
-        );
-        if (spendResult.rowCount === 0) {
-          await client.query('ROLLBACK');
-          throw new AppError(402, 'No credits remaining');
+        try {
+          await spendCredit(session_id, userId, guestToken, client);
+        } catch (err) {
+          await client.query('ROLLBACK', []);
+          throw err;
         }
       }
 
@@ -934,30 +930,6 @@ async function refundQuestionCredit(
   );
 }
 
-/**
- * Atomically deducts 1 credit. Throws 402 if user is out of credits.
- */
-async function spendCredit(
-  sessionId: string,
-  userId: string | null,
-  guestToken: string | null,
-) {
-  const col = userId ? 'user_id' : 'guest_token';
-  const val = userId ?? guestToken;
-
-  const result = await pool.query(
-    `UPDATE session_participants
-     SET credits_remaining = credits_remaining - 1,
-         actions_used = actions_used + 1
-     WHERE session_id = $1 AND ${col} = $2 AND credits_remaining > 0
-     RETURNING credits_remaining`,
-    [sessionId, val],
-  );
-
-  if (result.rowCount === 0) {
-    throw new AppError(402, 'No credits remaining');
-  }
-}
 
 /**
  * Maps a status transition to the moderator permission it requires.

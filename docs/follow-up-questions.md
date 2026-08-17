@@ -1,6 +1,8 @@
 # Follow-up questions
 
-**Status:** spec, not built. Two product decisions still open (§6).
+**Status:** spec, not built. One product decision still open (§6) — whether a
+free follow-up bypasses the guest sign-up wall. Expiry is settled: 24 hours
+after the session closes.
 
 When a host answers your question, you get to ask one follow-up, free of
 credits. The point is the conversation an answer starts — *"you said X, but what
@@ -137,9 +139,22 @@ voluntarily; a paywall exactly there converts worse and reads as punitive. It
 does not uncap guests, since the host still gates every follow-up. But it does
 soften the funnel, and the funnel is deliberate — so this is a product call.
 
-**Expiry.** Recommendation: none within the session. On a 6am–3pm show people
-are away when their question gets answered, and threading keeps a late follow-up
-readable in context. Let the right die with the session.
+**Expiry.** ~~Recommendation: none within the session.~~ **Decided: 24 hours
+after the session closes.**
+
+Nothing expires while the show is running, so a listener who was away when their
+question got answered still has it when they come back. The window then runs on
+past the close, which is when someone catching up finds out they were answered
+and has a day to respond — and it eventually shuts, so a session cannot be
+reopened months later by a queue of stale follow-ups.
+
+Enforce it against `ends_at`, which `closeSession` already stamps with `NOW()`
+— there is no `closed_at`. Reading the timestamp rather than `status = 'closed'`
+matters because a host who simply walks away never closes anything, and a
+status check would leave the right open forever on an abandoned session. Worth
+deciding what an abandoned session should do, since `ends_at` stays null there
+too: either follow-ups stay open on it, or a session with a past `starts_at` and
+no activity gets swept closed.
 
 ## 7. Build order
 
