@@ -224,6 +224,41 @@ check("HTML claiming image/png rejected", code, 400)
 code, r = upload("evil.html", PNG, "image/png", host)
 check("filename extension ignored", r.get("url", "").endswith(".png"), True)
 
+section("FOLLOWING — an account feature, and the count says so")
+# Guests hold a real users row, so requireAuth let one follow an org: the insert
+# succeeded and the public follower count went up by one for someone the go-live
+# fan-out deliberately skips and whose token dies with their browser.
+fol_host = new_host("fol")
+_, fol_org = call("POST", "/orgs", fol_host,
+                  {"name": f"Radio {stamp}", "slug": f"radio{stamp}"})
+org_id, org_slug = fol_org["id"], fol_org["slug"]
+_, fg = call("POST", "/auth/guest")
+
+check("guest cannot follow a user",
+      call("POST", f"/users/fol{stamp}/follow", fg["token"])[0], 403)
+check("guest cannot follow an org",
+      call("POST", f"/orgs/{org_id}/follow", fg["token"])[0], 403)
+check("anonymous cannot follow an org",
+      call("POST", f"/orgs/{org_id}/follow")[0], 401)
+
+# Rows written before the route was locked must not still inflate the count.
+sql(f"INSERT INTO org_followers (org_id, user_id) "
+    f"SELECT '{org_id}', id FROM users WHERE is_guest = true LIMIT 1 "
+    f"ON CONFLICT DO NOTHING")
+check("a stale guest row is present",
+      sql(f"SELECT count(*) FROM org_followers f JOIN users u ON u.id=f.user_id "
+          f"WHERE f.org_id='{org_id}' AND u.is_guest"), "1")
+_, org_view = call("GET", f"/orgs/{org_slug}")
+check("but the public count ignores it",
+      (org_view.get("org") or org_view).get("follower_count"), 0)
+
+# A registered follower still counts.
+follower = new_host("folb")
+check("registered follow accepted",
+      call("POST", f"/orgs/{org_id}/follow", follower)[0], 200)
+_, org_view2 = call("GET", f"/orgs/{org_slug}")
+check("and is counted", (org_view2.get("org") or org_view2).get("follower_count"), 1)
+
 print(f"\nRESULT: {sum(results)}/{len(results)} passed",
       "— ALL PASS" if all(results) else "— FAILURES PRESENT")
 # Signal failure to the runner. Printing "FAILURES PRESENT" and exiting 0

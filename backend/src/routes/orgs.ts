@@ -44,9 +44,15 @@ router.post('/:id/members', requireAuth, addMember);
 router.delete('/:id/members/:userId', requireAuth, removeMember);
 
 // POST   /api/orgs/:id/follow
-router.post('/:id/follow', requireAuth, followOrg);
-
 // DELETE /api/orgs/:id/follow
-router.delete('/:id/follow', requireAuth, unfollowOrg);
+//
+// requireRegistered, matching user follows. On requireAuth a guest could
+// follow: guests hold a real users row, so the insert succeeded and the org's
+// public follower count went up by one for someone who can never be notified —
+// the go-live fan-out filters is_guest — and whose token disappears with their
+// browser. Following is an account feature; there is nothing to follow with
+// until you have one.
+router.post('/:id/follow', requireRegistered, followOrg);
+router.delete('/:id/follow', requireRegistered, unfollowOrg);
 
 export default router;

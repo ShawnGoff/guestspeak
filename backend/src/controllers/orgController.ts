@@ -98,10 +98,15 @@ export async function getOrg(req: Request, res: Response, next: NextFunction) {
     const callerId = req.user?.isGuest === false ? req.user.userId : null;
 
     const orgResult = await pool.query(
+      // Counts registered followers only, and the join is what enforces it.
+      // The route now refuses guests, but rows created while it did not are
+      // still here, and the count is what the public sees — it should agree
+      // with the go-live fan-out, which has always filtered guests.
       `SELECT o.*,
-              COUNT(DISTINCT of2.user_id)::int AS follower_count
+              COUNT(DISTINCT fu.id)::int AS follower_count
        FROM organizations o
        LEFT JOIN org_followers of2 ON of2.org_id = o.id
+       LEFT JOIN users fu ON fu.id = of2.user_id AND fu.is_guest = false
        WHERE o.slug = $1
        GROUP BY o.id`,
       [slug],
