@@ -36,6 +36,17 @@ first failure rather than leaving a half-applied schema.
 cd backend && DATABASE_URL="<your-connection-string>" npm run migrate
 ```
 
+**Run migrations before the code that needs them reaches production.** Railway
+deploys on push to `main`, so a push containing both a migration and the code
+that reads its column ships the code first, and the gap between the two is an
+outage. It has happened: two additive columns went out ahead of their
+migrations and every question feed returned 500 until the SQL was applied,
+because the projection selected a column the database did not have.
+
+Additive migrations are safe to apply early and unsafe to apply late. Apply
+them, confirm, then push. Rolling the code back does not help if the migration
+is the missing half.
+
 That is the whole process for a fresh database, and the only step needed for
 every migration added from here on. This section deliberately does not list the
 migration files: the previous version enumerated them, fell fifteen behind, and
@@ -49,7 +60,20 @@ everything from `001` — which fails immediately, because `001_initial_schema.s
 uses bare `CREATE TABLE` with no `IF NOT EXISTS`.
 
 Tell the runner what has already been applied, once, before the first
-`npm run migrate` against that database:
+`npm run migrate` against that database.
+
+Generate the list rather than typing it. This section used to enumerate the
+filenames, fell fifteen behind, and silently produced a broken schema for
+anyone following it — then drifted again the moment two more were added:
+
+```bash
+ls database/migrations/*.sql | xargs -n1 basename | sed "s/.*/  ('&'),/"
+```
+
+Paste the output below, **delete the lines for anything not yet applied**, and
+drop the trailing comma on the last one. Anything you leave in is recorded as
+done and will never run; anything you take out runs on the next
+`npm run migrate`.
 
 ```sql
 CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -57,39 +81,27 @@ CREATE TABLE IF NOT EXISTS schema_migrations (
   applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- List every migration already applied by hand, then stop before the first one
--- that has NOT been applied yet. Anything omitted here will run on the next
--- `npm run migrate`.
+-- Matches what 030 does to every other table. The runner owns this one and
+-- owners bypass RLS, so its own reads and writes still work.
+ALTER TABLE schema_migrations ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON schema_migrations FROM anon, authenticated;
+
 INSERT INTO schema_migrations (filename) VALUES
-  ('001_initial_schema.sql'),
-  ('002_password_reset_tokens.sql'),
-  ('003_featured_sessions.sql'),
-  ('004_user_follows.sql'),
-  ('005_flags_unique_constraint.sql'),
-  ('006_guest_username.sql'),
-  ('007_org_location.sql'),
-  ('008_session_online.sql'),
-  ('009_org_categories.sql'),
-  ('010_org_online.sql'),
-  ('011_question_pin.sql'),
-  ('012_question_spotlight.sql'),
-  ('013_banned_words.sql'),
-  ('014_moderation_controls.sql'),
-  ('015_platform_bans_admin.sql'),
-  ('016_anonymous_posts.sql'),
-  ('017_stream_url.sql'),
-  ('018_credit_regen.sql'),
-  ('019_seed_banned_words.sql'),
-  ('020_ip_address.sql'),
-  ('021_token_version.sql'),
-  ('022_guest_regen_count.sql'),
-  ('023_credits_max_6.sql'),
-  ('024_question_burst_limit.sql'),
-  ('025_anon_credits.sql'),
-  ('026_session_reports.sql'),
-  ('027_question_author_snapshot.sql'),
-  ('028_account_deletion.sql'),
-  ('029_push_subscriptions.sql')
+  -- ← generated list goes here
+ON CONFLICT (filename) DO NOTHING;
+```
+
+When you are unsure whether one was applied, test for it instead of guessing.
+A security migration recorded as done that never ran is worse than one that
+runs twice:
+
+```sql
+INSERT INTO schema_migrations (filename)
+SELECT '030_enable_rls.sql'
+ WHERE EXISTS (
+   SELECT 1 FROM pg_tables
+    WHERE schemaname = 'public' AND tablename = 'questions' AND rowsecurity
+ )
 ON CONFLICT (filename) DO NOTHING;
 ```
 

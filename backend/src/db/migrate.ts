@@ -10,12 +10,35 @@ import { pool } from './pool';
 async function runMigrations() {
   const client = await pool.connect();
   try {
-    // Create the tracking table if it doesn't exist
+    // Create the tracking table if it doesn't exist.
+    //
+    // Locked down the same way 030_enable_rls locks every other table. This one
+    // is created here rather than by a migration file, so that migration never
+    // covered it and every database built by the runner had one public table
+    // among the locked ones. It leaks only filenames and dates, but that is a
+    // map of the schema's history handed to anyone holding the anon key.
+    //
+    // No policies, so PostgREST can read nothing. The runner owns the table and
+    // owners bypass RLS, so its own reads and writes are unaffected.
     await client.query(`
       CREATE TABLE IF NOT EXISTS schema_migrations (
         filename   TEXT PRIMARY KEY,
         applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       )
+    `);
+    await client.query('ALTER TABLE schema_migrations ENABLE ROW LEVEL SECURITY');
+    // Roles are absent on a plain Postgres database (local dev, CI), where this
+    // is a no-op rather than a failure.
+    await client.query(`
+      DO $$
+      BEGIN
+        IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN
+          REVOKE ALL ON schema_migrations FROM anon;
+        END IF;
+        IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN
+          REVOKE ALL ON schema_migrations FROM authenticated;
+        END IF;
+      END $$;
     `);
 
     // Find migration files
