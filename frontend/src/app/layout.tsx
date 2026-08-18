@@ -2,7 +2,15 @@ import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import ServiceWorker from '@/components/ServiceWorker';
 
-const SITE_URL = 'https://guestspeak-frontend.vercel.app';
+// The canonical public address, used for metadataBase, the canonical URL and
+// the Open Graph url. Overridable so preview deployments describe themselves
+// rather than pointing every share card at production.
+//
+// This was pinned to the generated guestspeak-frontend.vercel.app hostname. Once
+// that became a redirect to the real domain, every page still advertised it as
+// canonical — telling search engines the site lives at a URL that immediately
+// bounces, which is the damage moving to a real domain is meant to undo.
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://guestspeak.app';
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
