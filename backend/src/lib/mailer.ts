@@ -6,11 +6,35 @@ import nodemailer from 'nodemailer';
  * In production, set SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM.
  */
 
+/** True when real mail can actually be sent. */
+export const mailConfigured = !!process.env.SMTP_HOST;
+
+const IS_PROD = process.env.NODE_ENV === 'production';
+
+/**
+ * Warns once, loudly, if production is running without a mail provider.
+ *
+ * Unconfigured mail does not fail — nodemailer's jsonTransport accepts the
+ * message and reports success — so a deploy with no SMTP tells every user their
+ * reset link is on its way and sends nothing. The only way that surfaces is if
+ * somebody says the button does not work.
+ */
+let warnedNoMail = false;
+function warnIfUnconfigured() {
+  if (mailConfigured || warnedNoMail) return;
+  warnedNoMail = true;
+  const msg = 'SMTP is not configured — password resets and session-live emails '
+    + 'are silently discarded. Set SMTP_HOST/PORT/USER/PASS/FROM.';
+  if (IS_PROD) console.error(`[mailer] ${msg}`);
+  else console.warn(`[mailer] ${msg} (expected in development)`);
+}
+
 function createTransport() {
   const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS } = process.env;
 
   if (!SMTP_HOST) {
-    // Dev mode — use nodemailer's built-in preview (logs to console)
+    warnIfUnconfigured();
+    // Accepts and discards. Dev only — see warnIfUnconfigured.
     return nodemailer.createTransport({ jsonTransport: true });
   }
 
@@ -89,8 +113,14 @@ export async function sendPasswordReset(to: string, resetUrl: string) {
 
   const info = await transport.sendMail(msg);
 
-  // In dev (jsonTransport), log the reset URL so you can use it without real email
-  if (!process.env.SMTP_HOST) {
+  // Print the link so a developer can follow it without a mail provider.
+  //
+  // Gated on NODE_ENV, not on SMTP_HOST. It used to key off the missing host,
+  // which is the same condition in development and in a production deploy that
+  // simply has no mail configured — so production printed working reset links
+  // into the platform logs, where anyone with log access could use them. The
+  // label said [DEV]; the environment was not.
+  if (!IS_PROD && !mailConfigured) {
     console.log('\n📧 [DEV] Password reset email (not actually sent):');
     console.log(`   To: ${to}`);
     console.log(`   Reset URL: ${resetUrl}\n`);
