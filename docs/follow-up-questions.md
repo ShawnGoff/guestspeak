@@ -1,8 +1,6 @@
 # Follow-up questions
 
-**Status:** spec, not built. One product decision still open (§6) — whether a
-free follow-up bypasses the guest sign-up wall. Expiry is settled: 24 hours
-after the session closes.
+**Status:** all decisions made. Being built.
 
 When a host answers your question, you get to ask one follow-up, free of
 credits. The point is the conversation an answer starts — *"you said X, but what
@@ -118,9 +116,15 @@ A follow-up dropped into the flat queue loses the point. Minimum viable:
 - **Asker** — the affordance appears on their own answered question. It should
   read as a reply, not as a new submission, and should say plainly that it is
   free.
-- **Feed payload** — `parent_question_id`, `thread_root_id`, and a
-  `can_follow_up` boolean computed per caller, so the client does not re-derive
-  the permission and drift from the server.
+- **Feed payload** — `parent_question_id` and `thread_root_id`.
+
+  Not `can_follow_up`. It was going to be computed per caller, but the audience
+  feed is cached on a key of session/sort/limit/offset and shared across every
+  reader — a per-caller field would serve one person's flags to everyone. The
+  client derives the affordance instead, from the questions it knows it posted
+  plus `status === 'answered'`, exactly as it already does for "Your question".
+  Drift is harmless here because the server owns the rule: a wrong guess earns
+  a 403, never a free question.
 
 Echoes on follow-ups behave normally.
 
@@ -130,14 +134,20 @@ scatters itself across the feed.
 
 ## 6. Open decisions
 
-**Does a free follow-up bypass the guest wall?** A guest at `regen_exhausted`
-whose question just got answered on air — follow-up, or sign-up prompt?
+**Does a free follow-up bypass the guest wall?** ~~Recommendation: give them
+the follow-up.~~ **Decided: yes, it bypasses.**
 
-Recommendation: give them the follow-up. Being answered is the high point of the
-entire experience and the moment they are most likely to make an account
-voluntarily; a paywall exactly there converts worse and reads as punitive. It
-does not uncap guests, since the host still gates every follow-up. But it does
-soften the funnel, and the funnel is deliberate — so this is a product call.
+A guest sitting at `regen_exhausted` whose question just got answered on air can
+still post their follow-up. Being answered is the high point of the whole
+experience and the moment they are most likely to make an account voluntarily; a
+paywall exactly there converts worse and reads as punitive.
+
+It does not uncap guests. The host gates every follow-up by choosing what to
+answer, so the ceiling is the host's attention rather than a credit balance.
+
+In practice this needs no separate code — follow-ups skip the credit spend
+entirely, so the wall is never consulted. Worth a test that pins it, because a
+later change to how the wall is enforced could reintroduce it by accident.
 
 **Expiry.** ~~Recommendation: none within the session.~~ **Decided: 24 hours
 after the session closes.**

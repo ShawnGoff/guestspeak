@@ -393,6 +393,124 @@ _, idle1 = call("POST", f"/sessions/{psid2}/heartbeat", gt_idle)
 check("no instant refill for having waited beforehand", idle1.get("credits_remaining"), 1)
 check("and the countdown is a real wait", idle1.get("next_credit_secs", 0) > 500, True)
 
+# ── 12. Follow-up questions ──────────────────────────────────────────────────
+# Answered earns one free follow-up, threaded to the question it answers. The
+# right is derived from rows that already exist, so there is no token to
+# double-spend and reopening a question withdraws it.
+section("12. FOLLOW-UP — earned by being answered, not bought")
+_, fs = call("POST", "/sessions", host,
+             {"title": "Follow ups", "visibility": "public", "credits_per_user": 1})
+fsid = fs["id"]
+call("POST", f"/sessions/{fsid}/go-live", host)
+gt_fu = guest(fsid, "follower")
+
+_, q1 = call("POST", "/questions", gt_fu, {"session_id": fsid, "body": "The original question here"})
+check("guest spent their only credit",
+      sql(f"SELECT credits_remaining FROM session_participants "
+          f"WHERE session_id='{fsid}' AND guest_username='follower'"), "0")
+
+# not answered yet
+c, _ = call("POST", "/questions", gt_fu,
+            {"session_id": fsid, "body": "Too early to follow up", "parent_question_id": q1["id"]})
+check("cannot follow up before it is answered", c, 409)
+
+call("PATCH", f"/questions/{q1['id']}/status", host, {"status": "answered"})
+sql(f"UPDATE session_participants SET last_question_at = NULL, question_burst = 0 "
+    f"WHERE session_id='{fsid}' AND guest_username='follower'")
+
+c, f1 = call("POST", "/questions", gt_fu,
+             {"session_id": fsid, "body": "A follow up to the answer", "parent_question_id": q1["id"]})
+check("follow-up accepted with zero credits", c, 201)
+check("and cost nothing",
+      sql(f"SELECT credits_remaining FROM session_participants "
+          f"WHERE session_id='{fsid}' AND guest_username='follower'"), "0")
+check("threaded to its parent",
+      sql(f"SELECT parent_question_id FROM questions WHERE id='{f1['id']}'"), q1["id"])
+check("thread root is the original",
+      sql(f"SELECT thread_root_id FROM questions WHERE id='{f1['id']}'"), q1["id"])
+
+# once only
+sql(f"UPDATE session_participants SET last_question_at = NULL, question_burst = 0 "
+    f"WHERE session_id='{fsid}' AND guest_username='follower'")
+c, _ = call("POST", "/questions", gt_fu,
+            {"session_id": fsid, "body": "Trying to follow up twice", "parent_question_id": q1["id"]})
+check("only one follow-up per answered question", c, 409)
+
+# someone else's question
+gt_other = guest(fsid, "stranger")
+c, _ = call("POST", "/questions", gt_other,
+            {"session_id": fsid, "body": "Following up on someone else", "parent_question_id": q1["id"]})
+check("cannot follow up on another person's question", c, 403)
+
+# chains: answering the follow-up earns another
+call("PATCH", f"/questions/{f1['id']}/status", host, {"status": "answered"})
+sql(f"UPDATE session_participants SET last_question_at = NULL, question_burst = 0 "
+    f"WHERE session_id='{fsid}' AND guest_username='follower'")
+c, f2 = call("POST", "/questions", gt_fu,
+             {"session_id": fsid, "body": "Second follow up in the chain", "parent_question_id": f1["id"]})
+check("answering a follow-up earns another", c, 201)
+check("chain stays flat under the original root",
+      sql(f"SELECT thread_root_id FROM questions WHERE id='{f2['id']}'"), q1["id"])
+
+# ── 13. Follow-up anonymity is inherited ─────────────────────────────────────
+# A named follow-up threaded onto an answered anonymous question would publicly
+# link the account to the anonymous post.
+section("13. FOLLOW-UP — anonymity is inherited, never re-chosen")
+_, au = call("POST", "/auth/register", body={
+    "email": f"anon{stamp}@t.com", "username": f"anon{stamp}", "password": "password123"})
+call("POST", f"/sessions/{fsid}/join", au["token"])
+_, aq = call("POST", "/questions", au["token"],
+             {"session_id": fsid, "body": "An anonymous question", "post_anonymously": True})
+parent_num = sql(f"SELECT anon_number FROM questions WHERE id='{aq['id']}'")
+check("parent is anonymous", sql(f"SELECT post_anonymously FROM questions WHERE id='{aq['id']}'"), "t")
+
+call("PATCH", f"/questions/{aq['id']}/status", host, {"status": "answered"})
+sql(f"UPDATE session_participants SET last_question_at = NULL, question_burst = 0 "
+    f"WHERE session_id='{fsid}' AND user_id='{au['user']['id']}'")
+# deliberately does NOT ask for anonymity — it must be inherited anyway
+c, af = call("POST", "/questions", au["token"],
+             {"session_id": fsid, "body": "Following up, not asking for anon",
+              "parent_question_id": aq["id"]})
+check("follow-up accepted", c, 201)
+check("follow-up is anonymous even though it did not ask",
+      sql(f"SELECT post_anonymously FROM questions WHERE id='{af['id']}'"), "t")
+check("and reuses the parent's number rather than taking a new one",
+      sql(f"SELECT anon_number FROM questions WHERE id='{af['id']}'"), parent_num)
+check("no display name is stored to leak the author",
+      sql(f"SELECT COALESCE(author_display_name,'NULL') FROM questions WHERE id='{af['id']}'"), "NULL")
+
+# ── 14. Follow-up expiry ─────────────────────────────────────────────────────
+section("14. FOLLOW-UP — survives the close, expires a day later")
+# Both questions are asked and answered while the session is still open — an
+# ordinary question after the close is refused, which is the point of the test
+# below rather than a way to set it up.
+# This session runs at one credit each, so top the fixture up between posts —
+# the credit economy is section 4's subject, not this one's.
+RESET_STRANGER = (f"UPDATE session_participants SET credits_remaining = 2, "
+                  f"last_question_at = NULL, question_burst = 0 "
+                  f"WHERE session_id='{fsid}' AND guest_username='stranger'")
+sql(RESET_STRANGER)
+_, cq = call("POST", "/questions", gt_other, {"session_id": fsid, "body": "Question before the close"})
+sql(RESET_STRANGER)
+_, cq2 = call("POST", "/questions", gt_other, {"session_id": fsid, "body": "Second question before the close"})
+call("PATCH", f"/questions/{cq['id']}/status", host, {"status": "answered"})
+call("PATCH", f"/questions/{cq2['id']}/status", host, {"status": "answered"})
+
+call("POST", f"/sessions/{fsid}/close", host)
+sql(RESET_STRANGER)
+c, _ = call("POST", "/questions", gt_other,
+            {"session_id": fsid, "body": "Following up after the close", "parent_question_id": cq["id"]})
+check("still allowed just after the session closes", c, 201)
+
+c, _ = call("POST", "/questions", gt_other, {"session_id": fsid, "body": "An ordinary late question"})
+check("but an ordinary question is refused", c, 410)
+
+sql(f"UPDATE sessions SET ends_at = NOW() - INTERVAL '25 hours' WHERE id='{fsid}'")
+sql(RESET_STRANGER)
+c, _ = call("POST", "/questions", gt_other,
+            {"session_id": fsid, "body": "Following up a day too late", "parent_question_id": cq2["id"]})
+check("refused once the grace window has passed", c, 410)
+
 print(f"\nRESULT: {sum(results)}/{len(results)} passed",
       "— ALL PASS" if all(results) else "— FAILURES PRESENT")
 # Signal failure to the runner. Printing "FAILURES PRESENT" and exiting 0

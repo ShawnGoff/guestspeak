@@ -15,7 +15,12 @@ const CreateQuestionSchema = z.object({
   session_id: z.string().uuid(),
   body: z.string().min(1).max(300),
   post_anonymously: z.boolean().optional(),
+  /** Set to follow up on your own answered question — free, and threaded to it. */
+  parent_question_id: z.string().uuid().optional(),
 });
+
+/** How long after a session closes an earned follow-up can still be posted. */
+const FOLLOW_UP_GRACE_HOURS = 24;
 
 const StatusSchema = z.object({
   status: z.enum(['new', 'starred', 'answered', 'hidden']),
@@ -99,6 +104,7 @@ export async function getQuestions(req: Request, res: Response, next: NextFuncti
     const result = await pool.query(
       `SELECT q.id, q.body, q.status, q.is_pinned, q.is_spotlighted, q.vote_count,
               q.host_reply, q.host_replied_at, q.created_at, q.edited_at,
+              q.parent_question_id, q.thread_root_id,
               q.post_anonymously, q.anon_number,
               -- For anon posts: return "Anon{n}" as the display name; hide real identity from everyone.
               -- Named posts read the snapshot taken at post time, so removing or
@@ -137,7 +143,9 @@ export async function getQuestions(req: Request, res: Response, next: NextFuncti
 
 export async function createQuestion(req: Request, res: Response, next: NextFunction) {
   try {
-    const { session_id, body, post_anonymously: wantsAnon } = CreateQuestionSchema.parse(req.body);
+    const {
+      session_id, body, post_anonymously: wantsAnon, parent_question_id: parentId,
+    } = CreateQuestionSchema.parse(req.body);
     const userId = req.user?.isGuest === false ? req.user.userId : null;
     const guestToken = req.user?.guestToken ?? null;
     // Only registered users can post anonymously — guests are already pseudonymous
@@ -147,12 +155,16 @@ export async function createQuestion(req: Request, res: Response, next: NextFunc
 
     // Verify session is open and accepting questions
     const sessionResult = await pool.query(
-      'SELECT status, submission_cutoff_at, visibility, host_id, requires_approval FROM sessions WHERE id = $1',
+      `SELECT status, submission_cutoff_at, visibility, host_id, requires_approval,
+              ends_at
+         FROM sessions WHERE id = $1`,
       [session_id],
     );
     if (!sessionResult.rows[0]) throw new AppError(404, 'Session not found');
 
-    const { status, submission_cutoff_at, visibility, host_id, requires_approval } = sessionResult.rows[0];
+    const {
+      status, submission_cutoff_at, visibility, host_id, requires_approval, ends_at,
+    } = sessionResult.rows[0];
 
     // Resolve the caller's standing once. Guests can never hold an elevated
     // role, and the host is already known from the session row, so the extra
@@ -166,12 +178,25 @@ export async function createQuestion(req: Request, res: Response, next: NextFunc
       throw new AppError(403, 'This session is private');
     }
 
-    if (status === 'closed') throw new AppError(410, 'Session is closed');
-    if (
-      submission_cutoff_at &&
-      new Date() > new Date(submission_cutoff_at)
-    ) {
-      throw new AppError(403, 'Question submission has closed for this session');
+    // A follow-up outlives both gates below, deliberately. The right is earned
+    // by being answered, and someone answered near the end of a show — or who
+    // only sees it afterwards — would otherwise lose it to a clock they had no
+    // part in. It expires FOLLOW_UP_GRACE_HOURS after the session closed.
+    //
+    // ends_at is the close timestamp (closeSession stamps it, reopen clears
+    // it), so an abandoned session that was never closed leaves it null and the
+    // right stays open — which matches a session that is, as far as anyone can
+    // tell, still running.
+    if (!parentId) {
+      if (status === 'closed') throw new AppError(410, 'Session is closed');
+      if (submission_cutoff_at && new Date() > new Date(submission_cutoff_at)) {
+        throw new AppError(403, 'Question submission has closed for this session');
+      }
+    } else if (ends_at) {
+      const graceEnds = new Date(ends_at).getTime() + FOLLOW_UP_GRACE_HOURS * 3600_000;
+      if (Date.now() > graceEnds) {
+        throw new AppError(410, 'This session closed too long ago to follow up');
+      }
     }
 
     // Everyone running the session — host, org owner/admin, assigned moderator —
@@ -234,10 +259,53 @@ export async function createQuestion(req: Request, res: Response, next: NextFunc
       }
     }
 
+    // A follow-up is earned, not bought. The right is derived from rows that
+    // already exist rather than stored as a token: you may follow up on Q if you
+    // authored Q and Q is answered. Nothing to double-spend, nothing to refund,
+    // and reopening a question quietly withdraws the right because the query
+    // stops matching.
+    //
+    // "Once" is enforced by the unique indexes, not by a check here. Two taps
+    // race through any check-then-insert, and the second would be free.
+    let followUp: { parentId: string; threadRootId: string;
+                    anon: boolean; anonNumber: number | null } | null = null;
+    if (parentId) {
+      const parent = await pool.query(
+        `SELECT id, session_id, status, author_id, author_guest_token,
+                post_anonymously, anon_number, thread_root_id
+           FROM questions WHERE id = $1`,
+        [parentId],
+      );
+      const q = parent.rows[0];
+      if (!q || q.session_id !== session_id) throw new AppError(404, 'Question not found');
+
+      const isAuthor = (userId && q.author_id === userId)
+        || (guestToken && q.author_guest_token === guestToken);
+      if (!isAuthor) throw new AppError(403, 'You can only follow up on your own question');
+      if (q.status !== 'answered') {
+        throw new AppError(409, 'You can follow up once this question has been answered');
+      }
+
+      followUp = {
+        parentId: q.id,
+        // Flat threading: the chain hangs off the original, not off its parent,
+        // so the UI nests one level however long the exchange runs.
+        threadRootId: q.thread_root_id ?? q.id,
+        // Anonymity is inherited, never re-chosen. A named follow-up threaded
+        // onto an answered anonymous question publicly links the account to the
+        // anonymous post — the author did nothing wrong and the feature would
+        // have deanonymised them.
+        anon: q.post_anonymously,
+        anonNumber: q.anon_number,
+      };
+    }
+
     // Deduct 1 credit — anon posts draw from a separate anon_credits pool (no replenishment),
     // regular posts draw from credits_remaining as normal.
-    // Elevated roles are exempt (see above).
-    if (isElevated) {
+    // Elevated roles are exempt (see above), and a follow-up costs nothing —
+    // which is also how it bypasses the guest sign-up wall: the credit balance
+    // is never consulted, so an exhausted guest can still answer back.
+    if (isElevated || followUp) {
       // no credit cost
     } else if (postAnonymously) {
       const col = userId ? 'user_id' : 'guest_token';
@@ -263,9 +331,11 @@ export async function createQuestion(req: Request, res: Response, next: NextFunc
     // and are invisible to the audience until approved.
     const initialStatus = requires_approval ? 'pending' : 'new';
 
-    // For anon posts, atomically claim the next anon number for this session
-    let anonNumber: number | null = null;
-    if (postAnonymously) {
+    // For anon posts, atomically claim the next anon number for this session.
+    // A follow-up reuses the parent's number instead of taking a new one, so a
+    // thread reads as one Anon rather than several.
+    let anonNumber: number | null = followUp?.anonNumber ?? null;
+    if (postAnonymously && !followUp) {
       const counterResult = await pool.query(
         `UPDATE sessions SET anon_counter = anon_counter + 1 WHERE id = $1 RETURNING anon_counter`,
         [session_id],
@@ -277,16 +347,31 @@ export async function createQuestion(req: Request, res: Response, next: NextFunc
     // posted it — not a live lookup. Resolving it later broke when a guest was
     // removed (their participant row is deleted) or renamed (the row is updated),
     // in both cases silently rewriting history on questions already on screen.
-    const authorDisplayName = postAnonymously
+    const isAnon = followUp ? followUp.anon : postAnonymously;
+    const authorDisplayName = isAnon
       ? null
       : await resolveAuthorDisplayName(session_id, userId, guestToken);
 
-    const result = await pool.query(
-      `INSERT INTO questions (session_id, author_id, author_guest_token, body, status, post_anonymously, anon_number, author_display_name)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-       RETURNING id`,
-      [session_id, userId, guestToken, cleanBody, initialStatus, postAnonymously, anonNumber, authorDisplayName],
-    );
+    let result;
+    try {
+      result = await pool.query(
+        `INSERT INTO questions (session_id, author_id, author_guest_token, body, status,
+                                post_anonymously, anon_number, author_display_name,
+                                parent_question_id, thread_root_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+         RETURNING id`,
+        [session_id, userId, guestToken, cleanBody, initialStatus, isAnon, anonNumber,
+         authorDisplayName, followUp?.parentId ?? null, followUp?.threadRootId ?? null],
+      );
+    } catch (err) {
+      // 23505 here is one of the idx_followup_once_* indexes: the follow-up was
+      // already used. The database is the only place that can say so without a
+      // race, which is why it is caught rather than pre-checked.
+      if ((err as { code?: string }).code === '23505' && followUp) {
+        throw new AppError(409, 'You have already followed up on that question');
+      }
+      throw err;
+    }
 
     const newId = result.rows[0].id;
     const publicQuestion = await fetchPublicQuestion(newId, session_id);

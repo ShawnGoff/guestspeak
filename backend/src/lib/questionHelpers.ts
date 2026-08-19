@@ -23,6 +23,7 @@ export async function fetchPublicQuestion(
   const result = await pool.query(
     `SELECT q.id, q.body, q.status, q.is_pinned, q.is_spotlighted, q.vote_count,
             q.host_reply, q.host_replied_at, q.created_at, q.updated_at, q.edited_at,
+q.parent_question_id, q.thread_root_id,
             q.post_anonymously, q.anon_number,
             CASE
               WHEN q.post_anonymously THEN 'Anon' || q.anon_number
