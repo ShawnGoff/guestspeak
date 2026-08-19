@@ -187,7 +187,7 @@ export default function DiscoverPage() {
                 onChange={e => { setJoinCode(e.target.value.toUpperCase()); setJoinError(null); }}
                 placeholder="Have a join code? Enter it here…"
                 maxLength={12}
-                className="w-full bg-brand-bg border border-brand-border rounded-xl pl-9 pr-4 py-2.5 text-sm text-white placeholder-purple-200/30 focus:outline-none focus:border-brand-purple transition-colors font-mono tracking-widest"
+                className="w-full bg-brand-bg border border-brand-border rounded-xl pl-9 pr-4 py-2.5 text-sm text-white focus:outline-none focus:border-brand-purple transition-colors font-mono tracking-widest"
               />
             </div>
             <button
@@ -211,7 +211,7 @@ export default function DiscoverPage() {
                 value={nameQuery}
                 onChange={e => handleNameChange(e.target.value)}
                 placeholder="Search shows &amp; channels…"
-                className="w-full bg-brand-bg border border-brand-border rounded-xl pl-9 pr-4 py-2.5 text-sm text-white placeholder-purple-200/30 focus:outline-none focus:border-brand-purple transition-colors"
+                className="w-full bg-brand-bg border border-brand-border rounded-xl pl-9 pr-4 py-2.5 text-sm text-white focus:outline-none focus:border-brand-purple transition-colors"
               />
             </div>
 
@@ -224,8 +224,8 @@ export default function DiscoverPage() {
                 placeholder={locationStatus === 'granted' ? 'Using your location' : 'City or region…'}
                 className={`w-full bg-brand-bg border border-brand-border rounded-xl pl-9 pr-4 py-2.5 text-sm focus:outline-none focus:border-brand-purple transition-colors ${
                   locationStatus === 'granted'
-                    ? 'text-emerald-400 placeholder-emerald-400/60'
-                    : 'text-white placeholder-purple-200/30'
+                    ? 'text-emerald-400 placeholder-emerald-400/75'
+                    : 'text-white'
                 }`}
               />
             </div>

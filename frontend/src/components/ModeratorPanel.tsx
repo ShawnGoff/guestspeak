@@ -157,8 +157,7 @@ export default function ModeratorPanel({ sessionId, hostId, onClose }: {
                 value={search}
                 onChange={e => onSearchChange(e.target.value)}
                 placeholder="Search by username…"
-                className="w-full bg-brand-bg border border-brand-border rounded-xl px-4 py-2.5 text-white text-sm
-                           placeholder-brand-border/50 focus:outline-none focus:border-brand-purple transition-colors"
+                className="w-full bg-brand-bg border border-brand-border rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:border-brand-purple transition-colors"
               />
 
               {results.length > 0 && !selected && (

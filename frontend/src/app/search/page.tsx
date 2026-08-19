@@ -90,7 +90,7 @@ function SearchPageInner() {
             value={query}
             onChange={e => setQuery(e.target.value)}
             placeholder="Search by username…"
-            className="w-full bg-brand-card border border-brand-border rounded-2xl pl-10 pr-4 py-3 text-white text-sm placeholder-purple-200/30 focus:outline-none focus:border-brand-purple transition-colors"
+            className="w-full bg-brand-card border border-brand-border rounded-2xl pl-10 pr-4 py-3 text-white text-sm focus:outline-none focus:border-brand-purple transition-colors"
           />
           {loading && (
             <span className="absolute right-4 top-1/2 -translate-y-1/2 text-purple-200/60 text-xs">Searching…</span>

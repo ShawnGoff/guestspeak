@@ -184,8 +184,7 @@ export default function GuestUsernameModal({
                   onChange={handleInputChange}
                   placeholder="your_name"
                   maxLength={30}
-                  className="w-full bg-brand-bg border border-brand-border rounded-xl px-4 py-3 text-white text-base
-                             placeholder-white/25 focus:outline-none focus:border-brand-purple transition-colors pr-10"
+                  className="w-full bg-brand-bg border border-brand-border rounded-xl px-4 py-3 text-white text-base focus:outline-none focus:border-brand-purple transition-colors pr-10"
                 />
                 {/* Status icon */}
                 <div className="absolute right-3 top-1/2 -translate-y-1/2">

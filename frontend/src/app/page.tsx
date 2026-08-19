@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 import Footer from '@/components/Footer';
+import JoinByCode from '@/components/JoinByCode';
 
 // ─── Nav ────────────────────────────────────────────────────────────────────
 
@@ -14,6 +15,10 @@ function Nav() {
       <div className="max-w-6xl mx-auto px-4 sm:px-6 flex items-center justify-between h-16">
         <Logo />
         <div className="flex items-center gap-2">
+          {/* Same box as every other page's nav. A code read out on air should
+              land somewhere obvious wherever the listener happens to be, and
+              the home page is where most of them arrive. */}
+          <JoinByCode />
           <Link href="/discover" className="hidden sm:block btn-ghost text-sm py-2 px-4">
             Discover
           </Link>
@@ -281,7 +286,7 @@ function Hero() {
                   placeholder="Enter session code"
                   maxLength={12}
                   className="flex-1 sm:w-48 bg-brand-card border border-brand-border rounded-l-xl px-4 py-3.5
-                             text-white placeholder-brand-border text-sm font-medium
+                             text-white text-sm font-medium
                              focus:outline-none focus:border-brand-purple transition-colors"
                 />
                 <button
@@ -526,7 +531,7 @@ function EarlyAccess() {
                 onChange={e => setEmail(e.target.value)}
                 placeholder="your@email.com"
                 className="flex-1 bg-brand-card border border-brand-border rounded-xl px-4 py-3.5
-                           text-white placeholder-brand-border/60 text-sm
+                           text-white text-sm
                            focus:outline-none focus:border-brand-purple transition-colors"
               />
               <button

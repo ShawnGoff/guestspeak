@@ -987,7 +987,7 @@ function SessionPageInner() {
                       id="ask-input"
                       rows={2}
                       className="w-full bg-brand-bg border border-brand-border rounded-xl px-4 py-3 pr-12
-                                 text-white text-sm placeholder-purple-200/40 resize-none
+                                 text-white text-sm resize-none
                                  focus:outline-none focus:border-brand-purple transition-colors"
                       placeholder="Ask a question…"
                       value={draft}

@@ -159,7 +159,7 @@ export default function DashboardPage() {
                 onChange={e => { setJoinCode(e.target.value.toUpperCase()); setJoinError(null); }}
                 placeholder="Join code"
                 maxLength={10}
-                className="w-28 bg-brand-card border border-brand-border rounded-lg px-3 py-1.5 text-sm text-white font-mono placeholder-purple-200/25 focus:outline-none focus:border-brand-purple transition-colors"
+                className="w-28 bg-brand-card border border-brand-border rounded-lg px-3 py-1.5 text-sm text-white font-mono focus:outline-none focus:border-brand-purple transition-colors"
               />
               <button
                 type="submit"

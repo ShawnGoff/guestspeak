@@ -150,8 +150,7 @@ export default function SettingsPage() {
                       onChange={e => setPrefix(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8))}
                       placeholder="e.g. KGMZ or HDTGM"
                       maxLength={8}
-                      className="flex-1 bg-brand-bg border border-brand-border rounded-xl px-4 py-3 text-white text-sm
-                                 placeholder-brand-border/50 focus:outline-none focus:border-brand-purple transition-colors font-mono tracking-wider"
+                      className="flex-1 bg-brand-bg border border-brand-border rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-brand-purple transition-colors font-mono tracking-wider"
                     />
                     <button
                       type="submit"
@@ -328,7 +327,7 @@ function SettingsField({ label, type, value, onChange, placeholder }: {
         onChange={e => onChange(e.target.value)}
         placeholder={placeholder}
         className="w-full bg-brand-bg border border-brand-border rounded-xl px-4 py-3
-                   text-white text-sm placeholder-brand-border/50
+                   text-white text-sm
                    focus:outline-none focus:border-brand-purple transition-colors"
       />
     </div>

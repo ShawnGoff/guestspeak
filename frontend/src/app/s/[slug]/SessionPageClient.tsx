@@ -951,7 +951,7 @@ export default function SessionPageClient({ params }: SessionPageProps) {
               onChange={e => setSearchQuery(e.target.value)}
               placeholder="Search questions…"
               className="w-full bg-brand-card border border-brand-border rounded-xl pl-9 pr-4 py-3
-                         text-white text-base placeholder-purple-200/40 focus:outline-none focus:border-brand-purple transition-colors"
+                         text-white text-base focus:outline-none focus:border-brand-purple transition-colors"
             />
           </div>
 
@@ -2027,8 +2027,7 @@ function ReplyModal({ question, reply, loading, onChange, onSubmit, onClose }: {
             placeholder="Write your reply…"
             rows={3}
             maxLength={2000}
-            className="w-full bg-brand-bg border border-brand-border rounded-xl px-4 py-3 text-base
-                       placeholder-purple-200/40 resize-none focus:outline-none focus:border-brand-purple transition-colors mb-4"
+            className="w-full bg-brand-bg border border-brand-border rounded-xl px-4 py-3 text-base resize-none focus:outline-none focus:border-brand-purple transition-colors mb-4"
           />
           <div className="flex gap-3 justify-end">
             <button type="button" onClick={onClose} className="btn-ghost text-sm py-2.5 px-4">Cancel</button>
@@ -2096,7 +2095,7 @@ function SubmitBar({ body, setBody, credits, anonCredits, submitting, similarQue
             maxLength={300}
             rows={2}
             className="w-full bg-brand-bg border border-brand-border rounded-xl px-4 py-3 pr-12
-                       text-white text-base placeholder-purple-200/40 resize-none
+                       text-white text-base resize-none
                        focus:outline-none focus:border-brand-purple transition-colors disabled:opacity-40"
           />
           <span className={`absolute right-3 bottom-3 text-xs ${remaining < 50 ? 'text-red-400' : 'text-purple-200/85'}`}>
@@ -2281,7 +2280,7 @@ function RegenUpgradeModal({ slug, onDismiss }: { slug: string; onDismiss: () =>
             onChange={e => setEmail(e.target.value)}
             autoComplete="email"
             required
-            className="w-full bg-brand-bg border border-brand-border rounded-xl px-4 py-3 text-sm text-white placeholder-purple-200/40 focus:outline-none focus:border-brand-purple transition-colors"
+            className="w-full bg-brand-bg border border-brand-border rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-brand-purple transition-colors"
           />
           <input
             type="text"
@@ -2290,7 +2289,7 @@ function RegenUpgradeModal({ slug, onDismiss }: { slug: string; onDismiss: () =>
             onChange={e => setUsername(e.target.value.replace(/[^a-zA-Z0-9_]/g, ''))}
             autoComplete="username"
             required
-            className="w-full bg-brand-bg border border-brand-border rounded-xl px-4 py-3 text-sm text-white placeholder-purple-200/40 focus:outline-none focus:border-brand-purple transition-colors"
+            className="w-full bg-brand-bg border border-brand-border rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-brand-purple transition-colors"
           />
           <input
             type="password"
@@ -2299,7 +2298,7 @@ function RegenUpgradeModal({ slug, onDismiss }: { slug: string; onDismiss: () =>
             onChange={e => setPassword(e.target.value)}
             autoComplete="new-password"
             required
-            className="w-full bg-brand-bg border border-brand-border rounded-xl px-4 py-3 text-sm text-white placeholder-purple-200/40 focus:outline-none focus:border-brand-purple transition-colors"
+            className="w-full bg-brand-bg border border-brand-border rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-brand-purple transition-colors"
           />
 
           {error && <p className="text-red-400 text-xs">{error}</p>}
@@ -2681,7 +2680,7 @@ function ReportSessionModal({ onSubmit, onClose }: {
               onChange={e => setDetails(e.target.value.slice(0, 500))}
               placeholder="Additional details (optional)"
               rows={3}
-              className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-purple-200/40 resize-none focus:outline-none focus:border-brand-orange/50"
+              className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white resize-none focus:outline-none focus:border-brand-orange/50"
             />
             <p className="text-xs text-purple-200/40 text-right mt-0.5">{details.length}/500</p>
           </div>

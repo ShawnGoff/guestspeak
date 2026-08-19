@@ -3,9 +3,11 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useState, useEffect, useRef } from 'react';
+import { api } from '@/lib/api';
 import { getUser, clearAuth } from '@/lib/auth';
 import type { AuthUser } from '@/lib/auth';
 import NotificationBell from './NotificationBell';
+import JoinByCode from './JoinByCode';
 
 const MAX_WIDTH: Record<string, string> = {
   '2xl': 'max-w-2xl',
@@ -110,6 +112,7 @@ export default function AppNav({
 
         {/* Right — page-specific controls + notifications + user settings */}
         <div className="flex items-center gap-3">
+          <JoinByCode />
           {right}
           {user && !user.is_guest && (
             <>

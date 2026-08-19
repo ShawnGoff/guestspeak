@@ -13,6 +13,25 @@
     --amber:        #FFB74D;
     --purple:       #5B21B6;
     --purple-light: #7C3AED;
+
+    /* Placeholder text.
+       One token, because this was previously set per input — twenty-four
+       Tailwind utilities across thirteen files, ranging from /25 to /60, each
+       chosen on its own. Most failed contrast badly: purple-200/30 on the
+       standard field composites to #544768, which is 2.21:1 against its own
+       background where 4.5:1 is the minimum for body text. It read as a
+       disabled field rather than a prompt.
+       #9D91C0 clears 4.5:1 on every surface a field sits on — 6.43:1 on
+       --bg, 5.82:1 on --card, 4.56:1 on --border — while staying far below
+       white value text at 13-18:1, so it still reads as a placeholder. */
+    --placeholder:  #9D91C0;
+  }
+
+  /* Applies to every field. Per-input overrides are how the old values drifted
+     apart, so prefer changing the token above. */
+  input::placeholder,
+  textarea::placeholder {
+    color: var(--placeholder);
   }
 
   * {
@@ -75,7 +94,7 @@
     outline: none;
     transition: border-color 0.15s;
   }
-  .input::placeholder { color: rgba(200,180,255,0.3); }
+  .input::placeholder { color: var(--placeholder); }
   .input:focus { border-color: #5B21B6; }
   .input option { background: #1A0A2E; }
   .input::-webkit-calendar-picker-indicator { filter: invert(0.7); cursor: pointer; }
