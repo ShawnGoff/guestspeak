@@ -165,19 +165,27 @@ export async function getOrg(req: Request, res: Response, next: NextFunction) {
     // and made the cost grow quadratically with channel size.
     const statsResult = await pool.query(
       `SELECT
-         (SELECT COUNT(*)::int FROM sessions s WHERE s.org_id = $1) AS total_sessions,
+         (SELECT COUNT(*)::int FROM sessions s
+           WHERE s.org_id = $1 AND s.visibility = 'public') AS total_sessions,
          (SELECT COUNT(*)::int FROM session_participants sp
             JOIN sessions s ON s.id = sp.session_id
-           WHERE s.org_id = $1) AS total_participants,
+           WHERE s.org_id = $1 AND s.visibility = 'public') AS total_participants,
          (SELECT COUNT(*)::int FROM questions q
             JOIN sessions s ON s.id = q.session_id
-           WHERE s.org_id = $1 AND q.status != 'hidden') AS total_questions,
+           WHERE s.org_id = $1 AND s.visibility = 'public'
+             AND q.status != 'hidden') AS total_questions,
          (SELECT COALESCE(SUM(q.vote_count), 0)::int FROM questions q
             JOIN sessions s ON s.id = q.session_id
-           WHERE s.org_id = $1 AND q.status != 'hidden') AS total_echoes`,
+           WHERE s.org_id = $1 AND s.visibility = 'public'
+             AND q.status != 'hidden') AS total_echoes`,
       [org.id],
     );
 
+    // Everything below is rendered on a channel page anyone can open, so every
+    // query is scoped to public sessions. The two session lists above always
+    // were; these six were not, and between them they published question text
+    // and session titles from private sessions, and the slug of unlisted ones —
+    // which for an unlisted session is the whole of its access control.
     // Top 5 contributors: registered users with most-echoed questions in this channel.
     // Anonymous posts are excluded entirely — counting them toward a named total
     // leaks authorship by arithmetic in a small channel.
@@ -190,7 +198,7 @@ export async function getOrg(req: Request, res: Response, next: NextFunction) {
        FROM questions q
        JOIN sessions s ON s.id = q.session_id
        JOIN users u ON u.id = q.author_id
-       WHERE s.org_id = $1 AND q.status != 'hidden'
+       WHERE s.org_id = $1 AND s.visibility = 'public' AND q.status != 'hidden'
          AND q.author_id IS NOT NULL AND NOT q.post_anonymously
        GROUP BY u.id, u.username
        ORDER BY total_echoes DESC, question_count DESC
@@ -211,6 +219,7 @@ export async function getOrg(req: Request, res: Response, next: NextFunction) {
        JOIN sessions s ON s.id = q.session_id
        LEFT JOIN users u ON u.id = q.author_id AND NOT q.post_anonymously
        WHERE s.org_id = $1
+         AND s.visibility = 'public'
          AND q.status != 'hidden'
          AND q.vote_count > 0
          AND s.status = 'closed'

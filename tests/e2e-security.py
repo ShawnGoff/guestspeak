@@ -259,6 +259,39 @@ check("registered follow accepted",
 _, org_view2 = call("GET", f"/orgs/{org_slug}")
 check("and is counted", (org_view2.get("org") or org_view2).get("follower_count"), 1)
 
+
+# ── Channel pages must not leak private or unlisted sessions ────────────────
+# The two session lists on a channel page were scoped to public sessions; the
+# six aggregate queries beside them were not. Between them they published
+# question text and titles from private sessions, and the slug of unlisted
+# ones — and for an unlisted session the slug is the entire access control.
+section("CHANNEL PAGE — aggregates must not reach past public sessions")
+_, leak_host = call("POST", "/auth/register", body={
+    "email": f"leak{stamp}@t.com", "username": f"leak{stamp}", "password": "password123"})
+_, leak_org = call("POST", "/orgs", leak_host["token"],
+                   {"name": f"Leak {stamp}", "slug": f"leak{stamp}"})
+
+for vis in ("private", "unlisted"):
+    _, ls = call("POST", "/sessions", leak_host["token"], {
+        "title": f"{vis} board meeting", "visibility": vis,
+        "credits_per_user": 6, "org_id": leak_org["id"]})
+    _, lq = call("POST", "/questions", leak_host["token"],
+                 {"session_id": ls["id"], "body": f"Confidential {vis} question"})
+    sql(f"UPDATE questions SET vote_count = 9 WHERE id = '{lq['id']}'")
+    call("POST", f"/sessions/{ls['id']}/close", leak_host["token"])
+
+# No token at all — an anonymous visitor opening the channel page.
+_, page = call("GET", f"/orgs/{leak_org['slug']}")
+st_ = page.get("stats") or {}
+check("no private sessions counted",     st_.get("total_sessions"), 0)
+check("no private questions counted",    st_.get("total_questions"), 0)
+check("no private echoes counted",       st_.get("total_echoes"), 0)
+check("no private participants counted", st_.get("total_participants"), 0)
+check("no question text leaked",         page.get("question_highlights"), [])
+check("no contributors leaked",          page.get("top_contributors"), [])
+check("no sessions listed",              page.get("sessions"), [])
+check("no past sessions listed",         page.get("past_sessions"), [])
+
 print(f"\nRESULT: {sum(results)}/{len(results)} passed",
       "— ALL PASS" if all(results) else "— FAILURES PRESENT")
 # Signal failure to the runner. Printing "FAILURES PRESENT" and exiting 0
