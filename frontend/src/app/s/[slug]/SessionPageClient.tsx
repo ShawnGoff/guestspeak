@@ -178,7 +178,10 @@ export default function SessionPageClient({ params }: SessionPageProps) {
     const created = await api.post<Question>('/questions', {
       session_id: sessionId, body, parent_question_id: parentId,
     });
-    setQuestions(prev => [...prev, created]);
+    // Same guard the SSE handler uses. The broadcast for this question can
+    // arrive before the POST resolves, and appending unconditionally then put
+    // the same row in the list twice.
+    setQuestions(prev => prev.some(x => x.id === created.id) ? prev : [...prev, created]);
     setMyQuestionIds(prev => new Set([...prev, created.id]));
   }, [sessionId]);
 
@@ -1796,6 +1799,9 @@ function FollowUpThread({
   const [draft, setDraft]   = useState('');
   const [busy, setBusy]     = useState(false);
   const [error, setError]   = useState<string | null>(null);
+  // Collapsed by default. Expanded inline, a long thread pushed every other
+  // question down the feed and buried the one people were voting on.
+  const [open, setOpen]     = useState(false);
 
   async function submit() {
     const text = draft.trim();
@@ -1815,24 +1821,41 @@ function FollowUpThread({
 
   return (
     <>
-      {replies.length > 0 && (
-        <div className="mt-3 pl-3 border-l-2 border-brand-purple/40 space-y-2.5">
+      {replies.length > 0 && !open && (
+        <button
+          onClick={() => setOpen(true)}
+          className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-violet-300 hover:text-white transition-colors"
+        >
+          <span aria-hidden>&#8629;</span>
+          {replies.length === 1 ? '1 follow-up' : `${replies.length} follow-ups`}
+          <span className="text-purple-200/60 font-normal">&middot; show</span>
+        </button>
+      )}
+
+      {replies.length > 0 && open && (
+        <div className="mt-3 pl-3 border-l-2 border-violet-400/50 space-y-2.5">
           {replies.map(r => (
             <div key={r.id}>
-              <p className="text-[10px] font-semibold text-brand-purple/80 uppercase tracking-wide mb-0.5">
+              <p className="text-[10px] font-semibold text-violet-300 uppercase tracking-wide mb-0.5">
                 Follow-up
                 {r.status === 'answered' && <span className="ml-1.5 text-emerald-400">\u2713 answered</span>}
               </p>
               <p className="text-sm text-purple-200/90 break-words">{r.body}</p>
             </div>
           ))}
+          <button
+            onClick={() => setOpen(false)}
+            className="text-xs font-semibold text-purple-200/70 hover:text-white transition-colors"
+          >
+            Hide
+          </button>
         </div>
       )}
 
       {canFollowUp && !asking && (
         <button
           onClick={() => setAsking(true)}
-          className="mt-3 text-xs font-semibold text-brand-purple hover:text-white transition-colors"
+          className="mt-3 text-xs font-semibold text-violet-300 hover:text-white transition-colors"
         >
           &#8629; Ask a follow-up &middot; free
         </button>
@@ -1847,7 +1870,7 @@ function FollowUpThread({
             autoFocus
             disabled={busy}
             placeholder="What did that answer leave open?"
-            className="w-full bg-brand-bg/60 border border-brand-purple/40 rounded-lg p-2 text-white text-sm leading-relaxed resize-none focus:outline-none focus:border-brand-purple disabled:opacity-60 placeholder:text-purple-200/45"
+            className="w-full bg-brand-bg/60 border border-brand-purple/40 rounded-lg p-2 text-white text-sm leading-relaxed resize-none focus:outline-none focus:border-brand-purple disabled:opacity-60"
           />
           <div className="flex items-center gap-2 mt-2 flex-wrap">
             <button
