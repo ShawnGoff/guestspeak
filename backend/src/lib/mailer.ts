@@ -6,8 +6,20 @@ import nodemailer from 'nodemailer';
  * In production, set SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM.
  */
 
-/** True when real mail can actually be sent. */
-export const mailConfigured = !!process.env.SMTP_HOST;
+/**
+ * Resend's HTTP API, preferred over SMTP when a key is present.
+ *
+ * SMTP is the reason mail was not arriving at all: Railway could not open a
+ * connection to smtp.resend.com on 465 and every send died with ETIMEDOUT on
+ * CONN. Outbound SMTP ports are routinely filtered by hosting providers —
+ * spam control — and nothing in the application can talk its way past that.
+ * The HTTP API is port 443, which no one blocks, and it is the integration
+ * Resend documents first; SMTP is their compatibility path.
+ */
+const RESEND_API_KEY = process.env.RESEND_API_KEY;
+
+/** True when real mail can actually be sent, by either route. */
+export const mailConfigured = !!(RESEND_API_KEY || process.env.SMTP_HOST);
 
 const IS_PROD = process.env.NODE_ENV === 'production';
 
@@ -23,10 +35,53 @@ let warnedNoMail = false;
 function warnIfUnconfigured() {
   if (mailConfigured || warnedNoMail) return;
   warnedNoMail = true;
-  const msg = 'SMTP is not configured — password resets and session-live emails '
-    + 'are silently discarded. Set SMTP_HOST/PORT/USER/PASS/FROM.';
+  const msg = 'No mail provider is configured — password resets and '
+    + 'session-live emails are silently discarded. Set RESEND_API_KEY '
+    + '(preferred) or SMTP_HOST/PORT/USER/PASS.';
   if (IS_PROD) console.error(`[mailer] ${msg}`);
   else console.warn(`[mailer] ${msg} (expected in development)`);
+}
+
+/** What both senders hand to the delivery layer. */
+interface Message {
+  from: string;
+  to: string;
+  subject: string;
+  text: string;
+  html: string;
+}
+
+/**
+ * Delivers one message by whichever route is configured.
+ *
+ * Resend's HTTP API first, SMTP second, and a no-op third so development
+ * without either still runs. Errors are thrown rather than swallowed — the
+ * callers decide what a failure means, and forgotPassword logs it.
+ */
+async function deliver(msg: Message): Promise<unknown> {
+  if (RESEND_API_KEY) {
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${RESEND_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from: msg.from, to: [msg.to], subject: msg.subject,
+        text: msg.text, html: msg.html,
+      }),
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (!res.ok) {
+      // Resend puts the useful part in the body — an unverified sending domain
+      // or a revoked key both come back as plain 4xx otherwise.
+      const detail = await res.text().catch(() => '');
+      throw new Error(`Resend API ${res.status}: ${detail.slice(0, 300)}`);
+    }
+    return res.json();
+  }
+
+  return createTransport().sendMail(msg);
 }
 
 function createTransport() {
@@ -59,7 +114,7 @@ export async function sendSessionLive(
   opts: { orgName: string; sessionTitle: string; sessionUrl: string },
 ) {
   const { orgName, sessionTitle, sessionUrl } = opts;
-  const transport = createTransport();
+  warnIfUnconfigured();
 
   const msg = {
     from: FROM,
@@ -83,9 +138,9 @@ export async function sendSessionLive(
     `,
   };
 
-  const info = await transport.sendMail(msg);
+  const info = await deliver(msg);
 
-  if (!process.env.SMTP_HOST) {
+  if (!IS_PROD && !mailConfigured) {
     console.log('\n📧 [DEV] Session live email (not actually sent):');
     console.log(`   To: ${to}`);
     console.log(`   Subject: ${msg.subject}`);
@@ -96,7 +151,7 @@ export async function sendSessionLive(
 }
 
 export async function sendPasswordReset(to: string, resetUrl: string) {
-  const transport = createTransport();
+  warnIfUnconfigured();
 
   const msg = {
     from: FROM,
@@ -117,7 +172,7 @@ export async function sendPasswordReset(to: string, resetUrl: string) {
     `,
   };
 
-  const info = await transport.sendMail(msg);
+  const info = await deliver(msg);
 
   // Print the link so a developer can follow it without a mail provider.
   //
