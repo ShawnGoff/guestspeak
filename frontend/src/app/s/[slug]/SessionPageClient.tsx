@@ -160,6 +160,28 @@ export default function SessionPageClient({ params }: SessionPageProps) {
     return () => clearInterval(t);
   }, [questions, editSecondsLeft]);
 
+  /**
+   * Whether this question has a free follow-up waiting on it.
+   *
+   * Derived here rather than sent by the server: the audience feed is cached
+   * and shared between callers, so a per-caller field would poison it. The
+   * server is the enforcer either way — a wrong guess here just earns a 4xx —
+   * and "is it mine" is already worked out client-side the same way.
+   */
+  const canFollowUp = useCallback((q: Question) => (
+    myQuestionIds.has(q.id)
+    && q.status === 'answered'
+    && !questions.some(x => x.parent_question_id === q.id && myQuestionIds.has(x.id))
+  ), [myQuestionIds, questions]);
+
+  const askFollowUp = useCallback(async (parentId: string, body: string) => {
+    const created = await api.post<Question>('/questions', {
+      session_id: sessionId, body, parent_question_id: parentId,
+    });
+    setQuestions(prev => [...prev, created]);
+    setMyQuestionIds(prev => new Set([...prev, created.id]));
+  }, [sessionId]);
+
   const editQuestion = useCallback(async (id: string, body: string) => {
     const updated = await api.patch<Question>(`/questions/${id}`, { body });
     setQuestions(prev => prev.map(q => (q.id === id ? { ...q, ...updated } : q)));
@@ -800,10 +822,23 @@ export default function SessionPageClient({ params }: SessionPageProps) {
   if (!session) return null;
 
   // Separate featured (top) question from the rest
-  const featuredQuestion = sort === 'echoes' && displayedQuestions.length > 0 && !searchQuery
-    ? displayedQuestions[0]
+  // Roots only — a follow-up should never be hoisted out of its thread into the
+  // featured slot, where it would read as a question with no question before it.
+  const featuredQuestion = sort === 'echoes' && !searchQuery
+    ? (displayedQuestions.find(q => !q.parent_question_id) ?? null)
     : null;
-  const listQuestions = featuredQuestion ? displayedQuestions.slice(1) : displayedQuestions;
+  // Follow-ups are rendered inside their thread's root card, so they must not
+  // also appear as loose entries competing on their own echo count — an active
+  // thread would otherwise scatter itself across the feed.
+  // A plain function, not a hook: this sits below the loading/error returns, and
+  // a useCallback here would be called conditionally.
+  const threadReplies = (rootId: string) => questions
+    .filter(q => q.parent_question_id && (q.thread_root_id ?? q.parent_question_id) === rootId)
+    .sort((a, b) => Date.parse(a.created_at) - Date.parse(b.created_at));
+  const rootQuestions = displayedQuestions.filter(q => !q.parent_question_id);
+  const listQuestions = featuredQuestion
+    ? rootQuestions.filter(q => q.id !== featuredQuestion.id)
+    : rootQuestions;
 
   return (
     <div className="min-h-[100dvh] bg-brand-bg flex flex-col">
@@ -1040,6 +1075,9 @@ export default function SessionPageClient({ params }: SessionPageProps) {
                 onRemove={canRemove && featuredQuestion.participant_id && !myQuestionIds.has(featuredQuestion.id) ? () => removeAuthor(featuredQuestion.participant_id!) : undefined}
                 editSecondsLeft={editSecondsLeft(featuredQuestion)}
                 onEditSave={(body) => editQuestion(featuredQuestion.id, body)}
+                canFollowUp={canFollowUp(featuredQuestion)}
+                onFollowUp={(body) => askFollowUp(featuredQuestion.id, body)}
+                replies={threadReplies(featuredQuestion.id)}
               />
             )}
 
@@ -1082,6 +1120,9 @@ export default function SessionPageClient({ params }: SessionPageProps) {
                 onRemove={canRemove && q.participant_id && !myQuestionIds.has(q.id) ? () => removeAuthor(q.participant_id!) : undefined}
                 editSecondsLeft={editSecondsLeft(q)}
                 onEditSave={(body) => editQuestion(q.id, body)}
+                canFollowUp={canFollowUp(q)}
+                onFollowUp={(body) => askFollowUp(q.id, body)}
+                replies={threadReplies(q.id)}
               />
             ))}
           </div>
@@ -1733,9 +1774,109 @@ function EditAffordance({ edit }: { edit: InlineEdit }) {
 
 // ─── Featured top question card ───────────────────────────────────────────────
 
+/**
+ * A question's follow-up thread, and the affordance to add to it.
+ *
+ * Follow-ups render here rather than loose in the feed so the question and what
+ * it provoked are read together — and so an active thread does not scatter
+ * itself across the list competing on its own echo count.
+ *
+ * The button appears only when a follow-up is actually owed: your own question,
+ * answered, and not already followed up. It says "free" because that is the
+ * whole point — being answered should not depend on having credits left.
+ */
+function FollowUpThread({
+  replies, canFollowUp, onFollowUp,
+}: {
+  replies: Question[];
+  canFollowUp: boolean;
+  onFollowUp?: (body: string) => Promise<void>;
+}) {
+  const [asking, setAsking] = useState(false);
+  const [draft, setDraft]   = useState('');
+  const [busy, setBusy]     = useState(false);
+  const [error, setError]   = useState<string | null>(null);
+
+  async function submit() {
+    const text = draft.trim();
+    if (!text || !onFollowUp) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await onFollowUp(text);
+      setDraft('');
+      setAsking(false);
+    } catch (err: any) {
+      setError(err?.message ?? 'Could not post that follow-up');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <>
+      {replies.length > 0 && (
+        <div className="mt-3 pl-3 border-l-2 border-brand-purple/40 space-y-2.5">
+          {replies.map(r => (
+            <div key={r.id}>
+              <p className="text-[10px] font-semibold text-brand-purple/80 uppercase tracking-wide mb-0.5">
+                Follow-up
+                {r.status === 'answered' && <span className="ml-1.5 text-emerald-400">\u2713 answered</span>}
+              </p>
+              <p className="text-sm text-purple-200/90 break-words">{r.body}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {canFollowUp && !asking && (
+        <button
+          onClick={() => setAsking(true)}
+          className="mt-3 text-xs font-semibold text-brand-purple hover:text-white transition-colors"
+        >
+          &#8629; Ask a follow-up &middot; free
+        </button>
+      )}
+
+      {asking && (
+        <div className="mt-3 pl-3 border-l-2 border-brand-purple/40">
+          <textarea
+            value={draft}
+            onChange={e => setDraft(e.target.value.slice(0, 300))}
+            rows={2}
+            autoFocus
+            disabled={busy}
+            placeholder="What did that answer leave open?"
+            className="w-full bg-brand-bg/60 border border-brand-purple/40 rounded-lg p-2 text-white text-sm leading-relaxed resize-none focus:outline-none focus:border-brand-purple disabled:opacity-60 placeholder:text-purple-200/45"
+          />
+          <div className="flex items-center gap-2 mt-2 flex-wrap">
+            <button
+              onClick={submit}
+              disabled={busy || !draft.trim()}
+              className="text-xs font-semibold px-3 py-2 rounded-lg bg-brand-purple text-white hover:bg-brand-purple/80 transition-colors disabled:opacity-40"
+            >
+              {busy ? 'Posting\u2026' : 'Post follow-up'}
+            </button>
+            <button
+              onClick={() => { setAsking(false); setDraft(''); setError(null); }}
+              disabled={busy}
+              className="text-xs font-semibold px-3 py-2 rounded-lg border border-brand-border/60 text-purple-200/90 hover:text-white transition-colors disabled:opacity-60"
+            >
+              Cancel
+            </button>
+            <span className="text-xs text-purple-200/50 ml-auto">{draft.length}/300</span>
+          </div>
+          {error && <p className="text-xs text-red-300 mt-1.5">{error}</p>}
+        </div>
+      )}
+    </>
+  );
+}
+
 function FeaturedQuestionCard({ question, isEchoed, isMine, creditsLeft, onEcho,
   hostView, onStar, onAnswered, onHide, onPin, onSpotlight, onReply,
-  onMute, onRemove, editSecondsLeft = 0, onEditSave }: {
+  onMute, onRemove, editSecondsLeft = 0, onEditSave,
+  canFollowUp = false, onFollowUp, replies = [] }: {
   question: Question & { is_pinned?: boolean; is_spotlighted?: boolean };
   isEchoed: boolean; isMine: boolean; creditsLeft: number;
   onEcho: () => void; hostView: boolean;
@@ -1744,6 +1885,9 @@ function FeaturedQuestionCard({ question, isEchoed, isMine, creditsLeft, onEcho,
   onMute?: () => void; onRemove?: () => void;
   editSecondsLeft?: number;
   onEditSave?: (body: string) => Promise<void>;
+  canFollowUp?: boolean;
+  onFollowUp?: (body: string) => Promise<void>;
+  replies?: Question[];
 }) {
   const canEcho = !isEchoed && !isMine && creditsLeft > 0 && question.status !== 'hidden';
   const isSpotlighted = !!question.is_spotlighted;
@@ -1789,6 +1933,7 @@ function FeaturedQuestionCard({ question, isEchoed, isMine, creditsLeft, onEcho,
               <p className="text-sm text-purple-200/80">{question.host_reply}</p>
             </div>
           )}
+          <FollowUpThread replies={replies} canFollowUp={canFollowUp} onFollowUp={onFollowUp} />
           {hostView && (
             <div className="mt-4 pt-3 border-t border-brand-border/30 space-y-2">
               <div className="flex items-center gap-2">
@@ -1834,7 +1979,8 @@ function FeaturedQuestionCard({ question, isEchoed, isMine, creditsLeft, onEcho,
 
 function QuestionCard({ question, isEchoed, isMine, creditsLeft, onEcho,
   hostView, onStar, onAnswered, onHide, onPin, onSpotlight, onReply,
-  onMute, onRemove, editSecondsLeft = 0, onEditSave }: {
+  onMute, onRemove, editSecondsLeft = 0, onEditSave,
+  canFollowUp = false, onFollowUp, replies = [] }: {
   question: Question & { is_pinned?: boolean; is_spotlighted?: boolean };
   isEchoed: boolean;
   isMine: boolean;
@@ -1851,6 +1997,9 @@ function QuestionCard({ question, isEchoed, isMine, creditsLeft, onEcho,
   onRemove?: () => void;
   editSecondsLeft?: number;
   onEditSave?: (body: string) => Promise<void>;
+  canFollowUp?: boolean;
+  onFollowUp?: (body: string) => Promise<void>;
+  replies?: Question[];
 }) {
   const canEcho = !isEchoed && !isMine && creditsLeft > 0 && question.status !== 'hidden';
   const edit = useInlineEdit(question, editSecondsLeft, onEditSave);
@@ -1900,6 +2049,8 @@ function QuestionCard({ question, isEchoed, isMine, creditsLeft, onEcho,
               <p className="text-sm text-purple-200/80">{question.host_reply}</p>
             </div>
           )}
+
+          <FollowUpThread replies={replies} canFollowUp={canFollowUp} onFollowUp={onFollowUp} />
 
           {/* Mod action buttons */}
           {hostView && (

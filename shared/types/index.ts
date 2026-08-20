@@ -156,6 +156,10 @@ export interface Question {
   updated_at: string;
   /** Set only when the author corrected their own wording inside the edit window. */
   edited_at?: string | null;
+  /** The answered question this one follows up on, if any. */
+  parent_question_id?: string | null;
+  /** The original question at the head of this thread. Null on a root question. */
+  thread_root_id?: string | null;
 }
 
 // ─── Votes / Flags / Moderators ──────────────────────────────────────────────
