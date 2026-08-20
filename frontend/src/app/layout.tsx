@@ -46,6 +46,12 @@ export const metadata: Metadata = {
     statusBarStyle: 'black-translucent',
   },
   icons: {
+    // Declaring `icons` at all overrides Next's app/icon.svg file convention,
+    // so naming only `apple` left the page with no <link rel="icon"> and
+    // browsers fell back to /favicon.ico, which does not exist. The icon was
+    // there and served the whole time; nothing pointed at it.
+    icon: '/icon.svg',
+    shortcut: '/icon.svg',
     apple: '/icons/apple-touch-icon.png',
   },
 };

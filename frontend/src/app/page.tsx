@@ -6,10 +6,21 @@ import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 import Footer from '@/components/Footer';
 import JoinByCode from '@/components/JoinByCode';
+import NotificationBell from '@/components/NotificationBell';
+import { UserMenu } from '@/components/AppNav';
+import { getUser } from '@/lib/auth';
+import type { AuthUser } from '@/lib/auth';
 
 // ─── Nav ────────────────────────────────────────────────────────────────────
 
 function Nav() {
+  // Read after mount, not during render: getUser reads localStorage, which does
+  // not exist on the server, and rendering a signed-out nav then swapping it is
+  // what every other page already does.
+  const [user, setUser] = useState<AuthUser | null>(null);
+  useEffect(() => { setUser(getUser()); }, []);
+  const signedIn = !!user && !user.is_guest;
+
   return (
     <nav className="fixed top-0 inset-x-0 z-50 border-b border-brand-border/50 backdrop-blur-md bg-brand-bg/80">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 flex items-center justify-between h-16">
@@ -22,13 +33,21 @@ function Nav() {
           <Link href="/discover" className="hidden sm:block btn-ghost text-sm py-2 px-4">
             Discover
           </Link>
-          <Link href="/login" className="btn-ghost text-sm py-2 px-4">
-            Sign in
-          </Link>
+          {!signedIn && (
+            <Link href="/login" className="btn-ghost text-sm py-2 px-4">
+              Sign in
+            </Link>
+          )}
           <Link href="/create" className="btn-primary text-sm py-2 px-4">
             <span className="sm:hidden">Create</span>
             <span className="hidden sm:inline">Create session</span>
           </Link>
+          {signedIn && (
+            <>
+              <NotificationBell />
+              <UserMenu user={user!} />
+            </>
+          )}
         </div>
       </div>
     </nav>
@@ -556,6 +575,10 @@ function EarlyAccess() {
 // ─── CTA ─────────────────────────────────────────────────────────────────────
 
 function CTA() {
+  const [user, setUser] = useState<AuthUser | null>(null);
+  useEffect(() => { setUser(getUser()); }, []);
+  const signedIn = !!user && !user.is_guest;
+
   return (
     <section className="py-12 px-4">
       <div className="max-w-2xl mx-auto text-center">
@@ -574,8 +597,11 @@ function CTA() {
               <SparkleIcon />
               Create a session
             </Link>
-            <Link href="/login" className="btn-ghost px-8 py-4 text-lg">
-              Sign in
+            <Link
+              href={signedIn ? '/dashboard' : '/login'}
+              className="btn-ghost px-8 py-4 text-lg"
+            >
+              {signedIn ? 'Your sessions' : 'Sign in'}
             </Link>
           </div>
 

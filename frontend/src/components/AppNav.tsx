@@ -22,7 +22,7 @@ const MAX_WIDTH: Record<string, string> = {
  * Left side:  GuestSpeak logo → Discover link (always)
  * Right side: pass `right` prop for page-specific controls
  */
-function UserMenu({ user }: { user: AuthUser }) {
+export function UserMenu({ user }: { user: AuthUser }) {
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const router  = useRouter();

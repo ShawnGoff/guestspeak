@@ -87,7 +87,10 @@ export default function NewOrgPage() {
         categories,
       });
 
-      router.push(`/org/${org.slug}/settings`);
+      // The channel itself, not its settings. Creating something and being
+      // dropped straight into a configuration form reads like the job is not
+      // finished; the page has a Settings link for anyone who wants one.
+      router.push(`/org/${org.slug}`);
     } catch (err: any) {
       setError(err.message);
     } finally {
