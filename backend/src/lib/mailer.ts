@@ -43,6 +43,12 @@ function createTransport() {
     port: parseInt(SMTP_PORT ?? '587'),
     secure: parseInt(SMTP_PORT ?? '587') === 465,
     auth: { user: SMTP_USER, pass: SMTP_PASS },
+    // Nodemailer's defaults are minutes long. Nothing here is worth waiting
+    // that long for — a send that has not connected in ten seconds is not
+    // about to, and failing fast turns a hang into a log line.
+    connectionTimeout: 10_000,
+    greetingTimeout:   10_000,
+    socketTimeout:     20_000,
   });
 }
 

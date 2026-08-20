@@ -379,7 +379,21 @@ export async function forgotPassword(req: Request, res: Response, next: NextFunc
     const appUrl = process.env.APP_URL ?? 'http://localhost:3000';
     const resetUrl = `${appUrl}/reset-password?token=${rawToken}`;
 
-    await sendPasswordReset(user.email, resetUrl);
+    // Fire-and-forget, like the go-live fan-out. Two reasons, and the second
+    // is the one that matters.
+    //
+    // Awaiting the send held the browser open for as long as SMTP took, so a
+    // slow or stalled provider left the button sitting on "sending" with no
+    // way to tell a hang from a slow network.
+    //
+    // It also leaked the thing the generic response exists to hide. A
+    // registered address waited for a round-trip to the mail provider; an
+    // unregistered one returned immediately, because the branch above skips
+    // the send entirely. "If that email is registered" says nothing that the
+    // response time did not already give away.
+    sendPasswordReset(user.email, resetUrl).catch(err =>
+      console.error('[forgotPassword] reset email failed to send:', err),
+    );
 
     res.json({ message: 'If that email is registered you will receive a reset link.' });
   } catch (err) {
