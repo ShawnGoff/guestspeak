@@ -173,11 +173,22 @@ export async function getSession(req: Request, res: Response, next: NextFunction
     // frontend can gate mute/remove/approve buttons without an extra round-trip.
     let caller_role = 'none';
     let mod_permissions: Record<string, boolean> | null = null;
+    // Whether this caller already follows the session's channel, so the page
+    // can offer to follow it without a second round-trip. Guests never follow —
+    // the route refuses them — so this stays false for them by construction.
+    let org_is_following = false;
     if (req.user && !req.user.isGuest) {
       const resolved = await resolveCallerRole(session.id, req.user.userId);
       caller_role = resolved.role;
       if (resolved.role === 'moderator') {
         mod_permissions = resolved.permissions as unknown as Record<string, boolean>;
+      }
+      if (session.org_id) {
+        const f = await pool.query(
+          'SELECT 1 FROM org_followers WHERE org_id = $1 AND user_id = $2',
+          [session.org_id, req.user.userId],
+        );
+        org_is_following = (f.rowCount ?? 0) > 0;
       }
     }
 
@@ -198,6 +209,7 @@ export async function getSession(req: Request, res: Response, next: NextFunction
     res.json({
       ...session,
       caller_role,
+      org_is_following,
       feed_mode,
       poll_interval_ms: FEED_POLL_INTERVAL_MS,
       ...(mod_permissions ? { mod_permissions } : {}),

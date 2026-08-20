@@ -103,13 +103,20 @@ export async function getOrg(req: Request, res: Response, next: NextFunction) {
       // still here, and the count is what the public sees — it should agree
       // with the go-live fan-out, which has always filtered guests.
       `SELECT o.*,
-              COUNT(DISTINCT fu.id)::int AS follower_count
+              COUNT(DISTINCT fu.id)::int AS follower_count,
+              -- Whether this caller already follows. Without it the button
+              -- always rendered "Follow", so someone who followed last week
+              -- was invited to do it again on every visit.
+              ($2::uuid IS NOT NULL AND EXISTS (
+                SELECT 1 FROM org_followers f
+                 WHERE f.org_id = o.id AND f.user_id = $2
+              )) AS is_following
        FROM organizations o
        LEFT JOIN org_followers of2 ON of2.org_id = o.id
        LEFT JOIN users fu ON fu.id = of2.user_id AND fu.is_guest = false
        WHERE o.slug = $1
        GROUP BY o.id`,
-      [slug],
+      [slug, callerId],
     );
     if (!orgResult.rows[0]) throw new AppError(404, 'Channel not found');
     const org = orgResult.rows[0];

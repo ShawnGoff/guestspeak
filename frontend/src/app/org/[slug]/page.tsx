@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { api, resolveAsset } from '@/lib/api';
 import type { Organization, Session } from '@ask-away/shared/types';
 import AppNav from '@/components/AppNav';
+import FollowChannel from '@/components/FollowChannel';
 
 interface OrgPageProps {
   params: { slug: string };
@@ -60,8 +61,6 @@ export default function OrgPage({ params }: OrgPageProps) {
   const [data, setData]           = useState<OrgData | null>(null);
   const [loading, setLoading]     = useState(true);
   const [error, setError]         = useState<string | null>(null);
-  const [following, setFollowing] = useState(false);
-  const [followLoading, setFollowLoading] = useState(false);
 
   useEffect(() => {
     api.get<OrgData>(`/orgs/${params.slug}`)
@@ -70,20 +69,6 @@ export default function OrgPage({ params }: OrgPageProps) {
       .finally(() => setLoading(false));
   }, [params.slug]);
 
-  async function toggleFollow() {
-    if (!data) return;
-    setFollowLoading(true);
-    try {
-      if (following) {
-        await api.delete(`/orgs/${data.org.id}/follow`);
-        setFollowing(false);
-      } else {
-        await api.post(`/orgs/${data.org.id}/follow`, {});
-        setFollowing(true);
-      }
-    } catch {}
-    finally { setFollowLoading(false); }
-  }
 
   if (loading) return <PageSkeleton />;
   if (error || !data) return <NotFound />;
@@ -173,17 +158,10 @@ export default function OrgPage({ params }: OrgPageProps) {
                   Edit
                 </Link>
               )}
-              <button
-                onClick={toggleFollow}
-                disabled={followLoading}
-                className={`text-sm font-semibold px-4 py-2 rounded-xl border transition-colors ${
-                  following
-                    ? 'border-brand-purple bg-brand-purple/20 text-white'
-                    : 'border-brand-orange text-brand-orange hover:bg-brand-orange/10'
-                } disabled:opacity-40`}
-              >
-                {followLoading ? '…' : following ? 'Following' : 'Follow'}
-              </button>
+              <FollowChannel
+                orgId={org.id}
+                initialFollowing={!!(org as { is_following?: boolean }).is_following}
+              />
             </div>
           </div>
 

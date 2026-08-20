@@ -11,6 +11,7 @@ const API_BASE = (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001');
 import ModeratorPanel from '@/components/ModeratorPanel';
 import GuestUsernameModal from '@/components/GuestUsernameModal';
 import QRCode from 'react-qr-code';
+import FollowChannel from '@/components/FollowChannel';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -864,14 +865,27 @@ export default function SessionPageClient({ params }: SessionPageProps) {
                 <p className="text-xs text-purple-200/85">Hosted by <span className="text-brand-amber font-semibold">{session.host_username}</span></p>
               )}
               {session.org_name && (
-                <Link href={`/org/${session.org_slug}`} className="text-xs text-brand-orange/70 hover:text-brand-orange mt-0.5 flex items-center gap-1">
-                  {session.org_name}
-                  {session.org_is_verified && (
-                    <span className="inline-flex items-center justify-center w-3 h-3 rounded-full bg-brand-orange text-white flex-shrink-0">
-                      <svg viewBox="0 0 24 24" className="w-1.5 h-1.5" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 13l4 4L19 7" /></svg>
-                    </span>
+                <div className="mt-0.5 flex items-center gap-2 flex-wrap">
+                  <Link href={`/org/${session.org_slug}`} className="text-xs text-brand-orange/70 hover:text-brand-orange flex items-center gap-1">
+                    {session.org_name}
+                    {session.org_is_verified && (
+                      <span className="inline-flex items-center justify-center w-3 h-3 rounded-full bg-brand-orange text-white flex-shrink-0">
+                        <svg viewBox="0 0 24 24" className="w-1.5 h-1.5" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 13l4 4L19 7" /></svg>
+                      </span>
+                    )}
+                  </Link>
+                  {/* Someone who came for this show is the likeliest person to
+                      want the next one. Offering it here, rather than only on
+                      the channel page, is the difference between a listener and
+                      a returning audience. */}
+                  {session.org_id && (
+                    <FollowChannel
+                      orgId={session.org_id}
+                      initialFollowing={!!session.org_is_following}
+                      size="sm"
+                    />
                   )}
-                </Link>
+                </div>
               )}
             </div>
 

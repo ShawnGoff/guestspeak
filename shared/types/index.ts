@@ -91,6 +91,8 @@ export interface Session {
   org_id?: string;
   org_name?: string;
   org_slug?: string;
+  /** Whether the signed-in caller already follows this session's channel. */
+  org_is_following?: boolean;
   org_is_verified?: boolean;
   /** Populated in discover/list responses */
   participant_count?: number;
