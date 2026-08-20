@@ -292,6 +292,31 @@ check("no contributors leaked",          page.get("top_contributors"), [])
 check("no sessions listed",              page.get("sessions"), [])
 check("no past sessions listed",         page.get("past_sessions"), [])
 
+
+# ── Following a host does not surface their unlisted sessions ───────────────
+# The following feed used to allow visibility IN ('public','unlisted'). Every
+# other feed on Discover is public-only, and an unlisted session carries its
+# slug in the payload — putting one in a feed is exactly the listing it exists
+# to avoid.
+section("DISCOVER — the following feed must not carry unlisted sessions")
+_, uh = call("POST", "/auth/register", body={
+    "email": f"uh{stamp}@t.com", "username": f"uh{stamp}", "password": "password123"})
+_, ufan = call("POST", "/auth/register", body={
+    "email": f"uf{stamp}@t.com", "username": f"uf{stamp}", "password": "password123"})
+call("POST", f"/users/uh{stamp}/follow", ufan["token"])
+
+_, upub = call("POST", "/sessions", uh["token"],
+               {"title": f"Public show {stamp}", "visibility": "public", "credits_per_user": 6})
+call("POST", f"/sessions/{upub['id']}/go-live", uh["token"])
+_, uunl = call("POST", "/sessions", uh["token"],
+               {"title": f"Unlisted show {stamp}", "visibility": "unlisted", "credits_per_user": 6})
+call("POST", f"/sessions/{uunl['id']}/go-live", uh["token"])
+
+_, disc = call("GET", "/discover", ufan["token"])
+following_slugs = [x.get("slug") for x in (disc.get("following") or [])]
+check("follower sees the public session",       upub["slug"] in following_slugs, True)
+check("follower does NOT see the unlisted one", uunl["slug"] in following_slugs, False)
+
 print(f"\nRESULT: {sum(results)}/{len(results)} passed",
       "— ALL PASS" if all(results) else "— FAILURES PRESENT")
 # Signal failure to the runner. Printing "FAILURES PRESENT" and exiting 0

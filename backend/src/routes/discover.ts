@@ -131,7 +131,11 @@ router.get('/', optionalAuth, async (req: Request, res: Response, next: NextFunc
          FROM sessions s
          JOIN users u ON u.id = s.host_id
          LEFT JOIN organizations o ON o.id = s.org_id
-         WHERE s.visibility IN ('public', 'unlisted')
+         -- Public only, like every other feed here. Following a host is not
+         -- an invitation to their unlisted sessions: unlisted means reachable
+         -- by link, and putting one in a feed is the listing it exists to
+         -- avoid — with the slug attached, which is its whole access control.
+         WHERE s.visibility = 'public'
            AND s.status IN ('upcoming', 'live')
            AND s.host_id IN (
              SELECT following_id FROM user_follows WHERE follower_id = $1
