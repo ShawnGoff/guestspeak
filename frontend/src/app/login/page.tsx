@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
-import { saveAuth } from '@/lib/auth';
+import { saveAuth, safeNext } from '@/lib/auth';
 import { AuthShell, Field, ErrorMsg } from '@/components/AuthShell';
 
 export default function LoginPage() {
@@ -22,8 +22,7 @@ export default function LoginPage() {
       const res = await api.post<{ token: string; user: any }>('/auth/login', { email, password });
       saveAuth(res.token, res.user);
       // Go to dashboard or wherever they were headed
-      const next = new URLSearchParams(window.location.search).get('next') ?? '/dashboard';
-      router.push(next);
+      router.push(safeNext(new URLSearchParams(window.location.search).get('next')));
     } catch (err: any) {
       setError(err.message ?? 'Invalid email or password');
     } finally {
@@ -32,9 +31,11 @@ export default function LoginPage() {
   }
 
   const next = typeof window !== 'undefined'
-    ? new URLSearchParams(window.location.search).get('next') ?? ''
+    ? safeNext(new URLSearchParams(window.location.search).get('next'), '')
     : '';
-  const registerHref = `/register${next ? `?next=${next}` : ''}`;
+  // Encoded, unlike before: an unencoded value carrying & or # would be read as
+  // further query parameters on the register URL rather than as the path.
+  const registerHref = `/register${next ? `?next=${encodeURIComponent(next)}` : ''}`;
 
   return (
     <AuthShell

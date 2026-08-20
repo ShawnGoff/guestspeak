@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
-import { saveAuth } from '@/lib/auth';
+import { saveAuth, safeNext } from '@/lib/auth';
 import { AuthShell, Field, ErrorMsg } from '@/components/AuthShell';
 
 export default function RegisterPage() {
@@ -27,7 +27,10 @@ export default function RegisterPage() {
         email, username, password,
       });
       saveAuth(res.token, res.user);
-      router.push('/dashboard');
+      // Honour where they were headed. The guest sign-up prompts all pass
+      // ?next=/s/<slug> so someone who makes an account mid-session lands back
+      // in it; this threw that away and dropped everyone on the dashboard.
+      router.push(safeNext(new URLSearchParams(window.location.search).get('next')));
     } catch (err: any) {
       setError(err.message ?? 'Something went wrong');
     } finally {

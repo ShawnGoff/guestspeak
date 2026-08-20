@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
-import { isLoggedIn, clearAuth } from '@/lib/auth';
+import { isLoggedIn, isGuest, clearAuth } from '@/lib/auth';
 import AppNav from '@/components/AppNav';
 import PushToggle from '@/components/PushToggle';
 
@@ -42,7 +42,7 @@ export default function SettingsPage() {
 
   useEffect(() => {
     setMounted(true);
-    if (!isLoggedIn()) { router.push('/login?next=/settings'); return; }
+    if (!isLoggedIn() || isGuest()) { router.push('/login?next=/settings'); return; }
     api.get<MeResponse>('/auth/me')
       .then(u => { setMe(u); setPrefix(u.code_prefix ?? ''); })
       .catch(() => {})

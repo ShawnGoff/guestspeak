@@ -98,7 +98,7 @@ export default function OrgSettingsPage({ params }: { params: { slug: string } }
 
   useEffect(() => {
     setMounted(true);
-    if (!isLoggedIn() || isGuest()) { router.push('/login'); return; }
+    if (!isLoggedIn() || isGuest()) { router.push(`/login?next=/org/${params.slug}/settings`); return; }
     loadData();
   }, [loadData, router]);
 

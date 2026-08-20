@@ -32,7 +32,7 @@ export default function MySessionsPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!isLoggedIn() || isGuest()) { router.push('/login'); return; }
+    if (!isLoggedIn() || isGuest()) { router.push('/login?next=/sessions/mine'); return; }
     api.get<{ sessions: MySession[] }>('/sessions/mine')
       .then(r => setSessions(r.sessions))
       .catch(() => {})

@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { api, resolveAsset } from '@/lib/api';
-import { getUser, clearAuth, isLoggedIn } from '@/lib/auth';
+import { getUser, clearAuth, isLoggedIn, isGuest } from '@/lib/auth';
 import type { DiscoverResponse, Session } from '@ask-away/shared/types';
 
 interface MyOrg {
@@ -69,7 +69,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     setMounted(true);
-    if (!isLoggedIn()) { router.push('/login'); return; }
+    if (!isLoggedIn() || isGuest()) { router.push('/login?next=/dashboard'); return; }
     Promise.all([
       api.get<{ sessions: MySession[] }>('/sessions/mine')
         .then(s => setSessions(s.sessions))
