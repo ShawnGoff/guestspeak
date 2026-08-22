@@ -191,9 +191,6 @@ export default function OrgPage({ params }: OrgPageProps) {
           </div>
         )}
 
-        {/* Host feed — the channel asking its audience something between shows */}
-        <ChannelFeed orgId={org.id} isManager={isManager} />
-
         {/* Upcoming schedule */}
         {upcoming.length > 0 && (
           <section>
@@ -203,6 +200,12 @@ export default function OrgPage({ params }: OrgPageProps) {
             </div>
           </section>
         )}
+
+        {/* Host feed — the channel asking its audience something between shows.
+            Below Upcoming deliberately: someone opening a channel page most
+            often wants to know when the next show is. The prompt is what keeps
+            them warm between them, not the reason they came. */}
+        <ChannelFeed orgId={org.id} isManager={isManager} />
 
         {/* Past sessions */}
         {past_sessions.length > 0 && (
