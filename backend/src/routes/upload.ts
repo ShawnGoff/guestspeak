@@ -11,12 +11,33 @@ const router = Router();
 // When R2 env vars are present → upload to Cloudflare R2 (persistent, CDN-backed)
 // Otherwise → local disk (fine for development, but ephemeral on Railway)
 
-const USE_R2 = !!(
-  process.env.R2_ACCOUNT_ID &&
-  process.env.R2_ACCESS_KEY_ID &&
-  process.env.R2_SECRET_ACCESS_KEY &&
-  process.env.R2_BUCKET
-);
+// R2_PUBLIC_URL belongs in this gate even though the upload itself does not
+// need it. Without it the upload succeeds and the stored URL is built from an
+// empty base — "/filename", a path with no host — so every avatar 404s while
+// the bytes sit safely in the bucket. Falling back to local disk is a better
+// failure than storing broken URLs, and the startup warning below says which
+// variable is missing.
+const R2_VARS = [
+  'R2_ACCOUNT_ID', 'R2_ACCESS_KEY_ID', 'R2_SECRET_ACCESS_KEY',
+  'R2_BUCKET', 'R2_PUBLIC_URL',
+] as const;
+
+const R2_MISSING = R2_VARS.filter(v => !process.env[v]);
+const USE_R2 = R2_MISSING.length === 0;
+
+if (!USE_R2 && R2_MISSING.length < R2_VARS.length) {
+  // Some set, some not — almost certainly a half-finished setup rather than a
+  // deliberate choice to use local disk.
+  console.error(
+    `[upload] R2 is partially configured — missing ${R2_MISSING.join(', ')}. `
+    + 'Falling back to local disk, which is wiped on every deploy.',
+  );
+} else if (!USE_R2 && process.env.NODE_ENV === 'production') {
+  console.warn(
+    '[upload] R2 is not configured. Uploads go to local disk, which Railway '
+    + 'wipes on every deploy — avatars will vanish.',
+  );
+}
 
 // ─── Local disk fallback ──────────────────────────────────────────────────────
 
