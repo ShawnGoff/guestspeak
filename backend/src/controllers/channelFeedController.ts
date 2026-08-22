@@ -152,7 +152,7 @@ export async function listPrompts(req: Request, res: Response, next: NextFunctio
 
     const result = await pool.query(
       `SELECT p.id, p.org_id, p.body, p.closed_at, p.created_at,
-              u.username AS author_username,
+              COALESCE(u.username, 'Removed account') AS author_username,
               (SELECT COUNT(*)::int FROM channel_replies r
                 WHERE r.prompt_id = p.id AND r.status <> 'hidden') AS reply_count,
               ($2::uuid IS NOT NULL AND EXISTS (
@@ -438,6 +438,13 @@ export async function editReply(req: Request, res: Response, next: NextFunction)
           AND author_id = $4
           AND status <> 'hidden'
           AND created_at > NOW() - INTERVAL '${REPLY_EDIT_WINDOW_SECONDS} seconds'
+          -- Closing freezes the thread. A host who closes a prompt is done with
+          -- it, and answers shifting underneath them afterwards is the thing
+          -- closing exists to stop. The window still applies while it is open.
+          AND EXISTS (
+            SELECT 1 FROM channel_prompts p
+             WHERE p.id = $3 AND p.closed_at IS NULL
+          )
         RETURNING id, prompt_id, body, status, created_at, edited_at,
                   author_display_name`,
       [cleanBody, replyId, promptId, callerId],
@@ -446,13 +453,17 @@ export async function editReply(req: Request, res: Response, next: NextFunction)
     if (result.rowCount === 0) {
       // Work out which rule stopped it, so the message is worth reading.
       const row = await pool.query(
-        `SELECT author_id, status,
-                created_at <= NOW() - INTERVAL '${REPLY_EDIT_WINDOW_SECONDS} seconds' AS expired
-           FROM channel_replies WHERE id = $1 AND prompt_id = $2`,
+        `SELECT r.author_id, r.status,
+                r.created_at <= NOW() - INTERVAL '${REPLY_EDIT_WINDOW_SECONDS} seconds' AS expired,
+                p.closed_at IS NOT NULL AS prompt_closed
+           FROM channel_replies r
+           JOIN channel_prompts p ON p.id = r.prompt_id
+          WHERE r.id = $1 AND r.prompt_id = $2`,
         [replyId, promptId],
       );
       const r = row.rows[0];
       if (!r) throw new AppError(404, 'Reply not found');
+      if (r.prompt_closed) throw new AppError(410, 'This prompt is closed');
       if (r.author_id !== callerId) throw new AppError(403, 'You can only edit your own reply');
       if (r.status === 'hidden') throw new AppError(409, 'That reply is no longer available');
       if (r.expired) {

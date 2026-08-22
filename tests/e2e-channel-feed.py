@@ -296,6 +296,36 @@ if banned:
     check("the edit window is not a filter bypass",
           banned in sql(f"SELECT body FROM channel_replies WHERE id='{wr['id']}'"), False)
 
+# ── 12. Review findings ──────────────────────────────────────────────────────
+section("12. REVIEW — closing freezes the thread, deletion scrubs the byline")
+
+# Closing is not just "no new replies": a host who closes a prompt is done with
+# it, and answers shifting underneath them afterwards is what closing prevents.
+_, cp = call("POST", f"/orgs/{org_id}/prompts", host["token"], {"body": "Prompt to be closed mid-window"})
+cpid = cp["id"]
+_, cr = call("POST", f"/prompts/{cpid}/replies", late["token"], {"body": "Wording before the close"})
+check("editable while open",
+      call("PATCH", f"/prompts/{cpid}/replies/{cr['id']}", late["token"],
+           {"body": "Edited while still open"})[0], 200)
+call("PATCH", f"/prompts/{cpid}/close", host["token"])
+check("closing freezes it, even inside the window",
+      call("PATCH", f"/prompts/{cpid}/replies/{cr['id']}", late["token"],
+           {"body": "Edited after the close"})[0], 410)
+check("the wording the host closed on is what stands",
+      sql(f"SELECT body FROM channel_replies WHERE id='{cr['id']}'"), "Edited while still open")
+
+# A deleted account must not keep its name on replies it left. questions.
+# author_display_name is scrubbed on deletion for exactly this reason; the same
+# snapshot on channel_replies was not.
+_, dp = call("POST", f"/orgs/{org_id}/prompts", host["token"], {"body": "Prompt for the deletion check"})
+gone_name = pest["user"]["username"]
+call("POST", f"/prompts/{dp['id']}/replies", pest["token"], {"body": "Something I later regret"})
+call("DELETE", "/auth/me", pest["token"], {"password": "password123"})
+_, after = call("GET", f"/prompts/{dp['id']}/replies")
+bylines = [r["author_username"] for r in after.get("replies") or []]
+check("a deleted account's name is gone from its replies", gone_name in bylines, False)
+check("and the reply itself survives, unattributed", "Removed account" in bylines, True)
+
 print(f"\nRESULT: {sum(results)}/{len(results)} passed",
       "— ALL PASS" if all(results) else "— FAILURES PRESENT")
 raise SystemExit(0 if all(results) else 1)

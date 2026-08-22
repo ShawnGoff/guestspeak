@@ -291,6 +291,15 @@ export async function deleteAccount(req: Request, res: Response, next: NextFunct
       [userId],
     );
 
+    // Channel replies carry the same byline snapshot for the same reason, and
+    // need the same scrubbing. Without this a deleted account keeps its name on
+    // every reply it ever left — the exact failure the line above exists to
+    // prevent, in a table added later.
+    await client.query(
+      `UPDATE channel_replies SET author_display_name = NULL WHERE author_id = $1`,
+      [userId],
+    );
+
     // Guest display names recorded against their participation.
     await client.query(
       `UPDATE session_participants SET guest_username = NULL WHERE user_id = $1`,
