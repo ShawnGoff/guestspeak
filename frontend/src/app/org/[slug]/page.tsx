@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { api, resolveAsset } from '@/lib/api';
 import type { Organization, Session } from '@ask-away/shared/types';
 import AppNav from '@/components/AppNav';
+import ChannelFeed from '@/components/ChannelFeed';
 import FollowChannel from '@/components/FollowChannel';
 
 interface OrgPageProps {
@@ -189,6 +190,9 @@ export default function OrgPage({ params }: OrgPageProps) {
             <p className="text-sm mt-1">Follow to get notified when they go live.</p>
           </div>
         )}
+
+        {/* Host feed — the channel asking its audience something between shows */}
+        <ChannelFeed orgId={org.id} isManager={isManager} />
 
         {/* Upcoming schedule */}
         {upcoming.length > 0 && (
