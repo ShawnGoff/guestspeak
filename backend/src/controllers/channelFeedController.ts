@@ -22,6 +22,9 @@ import { createNotificationsForUsers } from './notificationController';
 const PromptSchema = z.object({ body: z.string().min(1).max(300) });
 const ReplySchema  = z.object({ body: z.string().min(1).max(300) });
 
+/** How long an author may still fix their own reply. */
+const REPLY_EDIT_WINDOW_SECONDS = 300;
+
 /** Throws unless the caller runs this channel. */
 async function requireChannelStaff(orgId: string, callerId: string) {
   const result = await pool.query(
@@ -258,15 +261,21 @@ export async function listReplies(req: Request, res: Response, next: NextFunctio
     const isStaff = await isStaffForPrompt(promptId, callerId);
 
     const result = await pool.query(
-      `SELECT r.id, r.prompt_id, r.body, r.status, r.created_at,
-              COALESCE(r.author_display_name, u.username, 'Removed account') AS author_username
+      `SELECT r.id, r.prompt_id, r.body, r.status, r.created_at, r.edited_at,
+              COALESCE(r.author_display_name, u.username, 'Removed account') AS author_username,
+              -- Told rather than guessed. Matching on the display name would
+              -- break the moment someone renames, because the byline is a
+              -- snapshot taken when the reply was written.
+              ($3::uuid IS NOT NULL AND r.author_id = $3) AS is_mine,
+              GREATEST(0, ${REPLY_EDIT_WINDOW_SECONDS} -
+                EXTRACT(EPOCH FROM (NOW() - r.created_at))::int) AS edit_seconds_left
          FROM channel_replies r
          LEFT JOIN users u ON u.id = r.author_id
         WHERE r.prompt_id = $1
           AND ($2 OR r.status <> 'hidden')
         ORDER BY r.created_at
         LIMIT 200`,
-      [promptId, isStaff],
+      [promptId, isStaff, callerId],
     );
 
     res.json({ replies: result.rows });
@@ -391,6 +400,69 @@ export async function listFeedBlocks(req: Request, res: Response, next: NextFunc
     );
 
     res.json({ blocks: result.rows });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * PATCH /api/prompts/:promptId/replies/:replyId
+ *
+ * Lets the author correct their own reply for REPLY_EDIT_WINDOW_SECONDS. Nobody
+ * else can, including the host: rewriting someone's words puts them in their
+ * mouth, and a host who dislikes a reply can hide it.
+ *
+ * The deadline is enforced in the UPDATE rather than read first — a read then a
+ * write leaves a gap, and the deadline is precisely the moment the words stop
+ * being the author's alone.
+ *
+ * Hidden replies are excluded: a removed reply is not a draft, and an author
+ * must not be able to quietly rewrite one and have it restored as something
+ * else.
+ */
+export async function editReply(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { promptId, replyId } = req.params;
+    const { body } = ReplySchema.parse(req.body);
+    const callerId = req.user!.userId;
+
+    // Same masking createReply applies. Skipping it would make the window a way
+    // round the word list — post clean, then rewrite.
+    const cleanBody = await filterText(body);
+
+    const result = await pool.query(
+      `UPDATE channel_replies
+          SET body = $1, edited_at = NOW()
+        WHERE id = $2
+          AND prompt_id = $3
+          AND author_id = $4
+          AND status <> 'hidden'
+          AND created_at > NOW() - INTERVAL '${REPLY_EDIT_WINDOW_SECONDS} seconds'
+        RETURNING id, prompt_id, body, status, created_at, edited_at,
+                  author_display_name`,
+      [cleanBody, replyId, promptId, callerId],
+    );
+
+    if (result.rowCount === 0) {
+      // Work out which rule stopped it, so the message is worth reading.
+      const row = await pool.query(
+        `SELECT author_id, status,
+                created_at <= NOW() - INTERVAL '${REPLY_EDIT_WINDOW_SECONDS} seconds' AS expired
+           FROM channel_replies WHERE id = $1 AND prompt_id = $2`,
+        [replyId, promptId],
+      );
+      const r = row.rows[0];
+      if (!r) throw new AppError(404, 'Reply not found');
+      if (r.author_id !== callerId) throw new AppError(403, 'You can only edit your own reply');
+      if (r.status === 'hidden') throw new AppError(409, 'That reply is no longer available');
+      if (r.expired) {
+        const mins = Math.round(REPLY_EDIT_WINDOW_SECONDS / 60);
+        throw new AppError(409, `Replies can only be edited for ${mins} minutes after posting`);
+      }
+      throw new AppError(409, 'That reply can no longer be edited');
+    }
+
+    res.json(result.rows[0]);
   } catch (err) {
     next(err);
   }

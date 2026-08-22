@@ -4,6 +4,7 @@ import {
   createReply,
   listReplies,
   hideReply,
+  editReply,
 } from '../controllers/channelFeedController';
 import { requireRegistered, optionalAuth } from '../middleware/auth';
 import { channelReplyLimiter } from '../middleware/rateLimit';
@@ -24,6 +25,9 @@ router.get('/:promptId/replies', optionalAuth, listReplies);
 // the real bar. Rate-limited because replies are free and nothing else slows
 // them down.
 router.post('/:promptId/replies', requireRegistered, channelReplyLimiter, createReply);
+
+// PATCH /api/prompts/:promptId/replies/:replyId — author fixes their own words
+router.patch('/:promptId/replies/:replyId', requireRegistered, editReply);
 
 // PATCH /api/prompts/:promptId/replies/:replyId/hide — channel staff only.
 // Replies are free, so there is no credit economy slowing anyone down and this

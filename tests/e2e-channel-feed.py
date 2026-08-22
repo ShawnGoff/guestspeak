@@ -245,6 +245,57 @@ time.sleep(1)
 check("once the cooldown has passed, followers hear again",
       notes(follower["user"]["id"]), "2")
 
+# ── 11. Fixing your own reply ────────────────────────────────────────────────
+# One reply per prompt made a typo permanent: you could not fix it and could not
+# try again. Five minutes, not the sixty seconds a question gets — nothing
+# accumulates on a channel reply, so the pressure that justifies a short window
+# on a live question is absent.
+section("11. EDIT WINDOW — the author can fix their own words for five minutes")
+# Reusing accounts rather than making more: registerLimiter allows 10 per 15
+# minutes per IP and this suite is already at it. None of these have replied to
+# the new prompt, which is all that matters.
+eh = fan
+_, ep = call("POST", f"/orgs/{org_id}/prompts", host["token"], {"body": "A prompt for edit testing"})
+epid = ep["id"]
+_, er = call("POST", f"/prompts/{epid}/replies", eh["token"], {"body": "Teh reply wiht typos"})
+erid = er["id"]
+
+code, edited = call("PATCH", f"/prompts/{epid}/replies/{erid}", eh["token"],
+                    {"body": "The reply with typos fixed"})
+check("the author can fix their reply", code, 200)
+check("the new text is stored", edited.get("body"), "The reply with typos fixed")
+check("and it is marked as edited",
+      sql(f"SELECT edited_at IS NOT NULL FROM channel_replies WHERE id='{erid}'"), "t")
+
+check("a stranger cannot edit it",
+      call("PATCH", f"/prompts/{epid}/replies/{erid}", stranger["token"], {"body": "Rewritten"})[0], 403)
+check("nor can the host",
+      call("PATCH", f"/prompts/{epid}/replies/{erid}", host["token"], {"body": "Host rewrite"})[0], 403)
+check("the text survived both attempts",
+      sql(f"SELECT body FROM channel_replies WHERE id='{erid}'"), "The reply with typos fixed")
+
+# The hide route must still resolve — /:replyId is registered before
+# /:replyId/hide, and a greedy match would have swallowed it.
+check("hiding still routes correctly",
+      call("PATCH", f"/prompts/{epid}/replies/{erid}/hide", host["token"])[0], 200)
+check("a hidden reply cannot be rewritten",
+      call("PATCH", f"/prompts/{epid}/replies/{erid}", eh["token"], {"body": "Sneaking a change in"})[0], 409)
+call("PATCH", f"/prompts/{epid}/replies/{erid}/hide", host["token"])
+
+# Past the deadline
+sql(f"UPDATE channel_replies SET created_at = NOW() - INTERVAL '6 minutes' WHERE id='{erid}'")
+check("the window closes after five minutes",
+      call("PATCH", f"/prompts/{epid}/replies/{erid}", eh["token"], {"body": "Too late now"})[0], 409)
+
+# The filter reaches the edit path too — this was a real bug on questions.
+if banned:
+    wf2 = hid
+    _, wr = call("POST", f"/prompts/{epid}/replies", wf2["token"], {"body": "A clean reply first"})
+    call("PATCH", f"/prompts/{epid}/replies/{wr['id']}", wf2["token"],
+         {"body": f"Now with {banned} in it"})
+    check("the edit window is not a filter bypass",
+          banned in sql(f"SELECT body FROM channel_replies WHERE id='{wr['id']}'"), False)
+
 print(f"\nRESULT: {sum(results)}/{len(results)} passed",
       "— ALL PASS" if all(results) else "— FAILURES PRESENT")
 raise SystemExit(0 if all(results) else 1)

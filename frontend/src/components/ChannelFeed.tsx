@@ -28,7 +28,10 @@ interface Reply {
   body: string;
   status: string;
   created_at: string;
+  edited_at: string | null;
   author_username: string;
+  is_mine: boolean;
+  edit_seconds_left: number;
 }
 
 export default function ChannelFeed({ orgId, isManager }: { orgId: string; isManager: boolean }) {
@@ -146,6 +149,9 @@ function PromptCard({ prompt, isManager, onChanged }: {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [replied, setReplied] = useState(prompt.has_replied);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editDraft, setEditDraft] = useState('');
+  const [editError, setEditError] = useState<string | null>(null);
 
   const closed = !!prompt.closed_at;
   // Guests hold an account-shaped token but cannot reply — the account is the
@@ -182,6 +188,19 @@ function PromptCard({ prompt, isManager, onChanged }: {
       setError(err?.message ?? 'Could not post that reply');
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function saveEdit(reply: Reply) {
+    const next = editDraft.trim();
+    if (!next || next === reply.body) { setEditingId(null); return; }
+    setEditError(null);
+    try {
+      await api.patch(`/prompts/${prompt.id}/replies/${reply.id}`, { body: next });
+      setEditingId(null);
+      loadReplies();
+    } catch (err: any) {
+      setEditError(err?.message ?? 'Could not save that change');
     }
   }
 
@@ -281,8 +300,49 @@ function PromptCard({ prompt, isManager, onChanged }: {
                   {r.status === 'hidden' && (
                     <span className="ml-1.5 text-red-300 normal-case">· hidden</span>
                   )}
+                  {r.edited_at && (
+                    <span className="ml-1.5 text-purple-200/50 normal-case italic font-normal">edited</span>
+                  )}
                 </p>
-                <p className="text-sm text-purple-200/90 break-words">{r.body}</p>
+                {editingId === r.id ? (
+                  <div>
+                    <textarea
+                      value={editDraft}
+                      onChange={e => setEditDraft(e.target.value.slice(0, 300))}
+                      rows={2}
+                      autoFocus
+                      className="w-full bg-brand-bg/60 border border-violet-400/50 rounded-lg p-2 text-white text-sm resize-none focus:outline-none focus:border-violet-300"
+                    />
+                    <div className="flex items-center gap-2 mt-1.5">
+                      <button
+                        onClick={() => saveEdit(r)}
+                        className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-brand-orange text-white hover:bg-brand-amber transition-colors"
+                      >
+                        Save
+                      </button>
+                      <button
+                        onClick={() => { setEditingId(null); setEditError(null); }}
+                        className="text-xs font-semibold px-3 py-1.5 rounded-lg border border-brand-border/60 text-purple-200/90 hover:text-white transition-colors"
+                      >
+                        Cancel
+                      </button>
+                      <span className="text-xs text-purple-200/50 ml-auto">{editDraft.length}/300</span>
+                    </div>
+                    {editError && <p className="text-xs text-red-300 mt-1.5">{editError}</p>}
+                  </div>
+                ) : (
+                  <>
+                    <p className="text-sm text-purple-200/90 break-words">{r.body}</p>
+                    {r.is_mine && r.edit_seconds_left > 0 && r.status !== 'hidden' && (
+                      <button
+                        onClick={() => { setEditDraft(r.body); setEditingId(r.id); }}
+                        className="mt-1 text-xs font-semibold text-violet-300 hover:text-white transition-colors"
+                      >
+                        Edit · {Math.ceil(r.edit_seconds_left / 60)}m left
+                      </button>
+                    )}
+                  </>
+                )}
               </div>
               {isManager && (
                 <button
