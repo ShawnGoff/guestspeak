@@ -1,26 +1,19 @@
 import { Router } from 'express';
-import { requireRegistered, optionalAuth } from '../middleware/auth';
 import {
   searchUsers,
   getUserProfile,
-  followUser,
-  unfollowUser,
-  getFollowers,
-  getFollowing,
 } from '../controllers/userController';
 
 const router = Router();
 
-// Search — optionalAuth so is_following is accurate for logged-in users
-router.get('/search', optionalAuth, searchUsers);
+// Neither route needs the caller's identity any more. They used to, to report
+// whether you followed this person — following is a channel relationship now,
+// so both endpoints return the same thing to everyone.
 
-// Profile
-router.get('/:username',           optionalAuth,      getUserProfile);
-router.get('/:username/followers', optionalAuth,      getFollowers);
-router.get('/:username/following', optionalAuth,      getFollowing);
+// Search
+router.get('/search', searchUsers);
 
-// Follow / unfollow — registered users only
-router.post('/:username/follow',   requireRegistered, followUser);
-router.delete('/:username/follow', requireRegistered, unfollowUser);
+// Profile — username, join date, and their public sessions.
+router.get('/:username', getUserProfile);
 
 export default router;

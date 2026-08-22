@@ -305,6 +305,8 @@ export async function deleteAccount(req: Request, res: Response, next: NextFunct
     await client.query('DELETE FROM push_subscriptions WHERE user_id = $1', [userId]);
     await client.query('DELETE FROM password_reset_tokens WHERE user_id = $1', [userId]);
     await client.query(
+      // Person-follows are gone from the product; the table is still here so a
+      // DROP does not have to race the deploy. Remove this line with the table.
       'DELETE FROM user_follows WHERE follower_id = $1 OR following_id = $1', [userId]);
     await client.query('DELETE FROM org_followers WHERE user_id = $1', [userId]);
     await client.query('DELETE FROM organization_members WHERE user_id = $1', [userId]);

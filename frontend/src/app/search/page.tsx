@@ -16,7 +16,6 @@ function SearchPageInner() {
   const [query, setQuery] = useState(searchParams.get('q') ?? '');
   const [results, setResults] = useState<UserSearchResult[]>([]);
   const [loading, setLoading] = useState(false);
-  const [followingState, setFollowingState] = useState<Record<string, boolean>>({});
   const inputRef = useRef<HTMLInputElement>(null);
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -44,30 +43,10 @@ function SearchPageInner() {
     try {
       const data = await api.get<{ users: UserSearchResult[] }>(`/users/search?q=${encodeURIComponent(q)}`);
       setResults(data.users);
-      const state: Record<string, boolean> = {};
-      data.users.forEach(u => { state[u.id] = u.is_following; });
-      setFollowingState(state);
     } catch {
       setResults([]);
     } finally {
       setLoading(false);
-    }
-  }
-
-  async function toggleFollow(user: UserSearchResult) {
-    if (!isLoggedIn()) { router.push('/login?next=/search'); return; }
-    const currently = followingState[user.id] ?? user.is_following;
-    // Optimistic
-    setFollowingState(prev => ({ ...prev, [user.id]: !currently }));
-    try {
-      if (currently) {
-        await api.delete(`/users/${user.username}/follow`);
-      } else {
-        await api.post(`/users/${user.username}/follow`, {});
-      }
-    } catch {
-      // Revert
-      setFollowingState(prev => ({ ...prev, [user.id]: currently }));
     }
   }
 
@@ -80,7 +59,7 @@ function SearchPageInner() {
 
       <main className="max-w-2xl mx-auto px-4 py-10">
         <h1 className="text-2xl font-extrabold text-white mb-1">Find people</h1>
-        <p className="text-purple-200/75 text-sm mb-6">Search by username to discover hosts and follow their sessions.</p>
+        <p className="text-purple-200/75 text-sm mb-6">Search by username to find a host and see what they have run.</p>
 
         {/* Search input */}
         <div className="relative mb-6">
@@ -101,8 +80,6 @@ function SearchPageInner() {
         {results.length > 0 && (
           <div className="space-y-2">
             {results.map(user => {
-              const isFollowing = followingState[user.id] ?? user.is_following;
-              const isSelf = currentUser?.id === user.id;
               return (
                 <div key={user.id} className="card p-4 flex items-center gap-4">
                   {/* Avatar */}
@@ -116,24 +93,16 @@ function SearchPageInner() {
                       @{user.username}
                     </Link>
                     <p className="text-xs text-purple-200/70 mt-0.5">
-                      {user.follower_count} {user.follower_count === 1 ? 'follower' : 'followers'}
-                      {user.session_count > 0 && ` · ${user.session_count} sessions`}
+                      {user.session_count === 1 ? '1 public session' : `${user.session_count} public sessions`}
                     </p>
                   </div>
 
-                  {/* Follow button */}
-                  {!isSelf && (
-                    <button
-                      onClick={() => toggleFollow(user)}
-                      className={`text-sm px-4 py-1.5 rounded-lg border font-medium transition-colors flex-shrink-0 ${
-                        isFollowing
-                          ? 'border-brand-border text-purple-200/85 hover:border-red-700/50 hover:text-red-400'
-                          : 'border-brand-orange text-brand-orange hover:bg-brand-orange/10'
-                      }`}
-                    >
-                      {isFollowing ? 'Following' : 'Follow'}
-                    </button>
-                  )}
+                  <Link
+                    href={`/u/${user.username}`}
+                    className="text-sm px-4 py-1.5 rounded-lg border border-brand-border font-medium text-purple-200/85 hover:text-white hover:border-brand-orange transition-colors flex-shrink-0"
+                  >
+                    View
+                  </Link>
                 </div>
               );
             })}

@@ -234,8 +234,10 @@ _, fol_org = call("POST", "/orgs", fol_host,
 org_id, org_slug = fol_org["id"], fol_org["slug"]
 _, fg = call("POST", "/auth/guest")
 
-check("guest cannot follow a user",
-      call("POST", f"/users/fol{stamp}/follow", fg["token"])[0], 403)
+# Person-follows were removed: you follow a channel, not the person behind it.
+# 404 rather than 403 — the endpoint does not exist at all.
+check("following a person is gone entirely",
+      call("POST", f"/users/fol{stamp}/follow", fg["token"])[0], 404)
 check("guest cannot follow an org",
       call("POST", f"/orgs/{org_id}/follow", fg["token"])[0], 403)
 check("anonymous cannot follow an org",
@@ -303,13 +305,18 @@ _, uh = call("POST", "/auth/register", body={
     "email": f"uh{stamp}@t.com", "username": f"uh{stamp}", "password": "password123"})
 _, ufan = call("POST", "/auth/register", body={
     "email": f"uf{stamp}@t.com", "username": f"uf{stamp}", "password": "password123"})
-call("POST", f"/users/uh{stamp}/follow", ufan["token"])
+# The feed follows channels now, so the sessions must belong to one.
+_, uorg = call("POST", "/orgs", uh["token"],
+               {"name": f"Feed channel {stamp}", "slug": f"feedchan{stamp}"})
+call("POST", f"/orgs/{uorg['id']}/follow", ufan["token"])
 
 _, upub = call("POST", "/sessions", uh["token"],
-               {"title": f"Public show {stamp}", "visibility": "public", "credits_per_user": 6})
+               {"title": f"Public show {stamp}", "visibility": "public",
+                "credits_per_user": 6, "org_id": uorg["id"]})
 call("POST", f"/sessions/{upub['id']}/go-live", uh["token"])
 _, uunl = call("POST", "/sessions", uh["token"],
-               {"title": f"Unlisted show {stamp}", "visibility": "unlisted", "credits_per_user": 6})
+               {"title": f"Unlisted show {stamp}", "visibility": "unlisted",
+                "credits_per_user": 6, "org_id": uorg["id"]})
 call("POST", f"/sessions/{uunl['id']}/go-live", uh["token"])
 
 _, disc = call("GET", "/discover", ufan["token"])

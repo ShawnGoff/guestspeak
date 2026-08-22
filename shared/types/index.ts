@@ -208,22 +208,19 @@ export interface SessionParticipant {
 
 // ─── User profiles ────────────────────────────────────────────────────────────
 
+// Following is a channel relationship — see Organization.follower_count. A
+// person is not followable, so neither of these carries follow state.
 export interface UserProfile {
   id: string;
   username: string;
   created_at: string;
-  follower_count: number;
-  following_count: number;
   session_count: number;
-  is_following?: boolean; // true if the caller follows this user
 }
 
 export interface UserSearchResult {
   id: string;
   username: string;
   session_count: number;
-  follower_count: number;
-  is_following: boolean;
 }
 
 // ─── API response shapes ──────────────────────────────────────────────────────

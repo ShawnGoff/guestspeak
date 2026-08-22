@@ -137,8 +137,8 @@ router.get('/', optionalAuth, async (req: Request, res: Response, next: NextFunc
          -- avoid — with the slug attached, which is its whole access control.
          WHERE s.visibility = 'public'
            AND s.status IN ('upcoming', 'live')
-           AND s.host_id IN (
-             SELECT following_id FROM user_follows WHERE follower_id = $1
+           AND s.org_id IN (
+             SELECT org_id FROM org_followers WHERE user_id = $1
            )
          ORDER BY s.status = 'live' DESC, s.starts_at ASC NULLS LAST
          LIMIT 20`,
