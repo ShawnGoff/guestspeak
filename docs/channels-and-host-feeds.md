@@ -1,6 +1,6 @@
 # Channels, following, and host feeds
 
-**Status:** spec, not built. Three decisions still open (§5).
+**Status:** spec, not built. Two decisions still open (§5).
 
 Two changes that belong together. Following consolidates onto channels, and
 channels gain a feed where a host can put a question to their followers between
@@ -71,16 +71,20 @@ one. That is the line that keeps this from becoming the open message board that
 was explicitly ruled out: sessions are for live events, and this is a host
 asking their audience something between them, not a permanent forum.
 
-### Replies are echoable, and that is the point
+### Replies are not echoable — decided
 
-A prompt with plain replies is a comment section. A prompt whose replies can be
-**echoed** is this product applied to the gap between shows: followers reply,
-other followers echo the ones they want, and the host opens it to find the
-answer already ranked.
+Replies are a flat, chronological list. The host reads them.
 
-Two hundred unsorted replies is a chore. Two hundred replies with the top three
-surfaced is the same thing a live session does, on a week-long clock instead of
-an hour.
+Echoes were proposed and rejected. The argument for them was that a prompt with
+plain replies is a comment section, while echoable replies would rank the
+answers before the host arrives. The argument against is the one that wins:
+echoes are what makes a **session** work, and spreading the mechanic across
+every surface dilutes it. A live room where the best question rises is the
+product; a channel feed is a place to ask your audience something between
+shows.
+
+This removes vote_count from channel_replies, the echo endpoint, and the
+ranking work — the largest single piece of the build.
 
 ### Rules
 
@@ -118,7 +122,6 @@ CREATE TABLE channel_replies (
   prompt_id   UUID NOT NULL REFERENCES channel_prompts (id) ON DELETE CASCADE,
   author_id   UUID NOT NULL REFERENCES users (id) ON DELETE SET NULL,
   body        TEXT NOT NULL,
-  vote_count  INTEGER NOT NULL DEFAULT 0,
   status      VARCHAR(20) NOT NULL DEFAULT 'new'
               CHECK (status IN ('new', 'hidden')),
   created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -164,17 +167,12 @@ support load until later?
 followed, it is username, join date and a session list. That may not earn its
 spot.
 
-**Should replies be echoable at launch, or are plain replies enough to start?**
-Recommendation is echoes, per §3 — but it is the difference between a week and
-a couple of days.
-
 ## 6. Build order
 
 1. Drop person-follows: endpoints, profile button, Discover query, migration.
 2. "Move session to a channel" if it is day one.
 3. `channel_prompts` and `channel_replies`, host-posts and follower-replies.
-4. Echoes on replies.
-5. Channel-scoped moderation: hide a reply, mute an author.
-6. Notify followers when a prompt is posted — same fire-and-forget shape as the
+4. Channel-scoped moderation: hide a reply, mute an author.
+5. Notify followers when a prompt is posted — same fire-and-forget shape as the
    go-live fan-out, plus a limit on how often a host can blast their followers.
-7. Upcoming sessions rendered into the feed.
+6. Upcoming sessions rendered into the feed.
