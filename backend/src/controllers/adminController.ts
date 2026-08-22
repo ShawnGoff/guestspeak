@@ -63,13 +63,17 @@ const CreateBanSchema = z.object({
   user_id:        z.string().uuid().optional(),
   guest_token:    z.string().optional(),
   ip_address:     z.string().optional(),
+  // Ban whoever wrote this question. The preferred path for a guest: the admin
+  // never handles the token, so revealing an identity no longer also hands over
+  // the ability to act as them.
+  question_id:    z.string().uuid().optional(),
   reason:         z.string().min(1).max(500),
   duration_hours: z.union([z.literal(24), z.literal(72), z.literal(168)]).optional(),
   // Escape hatch — raw ISO datetime (admin can still pass a custom date).
   // If both duration_hours and expires_at are provided, duration_hours wins.
   expires_at:     z.string().datetime().optional(),
-}).refine(d => d.user_id || d.guest_token || d.ip_address, {
-  message: 'At least one of user_id, guest_token, or ip_address is required',
+}).refine(d => d.user_id || d.guest_token || d.ip_address || d.question_id, {
+  message: 'At least one of user_id, guest_token, ip_address, or question_id is required',
 });
 
 /** GET /api/admin/bans — list active platform bans */
@@ -101,6 +105,23 @@ export async function createBan(req: Request, res: Response, next: NextFunction)
     const data = CreateBanSchema.parse(req.body);
     const adminId = req.user!.userId;
 
+    // Resolve a question into whoever wrote it, so the admin can ban a guest
+    // without ever being handed their token.
+    let userId = data.user_id ?? null;
+    let guestToken = data.guest_token ?? null;
+    if (data.question_id) {
+      const author = await pool.query(
+        'SELECT author_id, author_guest_token FROM questions WHERE id = $1',
+        [data.question_id],
+      );
+      if (!author.rows[0]) throw new AppError(404, 'Question not found');
+      userId = userId ?? author.rows[0].author_id;
+      guestToken = guestToken ?? author.rows[0].author_guest_token;
+      if (!userId && !guestToken && !data.ip_address) {
+        throw new AppError(409, 'That question has no author left to ban');
+      }
+    }
+
     // Resolve expires_at: duration_hours takes precedence over raw expires_at.
     // null = permanent.
     let expiresAt: string | null = null;
@@ -116,14 +137,16 @@ export async function createBan(req: Request, res: Response, next: NextFunction)
     await pool.query(
       `INSERT INTO admin_action_log (admin_id, action, target_type, target_id, notes)
        VALUES ($1, 'platform_ban', 'user', $2, $3)`,
-      [adminId, data.user_id ?? data.guest_token ?? data.ip_address, data.reason],
+      // The resolved target, not the raw input — a question_id ban would
+      // otherwise log nothing identifying.
+      [adminId, userId ?? guestToken ?? data.ip_address, data.reason],
     );
 
     const result = await pool.query(
       `INSERT INTO platform_bans (user_id, guest_token, ip_address, reason, expires_at, banned_by)
        VALUES ($1, $2, $3, $4, $5, $6)
        RETURNING *`,
-      [data.user_id ?? null, data.guest_token ?? null, data.ip_address ?? null,
+      [userId, guestToken, data.ip_address ?? null,
        data.reason, expiresAt, adminId],
     );
 
@@ -225,10 +248,16 @@ export async function revealIdentity(req: Request, res: Response, next: NextFunc
     const adminId = req.user!.userId;
 
     const result = await pool.query(
-      `SELECT q.id, q.body, q.author_id, q.author_guest_token,
+      `SELECT q.id, q.body, q.author_id,
               q.author_display_name,
               u.username, u.email,
-              sp.guest_username, sp.guest_token
+              sp.guest_username,
+              -- Deliberately not the guest token. It is a bearer credential:
+              -- whoever holds it can post as that guest and spend their
+              -- credits, so returning it made "reveal who wrote this" also
+              -- grant "act as them". Ban by question_id instead — the server
+              -- resolves the author without the token leaving the database.
+              (q.author_guest_token IS NOT NULL) AS is_guest
        FROM questions q
        LEFT JOIN users u ON u.id = q.author_id
        LEFT JOIN session_participants sp

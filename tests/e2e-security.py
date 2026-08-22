@@ -324,6 +324,37 @@ following_slugs = [x.get("slug") for x in (disc.get("following") or [])]
 check("follower sees the public session",       upub["slug"] in following_slugs, True)
 check("follower does NOT see the unlisted one", uunl["slug"] in following_slugs, False)
 
+# ── Revealing an identity must not hand over a credential ───────────────────
+# A guest token is a bearer credential: whoever holds it can post as that guest
+# and spend their credits. The admin reveal endpoint returned it alongside the
+# username, so unmasking someone also granted the ability to act as them.
+section("ADMIN — identity reveal identifies, it does not authorise")
+ad_host = new_host("adm")
+adm_id = sql(f"SELECT id FROM users WHERE username='adm{stamp}'")
+sql(f"UPDATE users SET is_platform_admin = true WHERE id='{adm_id}'")
+# The flag is read from the database per request, so the existing token works.
+_, ad_sess = call("POST", "/sessions", ad_host,
+                  {"title": f"Admin probe {stamp}", "visibility": "public", "credits_per_user": 6})
+call("POST", f"/sessions/{ad_sess['id']}/go-live", ad_host)
+_, adg = call("POST", "/auth/guest")
+call("POST", f"/sessions/{ad_sess['id']}/join", adg["token"], {"guest_username": f"target{stamp}"})
+_, adq = call("POST", "/questions", adg["token"],
+              {"session_id": ad_sess["id"], "body": "A question by a guest to be revealed"})
+
+code, revealed = call("GET", f"/admin/questions/{adq['id']}/identity", ad_host)
+blob = json.dumps(revealed)
+real_token = sql(f"SELECT author_guest_token FROM questions WHERE id='{adq['id']}'")
+check("reveal succeeds for an admin", code, 200)
+check("but the guest token is not in the response", real_token in blob, False)
+check("it still identifies them", "guest_username" in blob or "is_guest" in blob, True)
+
+# Banning by question means the admin never needs the token at all.
+code2, _ = call("POST", "/admin/bans", ad_host,
+                {"question_id": adq["id"], "reason": "probe"})
+check("an admin can ban the author by question", code2, 201)
+check("and the ban landed on the right guest",
+      sql(f"SELECT count(*) FROM platform_bans WHERE guest_token='{real_token}'"), "1")
+
 print(f"\nRESULT: {sum(results)}/{len(results)} passed",
       "— ALL PASS" if all(results) else "— FAILURES PRESENT")
 # Signal failure to the runner. Printing "FAILURES PRESENT" and exiting 0
