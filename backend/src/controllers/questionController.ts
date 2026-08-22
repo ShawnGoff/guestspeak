@@ -728,6 +728,8 @@ export async function pinQuestion(req: Request, res: Response, next: NextFunctio
       [!is_pinned, id],
     );
 
+    invalidateSession(session_id);
+
     const publicQuestion = await fetchPublicQuestion(id, session_id);
     broadcast(session_id, { type: 'question:updated', data: publicQuestion });
     res.json(publicQuestion);
@@ -812,6 +814,8 @@ export async function addHostReply(req: Request, res: Response, next: NextFuncti
        WHERE id = $2`,
       [reply, id],
     );
+
+    invalidateSession(session_id);
 
     const publicQuestion = await fetchPublicQuestion(id, session_id);
     broadcast(session_id, { type: 'question:updated', data: publicQuestion });
