@@ -55,3 +55,19 @@ CREATE INDEX IF NOT EXISTS idx_channel_replies_prompt
 CREATE UNIQUE INDEX IF NOT EXISTS idx_channel_reply_once
   ON channel_replies (prompt_id, author_id)
   WHERE author_id IS NOT NULL;
+
+-- Lock the new tables the way 030 locks every other one. Guarded on the roles
+-- existing: anon and authenticated are Supabase's, and a plain Postgres
+-- database (local dev, CI) has neither, where an unguarded REVOKE aborts the
+-- whole migration.
+ALTER TABLE channel_prompts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE channel_replies ENABLE ROW LEVEL SECURITY;
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN
+    REVOKE ALL ON channel_prompts, channel_replies FROM anon;
+  END IF;
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN
+    REVOKE ALL ON channel_prompts, channel_replies FROM authenticated;
+  END IF;
+END $$;

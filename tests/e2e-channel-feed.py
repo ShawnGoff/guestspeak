@@ -139,6 +139,70 @@ _, staff = call("GET", f"/prompts/{pid}/replies", host["token"])
 check("the host still sees it",
       any(r["id"] == rid for r in staff.get("replies") or []), True)
 
+# ── 8. Hiding a reply ────────────────────────────────────────────────────────
+# Replies are free, so there is no credit economy slowing anyone down and
+# moderation is the only brake. It ships with the feed rather than after it.
+section("8. HIDING — staff can remove a reply, and it is recorded")
+hid = mkuser("cfhid")
+_, hr = call("POST", f"/prompts/{pid}/replies", hid["token"], {"body": "A reply to be removed"})
+hrid = hr["id"]
+
+check("a stranger cannot hide someone's reply",
+      call("PATCH", f"/prompts/{pid}/replies/{hrid}/hide", stranger["token"])[0], 403)
+check("the author cannot hide their way out of it",
+      call("PATCH", f"/prompts/{pid}/replies/{hrid}/hide", hid["token"])[0], 403)
+
+code, hidden = call("PATCH", f"/prompts/{pid}/replies/{hrid}/hide", host["token"])
+check("the host can hide it", code, 200)
+check("status is hidden", hidden.get("status"), "hidden")
+check("and who hid it is recorded",
+      sql(f"SELECT hidden_by IS NOT NULL AND hidden_at IS NOT NULL FROM channel_replies WHERE id='{hrid}'"), "t")
+
+_, pub2 = call("GET", f"/prompts/{pid}/replies")
+check("it leaves the public list",
+      any(r["id"] == hrid for r in pub2.get("replies") or []), False)
+
+call("PATCH", f"/prompts/{pid}/replies/{hrid}/hide", host["token"])
+check("un-hiding clears the record",
+      sql(f"SELECT hidden_by IS NULL AND hidden_at IS NULL FROM channel_replies WHERE id='{hrid}'"), "t")
+
+# ── 9. Blocking someone from the feed ────────────────────────────────────────
+# One reply per prompt bounds a single thread; this is for the person who comes
+# back to the next one.
+section("9. BLOCKING — scoped to this channel, not the platform")
+pest = mkuser("cfpest")
+_, p2 = call("POST", f"/orgs/{org_id}/prompts", host["token"], {"body": "Second prompt for blocking"})
+p2id = p2["id"]
+check("they can reply before being blocked",
+      call("POST", f"/prompts/{p2id}/replies", pest["token"], {"body": "First reply"})[0], 201)
+
+check("a stranger cannot block for someone else's channel",
+      call("POST", f"/orgs/{org_id}/feed-blocks", stranger["token"],
+           {"user_id": pest["user"]["id"]})[0], 403)
+check("staff cannot be blocked out of their own channel",
+      call("POST", f"/orgs/{org_id}/feed-blocks", host["token"],
+           {"user_id": host["user"]["id"]})[0], 403)
+
+check("the host can block them",
+      call("POST", f"/orgs/{org_id}/feed-blocks", host["token"],
+           {"user_id": pest["user"]["id"], "reason": "abuse"})[0], 201)
+
+_, p3 = call("POST", f"/orgs/{org_id}/prompts", host["token"], {"body": "Third prompt after the block"})
+check("a blocked account cannot reply to a new prompt",
+      call("POST", f"/prompts/{p3['id']}/replies", pest["token"], {"body": "Back again"})[0], 403)
+check("but everyone else still can",
+      call("POST", f"/prompts/{p3['id']}/replies", fan["token"], {"body": "Normal reply"})[0], 201)
+
+_, blocks = call("GET", f"/orgs/{org_id}/feed-blocks", host["token"])
+check("the block is listed for staff", len(blocks.get("blocks") or []), 1)
+check("blocking twice is not an error",
+      call("POST", f"/orgs/{org_id}/feed-blocks", host["token"],
+           {"user_id": pest["user"]["id"]})[0], 201)
+
+call("DELETE", f"/orgs/{org_id}/feed-blocks/{pest['user']['id']}", host["token"])
+check("unblocking lets them back in",
+      call("POST", f"/prompts/{p3['id']}/replies", pest["token"], {"body": "Behaving now"})[0], 201)
+
 print(f"\nRESULT: {sum(results)}/{len(results)} passed",
       "— ALL PASS" if all(results) else "— FAILURES PRESENT")
 raise SystemExit(0 if all(results) else 1)

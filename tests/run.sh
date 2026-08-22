@@ -31,7 +31,15 @@ run_suite () { # $1=db  $2=port  $3=script  $4=extra env
   stop_server "$2"
   dropdb --if-exists "$1" 2>/dev/null
   createdb "$1"
-  ( cd "$BACKEND" && DATABASE_URL="postgresql://localhost/$1" npm run migrate >/dev/null 2>&1 )
+  # Not silenced. A failed migration used to vanish here and the suite then ran
+  # against a half-built schema, reporting a pile of 500s instead of the one
+  # line saying the schema never got made.
+  if ! ( cd "$BACKEND" && DATABASE_URL="postgresql://localhost/$1" npm run migrate > "/tmp/migrate_$1.log" 2>&1 ); then
+    echo "MIGRATIONS FAILED ($1) — suite skipped"
+    tail -12 "/tmp/migrate_$1.log"
+    FAILED=1
+    return
+  fi
   start_api "$1" "$2" "$4" || { FAILED=1; return; }
   echo ""
   echo "############ $3 ############"

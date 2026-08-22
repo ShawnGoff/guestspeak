@@ -12,7 +12,10 @@ import {
   unfollowOrg,
   searchOrgs,
 } from '../controllers/orgController';
-import { listPrompts, createPrompt } from '../controllers/channelFeedController';
+import {
+  listPrompts, createPrompt,
+  blockFromFeed, unblockFromFeed, listFeedBlocks,
+} from '../controllers/channelFeedController';
 import { requireAuth, requireRegistered, optionalAuth } from '../middleware/auth';
 
 const router = Router();
@@ -58,6 +61,13 @@ router.delete('/:id/members/:userId', requireAuth, removeMember);
 // POST  /api/orgs/:id/prompts
 router.get('/:id/prompts',  optionalAuth,      listPrompts);
 router.post('/:id/prompts', requireRegistered, createPrompt);
+
+// Feed blocks — stop someone replying to this channel at all. Scoped to the
+// channel, not the platform: a host being done with someone should not decide
+// that for anybody else's channel.
+router.get('/:id/feed-blocks',            requireRegistered, listFeedBlocks);
+router.post('/:id/feed-blocks',           requireRegistered, blockFromFeed);
+router.delete('/:id/feed-blocks/:userId', requireRegistered, unblockFromFeed);
 
 router.post('/:id/follow', requireRegistered, followOrg);
 router.delete('/:id/follow', requireRegistered, unfollowOrg);

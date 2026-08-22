@@ -141,12 +141,22 @@ export async function createReply(req: Request, res: Response, next: NextFunctio
     const callerId = req.user!.userId;
 
     const promptResult = await pool.query(
-      'SELECT id, closed_at FROM channel_prompts WHERE id = $1',
-      [promptId],
+      `SELECT p.id, p.closed_at,
+              EXISTS (
+                SELECT 1 FROM channel_feed_blocks b
+                 WHERE b.org_id = p.org_id AND b.user_id = $2
+              ) AS blocked
+         FROM channel_prompts p WHERE p.id = $1`,
+      [promptId, callerId],
     );
     if (!promptResult.rows[0]) throw new AppError(404, 'Prompt not found');
     if (promptResult.rows[0].closed_at) {
       throw new AppError(410, 'This prompt is no longer taking replies');
+    }
+    // Deliberately indistinguishable from any other refusal. Telling someone
+    // they have been blocked invites them back with a second account.
+    if (promptResult.rows[0].blocked) {
+      throw new AppError(403, 'You cannot reply to this channel');
     }
 
     const who = await pool.query('SELECT username FROM users WHERE id = $1', [callerId]);
@@ -192,6 +202,127 @@ export async function listReplies(req: Request, res: Response, next: NextFunctio
     );
 
     res.json({ replies: result.rows });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * PATCH /api/prompts/:promptId/replies/:replyId/hide
+ *
+ * Toggles a reply out of the public list. Channel staff only.
+ *
+ * Records who and when. `status` alone says a reply is hidden; it does not say
+ * who decided that, which is exactly what an author asking why they were
+ * removed needs answering from.
+ */
+export async function hideReply(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { promptId, replyId } = req.params;
+    const callerId = req.user!.userId;
+
+    const owner = await pool.query(
+      `SELECT p.org_id FROM channel_replies r
+         JOIN channel_prompts p ON p.id = r.prompt_id
+        WHERE r.id = $1 AND r.prompt_id = $2`,
+      [replyId, promptId],
+    );
+    if (!owner.rows[0]) throw new AppError(404, 'Reply not found');
+    await requireChannelStaff(owner.rows[0].org_id, callerId);
+
+    const result = await pool.query(
+      `UPDATE channel_replies
+          SET status    = CASE WHEN status = 'hidden' THEN 'new' ELSE 'hidden' END,
+              -- Cast explicitly. With NULL in the other arm Postgres cannot
+              -- infer the parameter's type and rejects it as text — the same
+              -- inference trap that broke question status changes.
+              hidden_by = CASE WHEN status = 'hidden' THEN NULL ELSE $2::uuid END,
+              hidden_at = CASE WHEN status = 'hidden' THEN NULL ELSE NOW() END
+        WHERE id = $1
+        RETURNING id, prompt_id, body, status, created_at`,
+      [replyId, callerId],
+    );
+
+    res.json(result.rows[0]);
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * POST /api/orgs/:id/feed-blocks — stop someone replying to this channel.
+ *
+ * One reply per prompt already bounds a single thread, so hiding handles a bad
+ * reply. This is for the person who keeps coming back to the next prompt.
+ *
+ * Scoped to the channel's feed, not the platform: a host deciding they are done
+ * with someone should not be deciding it for anybody else's channel.
+ */
+export async function blockFromFeed(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { id: orgId } = req.params;
+    const callerId = req.user!.userId;
+    const { user_id, reason } = z.object({
+      user_id: z.string().uuid(),
+      reason: z.string().max(500).optional(),
+    }).parse(req.body);
+
+    await requireChannelStaff(orgId, callerId);
+
+    // Staff blocking staff would be a way to lock a co-owner out of their own
+    // channel's feed, so it is refused rather than merely discouraged.
+    const target = await pool.query(
+      'SELECT role FROM organization_members WHERE org_id = $1 AND user_id = $2',
+      [orgId, user_id],
+    );
+    if (target.rows[0]) throw new AppError(403, 'You cannot block someone who runs this channel');
+
+    await pool.query(
+      `INSERT INTO channel_feed_blocks (org_id, user_id, blocked_by, reason)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (org_id, user_id) DO NOTHING`,
+      [orgId, user_id, callerId, reason ?? null],
+    );
+
+    res.status(201).json({ blocked: true });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/** DELETE /api/orgs/:id/feed-blocks/:userId */
+export async function unblockFromFeed(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { id: orgId, userId } = req.params;
+    await requireChannelStaff(orgId, req.user!.userId);
+
+    await pool.query(
+      'DELETE FROM channel_feed_blocks WHERE org_id = $1 AND user_id = $2',
+      [orgId, userId],
+    );
+
+    res.json({ blocked: false });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/** GET /api/orgs/:id/feed-blocks — staff only. */
+export async function listFeedBlocks(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { id: orgId } = req.params;
+    await requireChannelStaff(orgId, req.user!.userId);
+
+    const result = await pool.query(
+      `SELECT b.user_id, b.reason, b.created_at, u.username
+         FROM channel_feed_blocks b
+         JOIN users u ON u.id = b.user_id
+        WHERE b.org_id = $1
+        ORDER BY b.created_at DESC`,
+      [orgId],
+    );
+
+    res.json({ blocks: result.rows });
   } catch (err) {
     next(err);
   }
