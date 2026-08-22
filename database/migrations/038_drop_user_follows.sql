@@ -1,0 +1,13 @@
+-- Migration 038: drop user_follows
+--
+-- Stage two of the following consolidation. a6ceddb stopped the application
+-- reading or writing this table; nothing has touched it since, and the account
+-- deletion cleanup that was the last reference is gone in the same commit as
+-- this file.
+--
+-- Deliberately split from a6ceddb rather than shipped with it. Additive
+-- migrations must run before the code that needs them; a DROP is the reverse,
+-- and one that races the deploy takes the still-running code down with it. The
+-- safe order is: stop using the table, deploy, confirm, then drop. An orphaned
+-- table costs nothing in the meantime.
+DROP TABLE IF EXISTS user_follows;
