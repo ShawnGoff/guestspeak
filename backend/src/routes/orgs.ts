@@ -12,6 +12,7 @@ import {
   unfollowOrg,
   searchOrgs,
 } from '../controllers/orgController';
+import { listPrompts, createPrompt } from '../controllers/channelFeedController';
 import { requireAuth, requireRegistered, optionalAuth } from '../middleware/auth';
 
 const router = Router();
@@ -52,6 +53,12 @@ router.delete('/:id/members/:userId', requireAuth, removeMember);
 // the go-live fan-out filters is_guest — and whose token disappears with their
 // browser. Following is an account feature; there is nothing to follow with
 // until you have one.
+// Channel feed — the host asks, followers reply.
+// GET   /api/orgs/:id/prompts
+// POST  /api/orgs/:id/prompts
+router.get('/:id/prompts',  optionalAuth,      listPrompts);
+router.post('/:id/prompts', requireRegistered, createPrompt);
+
 router.post('/:id/follow', requireRegistered, followOrg);
 router.delete('/:id/follow', requireRegistered, unfollowOrg);
 

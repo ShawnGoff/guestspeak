@@ -163,6 +163,23 @@ export const questionLimiter = rateLimit({
 });
 
 /**
+ * Channel-feed replies.
+ *
+ * The session burst cooldown lives on session_participants and has nothing to
+ * key off here — a channel reply has no participant row. This is the stand-in,
+ * and it matters more than the session one because replies are free: there is
+ * no credit economy slowing anybody down.
+ */
+export const channelReplyLimiter = rateLimit({
+  windowMs: 60_000,
+  max: 5,
+  keyGenerator: callerKey,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Slow down — too many replies.' },
+});
+
+/**
  * Flagging — a moderation signal, so cheap mass-flagging must not be possible.
  * 20 per 5 min per caller.
  */
