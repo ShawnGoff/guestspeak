@@ -203,6 +203,48 @@ call("DELETE", f"/orgs/{org_id}/feed-blocks/{pest['user']['id']}", host["token"]
 check("unblocking lets them back in",
       call("POST", f"/prompts/{p3['id']}/replies", pest["token"], {"body": "Behaving now"})[0], 201)
 
+# ── 10. Telling followers ────────────────────────────────────────────────────
+# A host can post a prompt, but if nobody hears about it the feed only exists
+# for people who happen to visit the channel page.
+section("10. NOTIFYING — followers hear about a new prompt, once")
+nh = mkuser("cfnh")
+_, norg = call("POST", "/orgs", nh["token"],
+               {"name": f"Notify channel {stamp}", "slug": f"cfnot{stamp}"})
+norg_id = norg["id"]
+
+follower    = mkuser("cffol")
+nonfollower = mkuser("cfnon")
+call("POST", f"/orgs/{norg_id}/follow", follower["token"])
+
+call("POST", f"/orgs/{norg_id}/prompts", nh["token"], {"body": "First question for you all"})
+time.sleep(1)   # the fan-out runs after the response
+
+def notes(user_id):
+    return sql(f"SELECT count(*) FROM notifications WHERE user_id='{user_id}' "
+               f"AND type='channel:prompt'")
+
+check("a follower is notified", notes(follower["user"]["id"]), "1")
+check("someone who does not follow is not", notes(nonfollower["user"]["id"]), "0")
+check("the payload carries the channel",
+      sql(f"SELECT payload->>'org_id' FROM notifications WHERE type='channel:prompt' "
+          f"AND user_id='{follower['user']['id']}'"), norg_id)
+
+# The cooldown: posting again straight away must not blast them a second time.
+call("POST", f"/orgs/{norg_id}/prompts", nh["token"], {"body": "Second question, right away"})
+time.sleep(1)
+check("a second prompt within the cooldown does not notify again",
+      notes(follower["user"]["id"]), "1")
+check("but the prompt itself still posted",
+      sql(f"SELECT count(*) FROM channel_prompts WHERE org_id='{norg_id}'"), "2")
+
+# Backdate the notification past the window and the next one gets through.
+sql(f"UPDATE notifications SET created_at = NOW() - INTERVAL '7 hours' "
+    f"WHERE type='channel:prompt' AND payload->>'org_id'='{norg_id}'")
+call("POST", f"/orgs/{norg_id}/prompts", nh["token"], {"body": "Third question, next day"})
+time.sleep(1)
+check("once the cooldown has passed, followers hear again",
+      notes(follower["user"]["id"]), "2")
+
 print(f"\nRESULT: {sum(results)}/{len(results)} passed",
       "— ALL PASS" if all(results) else "— FAILURES PRESENT")
 raise SystemExit(0 if all(results) else 1)

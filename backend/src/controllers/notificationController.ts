@@ -66,6 +66,18 @@ function pushCopy(type: string, p: Record<string, unknown>): PushPayload | null 
         tag: `reply-${p.question_id ?? slug}`,
       };
 
+    case 'channel:prompt':
+      return {
+        title: p.org_name ? `${p.org_name} asked a question` : 'A channel asked a question',
+        body: String(p.prompt_body ?? 'Tap to answer.'),
+        url: p.org_slug ? `/org/${p.org_slug}` : '/',
+        // One per prompt. A host who posts twice should not have the second
+        // quietly replace the first, so the id is in the tag rather than the
+        // channel — unlike session:live, where repeated go-lives of the same
+        // session genuinely are the same event.
+        tag: `channel-prompt-${p.prompt_id ?? p.org_slug ?? ''}`,
+      };
+
     default:
       return null;
   }

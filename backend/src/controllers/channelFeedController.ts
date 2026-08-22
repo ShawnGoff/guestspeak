@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { pool } from '../db/pool';
 import { AppError } from '../middleware/errorHandler';
 import { filterText } from '../lib/wordFilter';
+import { createNotificationsForUsers } from './notificationController';
 
 /**
  * Channel feeds: a host asks their audience something between shows.
@@ -45,6 +46,67 @@ async function isStaffForPrompt(promptId: string, callerId: string | null): Prom
   return (result.rowCount ?? 0) > 0;
 }
 
+
+/**
+ * Hours a channel must wait before it can notify its followers again.
+ *
+ * A prompt is not urgent the way a session going live is, and the whole point
+ * of the feed is that a host can use it freely between shows. Those two pull
+ * against each other: posting should stay cheap, but every post reaching every
+ * follower's lock screen turns a channel people opted into a channel they mute.
+ * So the prompt always posts; only the notification is rationed.
+ */
+const NOTIFY_COOLDOWN_HOURS = 6;
+
+/**
+ * Tell a channel's followers about a new prompt.
+ *
+ * Fire-and-forget at the call site, like the go-live fan-out: the prompt is
+ * already committed and is the thing that matters, so a failure here must not
+ * fail the request or make the host think their post did not land.
+ *
+ * Only registered followers — the join enforces it. Guests cannot follow, but
+ * rows written before that route was locked still exist.
+ */
+async function notifyChannelFollowers(promptId: string, orgId: string, body: string) {
+  const recent = await pool.query(
+    `SELECT 1 FROM notifications
+      WHERE type = 'channel:prompt'
+        AND payload->>'org_id' = $1
+        AND created_at > NOW() - INTERVAL '${NOTIFY_COOLDOWN_HOURS} hours'
+      LIMIT 1`,
+    [orgId],
+  );
+  if (recent.rowCount) {
+    console.log(`[channelFeed] prompt ${promptId}: followers notified within the last ` +
+      `${NOTIFY_COOLDOWN_HOURS}h, skipping`);
+    return;
+  }
+
+  const { rows } = await pool.query(
+    `SELECT f.user_id, o.name AS org_name, o.slug AS org_slug
+       FROM org_followers f
+       JOIN users u ON u.id = f.user_id AND u.is_guest = false AND u.deleted_at IS NULL
+       JOIN organizations o ON o.id = f.org_id
+      WHERE f.org_id = $1`,
+    [orgId],
+  );
+  if (!rows.length) return;
+
+  await createNotificationsForUsers(
+    rows.map((r: { user_id: string }) => r.user_id),
+    'channel:prompt',
+    {
+      org_id: orgId,
+      org_name: rows[0].org_name,
+      org_slug: rows[0].org_slug,
+      prompt_id: promptId,
+      // Truncated: this becomes a push body, and a lock screen shows a line.
+      prompt_body: body.length > 120 ? body.slice(0, 117) + '…' : body,
+    },
+  );
+}
+
 /** POST /api/orgs/:id/prompts */
 export async function createPrompt(req: Request, res: Response, next: NextFunction) {
   try {
@@ -61,7 +123,13 @@ export async function createPrompt(req: Request, res: Response, next: NextFuncti
       [orgId, callerId, await filterText(body)],
     );
 
-    res.status(201).json({ ...result.rows[0], reply_count: 0, has_replied: false });
+    const created = result.rows[0];
+    res.status(201).json({ ...created, reply_count: 0, has_replied: false });
+
+    // After the response, and never awaited — see notifyChannelFollowers.
+    notifyChannelFollowers(created.id, orgId, created.body).catch(err =>
+      console.error('[channelFeed] follower notification failed:', err),
+    );
   } catch (err) {
     next(err);
   }
