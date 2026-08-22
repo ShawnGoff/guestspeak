@@ -1,6 +1,6 @@
 # Channels, following, and host feeds
 
-**Status:** spec, not built. Two decisions still open (§5).
+**Status:** spec, not built. All decisions made (§5). Build order in §6.
 
 Two changes that belong together. Following consolidates onto channels, and
 channels gain a feed where a host can put a question to their followers between
@@ -157,22 +157,28 @@ A feed entry carries the slug, and for an unlisted session the slug is its
 entire access control. This is exactly the bug that was found and fixed in
 Discover's following feed.
 
-## 5. Open decisions
+## 5. Decisions
 
-**Moving a session into a channel after the fact.** Needed the moment someone
-creates a channel after already running sessions. Day one, or accept the
-support load until later?
+**Moving a session into a channel — build it, but not day one.** Someone who
+hosts before creating a channel ends up with their history sitting outside the
+thing they made to showcase it. That is a real path — "this went well, now let
+me organise it" — but it only affects people who host first and organise later,
+and moving a session is a one-line update that can be done by hand for anyone
+who asks until it earns a button.
 
-**Do profiles keep a place in the nav?** Once `/u/:username` cannot be
-followed, it is username, join date and a session list. That may not earn its
-spot.
+**Profiles stay, but come out of the nav.** `/u/:username` is still worth
+having when you click a host's name and want to see who they are. It is not
+worth being a destination once there is nothing to do there. The follower count
+comes off it, because following is a channel relationship now.
 
 ## 6. Build order
 
-1. Drop person-follows: endpoints, profile button, Discover query, migration.
-2. "Move session to a channel" if it is day one.
-3. `channel_prompts` and `channel_replies`, host-posts and follower-replies.
-4. Channel-scoped moderation: hide a reply, mute an author.
-5. Notify followers when a prompt is posted — same fire-and-forget shape as the
+1. Drop person-follows: endpoints, profile button and follower count, Discover
+   query, migration. Self-contained, and nothing else depends on it.
+2. `channel_prompts` and `channel_replies`, host-posts and follower-replies.
+3. Channel-scoped moderation: hide a reply, mute an author. Day one with the
+   feed, not after it — free replies have no credit economy to slow them down.
+4. Notify followers when a prompt is posted — same fire-and-forget shape as the
    go-live fan-out, plus a limit on how often a host can blast their followers.
-6. Upcoming sessions rendered into the feed.
+5. Upcoming sessions rendered into the feed.
+6. "Move session into a channel", once someone asks for it.
