@@ -18,7 +18,8 @@ stop_server () {  # $1 = port
 
 start_api () {  # $1=db  $2=port  $3=extra env
   ( cd "$BACKEND" && env DATABASE_URL="postgresql://localhost/$1" JWT_SECRET="$SECRET" \
-      PORT="$2" NODE_ENV=development GUEST_IP_TOKEN_CAP=0 $3 \
+      PORT="$2" NODE_ENV=development GUEST_IP_TOKEN_CAP=0 \
+      REGISTER_LIMIT_PER_WINDOW=200 $3 \
       npm run dev > "/tmp/e2e_$1.log" 2>&1 & )
   for _ in $(seq 1 30); do
     curl -s "http://localhost:$2/health" >/dev/null 2>&1 && return 0

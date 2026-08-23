@@ -25,7 +25,10 @@ const UpdateOrgSchema = CreateOrgSchema.partial();
 
 const AddMemberSchema = z.object({
   user_id: z.string().uuid(),
-  role: z.enum(['owner', 'admin', 'member']).default('member'),
+  // No default. 'member' used to be one and granted nothing, so adding
+  // somebody without thinking about it produced a row that did nothing. The
+  // remaining roles both carry real power, so the caller has to choose.
+  role: z.enum(['owner', 'admin']),
 });
 
 function makeOrgSlug(name: string) {

@@ -1,6 +1,7 @@
 import rateLimit from 'express-rate-limit';
 import jwt from 'jsonwebtoken';
 import type { Request } from 'express';
+import { envIntMin } from '../lib/env';
 
 const JWT_SECRET = process.env.JWT_SECRET ?? '';
 
@@ -82,12 +83,17 @@ export const loginLimiter = rateLimit({
 });
 
 /**
- * Register + password reset — moderate.
- * 10 per 15 min per IP.
+ * Register + password reset — 10 per 15 min per IP.
+ *
+ * Configurable only so the end-to-end suites can raise it: they register a
+ * dozen accounts in a run from one address and were hitting it. The default is
+ * the production value, so forgetting to set the variable fails closed.
  */
+const REGISTER_MAX = envIntMin('REGISTER_LIMIT_PER_WINDOW', 10, 1);
+
 export const registerLimiter = rateLimit({
   windowMs: 15 * 60_000,
-  max: 10,
+  max: REGISTER_MAX,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Too many requests. Try again in 15 minutes.' },

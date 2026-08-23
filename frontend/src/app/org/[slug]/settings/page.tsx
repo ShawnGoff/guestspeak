@@ -32,7 +32,7 @@ interface Member {
   id: string;
   user_id: string;
   username: string;
-  role: 'owner' | 'admin' | 'member';
+  role: 'owner' | 'admin';
   joined_at: string;
 }
 
@@ -68,7 +68,10 @@ export default function OrgSettingsPage({ params }: { params: { slug: string } }
   const [memberSearch, setMemberSearch] = useState('');
   const [memberResults, setMemberResults] = useState<UserResult[]>([]);
   const [addingMember, setAddingMember] = useState(false);
-  const [memberRole, setMemberRole] = useState<'admin' | 'member'>('member');
+  // Admin is the only role you can add. 'member' used to be the default and
+  // granted nothing at all, so the choice was between real access and a row
+  // that did nothing — which is not a choice worth putting in front of anyone.
+  const memberRole = 'admin' as const;
   const searchTimer = useRef<ReturnType<typeof setTimeout>>();
 
   const loadData = useCallback(async () => {
@@ -396,17 +399,9 @@ export default function OrgSettingsPage({ params }: { params: { slug: string } }
                   </div>
                 )}
               </div>
-              <select
-                value={memberRole}
-                onChange={e => setMemberRole(e.target.value as 'admin' | 'member')}
-                className="input w-auto flex-shrink-0"
-              >
-                <option value="member">Member</option>
-                <option value="admin">Admin</option>
-              </select>
             </div>
             <p className="text-xs text-purple-200/60">
-              Admins can manage all sessions and members. Members are listed under the channel but have no special access.
+              Anyone you add becomes an admin: they can create and run sessions for this channel, moderate its feed, and manage members.
             </p>
           </div>
 

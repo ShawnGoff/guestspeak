@@ -396,6 +396,29 @@ check("newest first when asked", newest["replies"][0]["body"], "Reply number 11"
 _, clamped = call("GET", f"/prompts/{ppid}/replies?limit=99999")
 check("an absurd limit is clamped, not honoured", clamped.get("limit"), 100)
 
+# ── 12. The member role is gone ──────────────────────────────────────────────
+# It granted nothing: never checked anywhere, invisible in the member's own
+# channel list, and offered in the settings UI as though it did something.
+section("12. ROLES — a channel has owners and admins, nothing else")
+mr = mkuser("cfrole")
+check("'member' is refused",
+      call("POST", f"/orgs/{org_id}/members", host["token"],
+           {"user_id": mr["user"]["id"], "role": "member"})[0], 400)
+check("a role must be named at all",
+      call("POST", f"/orgs/{org_id}/members", host["token"],
+           {"user_id": mr["user"]["id"]})[0], 400)
+check("admin is accepted",
+      call("POST", f"/orgs/{org_id}/members", host["token"],
+           {"user_id": mr["user"]["id"], "role": "admin"})[0], 201)
+check("and it grants real access — they can post a prompt",
+      call("POST", f"/orgs/{org_id}/prompts", mr["token"], {"body": "Added as an admin"})[0], 201)
+check("the database refuses a member row outright",
+      "violates check constraint" in subprocess.run(
+          ["psql", DB, "-tAc",
+           f"INSERT INTO organization_members (org_id, user_id, role) "
+           f"VALUES ('{org_id}','{mr['user']['id']}','member')"],
+          capture_output=True, text=True).stderr, True)
+
 print(f"\nRESULT: {sum(results)}/{len(results)} passed",
       "— ALL PASS" if all(results) else "— FAILURES PRESENT")
 raise SystemExit(0 if all(results) else 1)
