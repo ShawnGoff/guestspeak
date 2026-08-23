@@ -152,19 +152,40 @@ function PromptCard({ prompt, isManager, onChanged }: {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState('');
   const [editError, setEditError] = useState<string | null>(null);
+  const [newestFirst, setNewestFirst] = useState(false);
+  const [total, setTotal] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
 
   const closed = !!prompt.closed_at;
   // Guests hold an account-shaped token but cannot reply — the account is the
   // bar. Sending them to register keeps the refusal off the server.
   const canReply = !closed && !replied && isLoggedIn() && !isGuest();
 
-  const loadReplies = useCallback(() => {
+  const PAGE = 25;
+
+  /** `append` continues the current list; otherwise it replaces it. */
+  const loadReplies = useCallback((opts?: { append?: boolean; newest?: boolean }) => {
+    const newest = opts?.newest ?? newestFirst;
+    const offset = opts?.append ? replies.length : 0;
     setLoadingReplies(true);
-    api.get<{ replies: Reply[] }>(`/prompts/${prompt.id}/replies`)
-      .then(d => setReplies(d.replies))
-      .catch(() => setReplies([]))
+    api.get<{ replies: Reply[]; total: number; has_more: boolean }>(
+      `/prompts/${prompt.id}/replies?limit=${PAGE}&offset=${offset}`
+      + `&sort=${newest ? 'newest' : 'oldest'}`,
+    )
+      .then(d => {
+        setReplies(prev => (opts?.append ? [...prev, ...d.replies] : d.replies));
+        setTotal(d.total);
+        setHasMore(d.has_more);
+      })
+      .catch(() => { if (!opts?.append) setReplies([]); })
       .finally(() => setLoadingReplies(false));
-  }, [prompt.id]);
+  }, [prompt.id, newestFirst, replies.length]);
+
+  function flipSort() {
+    const next = !newestFirst;
+    setNewestFirst(next);
+    loadReplies({ newest: next });
+  }
 
   function toggle() {
     const next = !open;
@@ -292,7 +313,16 @@ function PromptCard({ prompt, isManager, onChanged }: {
             <p className="text-xs text-purple-200/60">Loading…</p>
           ) : replies.length === 0 ? (
             <p className="text-xs text-purple-200/60">No replies yet.</p>
-          ) : replies.map(r => (
+          ) : (<>
+          {total > 1 && (
+            <button
+              onClick={flipSort}
+              className="text-xs font-semibold text-purple-200/70 hover:text-white transition-colors"
+            >
+              {newestFirst ? 'Newest first' : 'Oldest first'} · switch
+            </button>
+          )}
+          {replies.map(r => (
             <div key={r.id} className="flex items-start gap-2">
               <div className="flex-1 min-w-0">
                 <p className="text-[10px] font-semibold text-violet-300 uppercase tracking-wide mb-0.5">
@@ -354,6 +384,16 @@ function PromptCard({ prompt, isManager, onChanged }: {
               )}
             </div>
           ))}
+          {hasMore && (
+            <button
+              onClick={() => loadReplies({ append: true })}
+              disabled={loadingReplies}
+              className="text-xs font-semibold text-violet-300 hover:text-white transition-colors disabled:opacity-50"
+            >
+              {loadingReplies ? 'Loading…' : `Show more · ${total - replies.length} left`}
+            </button>
+          )}
+          </>)}
         </div>
       )}
     </div>

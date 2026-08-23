@@ -326,6 +326,51 @@ bylines = [r["author_username"] for r in after.get("replies") or []]
 check("a deleted account's name is gone from its replies", gone_name in bylines, False)
 check("and the reply itself survives, unattributed", "Removed account" in bylines, True)
 
+# ── 12. Closing freezes the thread ───────────────────────────────────────────
+# The edit window exists so an author can fix a typo. It should not let answers
+# shift underneath a host who has closed the prompt and is done reading it.
+section("12. CLOSED — a closed prompt freezes its replies")
+_, fp = call("POST", f"/orgs/{org_id}/prompts", host["token"], {"body": "A prompt to be frozen"})
+fpid = fp["id"]
+_, fr = call("POST", f"/prompts/{fpid}/replies", fan["token"], {"body": "An answer before closing"})
+frid = fr["id"]
+check("editable while the prompt is open",
+      call("PATCH", f"/prompts/{fpid}/replies/{frid}", fan["token"],
+           {"body": "An answer, tidied up"})[0], 200)
+call("PATCH", f"/prompts/{fpid}/close", host["token"])
+check("frozen once the host closes it",
+      call("PATCH", f"/prompts/{fpid}/replies/{frid}", fan["token"],
+           {"body": "Sneaking a change in after close"})[0], 410)
+check("and the text is untouched",
+      sql(f"SELECT body FROM channel_replies WHERE id='{frid}'"), "An answer, tidied up")
+
+# ── 13. Paging and sort ──────────────────────────────────────────────────────
+# A popular prompt used to truncate silently at 200 with no way to see the rest.
+section("13. PAGING — a long thread pages, and can be read newest first")
+_, pp = call("POST", f"/orgs/{org_id}/prompts", host["token"], {"body": "A prompt with many replies"})
+ppid = pp["id"]
+# Seeded directly: one reply per account is the rule, and the point here is the
+# read path, not the write path.
+for i in range(12):
+    sql(f"INSERT INTO channel_replies (prompt_id, author_display_name, body, created_at) "
+        f"VALUES ('{ppid}', 'Person{i:02d}', 'Reply number {i:02d}', NOW() + INTERVAL '{i} seconds')")
+
+_, page1 = call("GET", f"/prompts/{ppid}/replies?limit=5")
+check("a page is the size asked for", len(page1.get("replies") or []), 5)
+check("the total is the whole thread", page1.get("total"), 12)
+check("and it says there is more", page1.get("has_more"), True)
+check("oldest first by default", page1["replies"][0]["body"], "Reply number 00")
+
+_, page3 = call("GET", f"/prompts/{ppid}/replies?limit=5&offset=10")
+check("the last page returns the remainder", len(page3.get("replies") or []), 2)
+check("and says there is no more", page3.get("has_more"), False)
+
+_, newest = call("GET", f"/prompts/{ppid}/replies?sort=newest&limit=5")
+check("newest first when asked", newest["replies"][0]["body"], "Reply number 11")
+
+_, clamped = call("GET", f"/prompts/{ppid}/replies?limit=99999")
+check("an absurd limit is clamped, not honoured", clamped.get("limit"), 100)
+
 print(f"\nRESULT: {sum(results)}/{len(results)} passed",
       "— ALL PASS" if all(results) else "— FAILURES PRESENT")
 raise SystemExit(0 if all(results) else 1)

@@ -260,6 +260,15 @@ export async function listReplies(req: Request, res: Response, next: NextFunctio
     const callerId = req.user?.isGuest === false ? req.user.userId : null;
     const isStaff = await isStaffForPrompt(promptId, callerId);
 
+    // Oldest first by default: a thread reads in the order it was written, and
+    // that is what a host working through it wants. Newest first is for coming
+    // back to something already long.
+    const newestFirst = req.query.sort === 'newest';
+    // Clamped rather than trusted. A caller asking for a million rows should
+    // get a page, not a timeout.
+    const limit = Math.min(Math.max(parseInt(req.query.limit as string) || 50, 1), 100);
+    const offset = Math.max(parseInt(req.query.offset as string) || 0, 0);
+
     const result = await pool.query(
       `SELECT r.id, r.prompt_id, r.body, r.status, r.created_at, r.edited_at,
               COALESCE(r.author_display_name, u.username, 'Removed account') AS author_username,
@@ -268,17 +277,29 @@ export async function listReplies(req: Request, res: Response, next: NextFunctio
               -- snapshot taken when the reply was written.
               ($3::uuid IS NOT NULL AND r.author_id = $3) AS is_mine,
               GREATEST(0, ${REPLY_EDIT_WINDOW_SECONDS} -
-                EXTRACT(EPOCH FROM (NOW() - r.created_at))::int) AS edit_seconds_left
+                EXTRACT(EPOCH FROM (NOW() - r.created_at))::int) AS edit_seconds_left,
+              -- The total the caller is allowed to see, carried on every row so
+              -- paging does not need a second round-trip. Counted over the same
+              -- visibility filter, or a moderator's page count would disagree
+              -- with the audience's.
+              COUNT(*) OVER ()::int AS total
          FROM channel_replies r
          LEFT JOIN users u ON u.id = r.author_id
         WHERE r.prompt_id = $1
           AND ($2 OR r.status <> 'hidden')
-        ORDER BY r.created_at
-        LIMIT 200`,
-      [promptId, isStaff, callerId],
+        ORDER BY r.created_at ${newestFirst ? 'DESC' : 'ASC'}
+        LIMIT $4 OFFSET $5`,
+      [promptId, isStaff, callerId, limit, offset],
     );
 
-    res.json({ replies: result.rows });
+    const total = result.rows[0]?.total ?? 0;
+    res.json({
+      replies: result.rows.map(({ total: _t, ...r }) => r),
+      total,
+      limit,
+      offset,
+      has_more: offset + result.rows.length < total,
+    });
   } catch (err) {
     next(err);
   }
