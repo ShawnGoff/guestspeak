@@ -53,6 +53,10 @@ async function isStaffForPrompt(promptId: string, callerId: string | null): Prom
 /**
  * Hours a channel must wait before it can notify its followers again.
  *
+ * Tracked on the channel rather than derived from notification rows. Those are
+ * deletable — a follower can clear theirs and account deletion removes them
+ * wholesale — so a cooldown read from them silently resets.
+ *
  * A prompt is not urgent the way a session going live is, and the whole point
  * of the feed is that a host can use it freely between shows. Those two pull
  * against each other: posting should stay cheap, but every post reaching every
@@ -72,20 +76,9 @@ const NOTIFY_COOLDOWN_HOURS = 6;
  * rows written before that route was locked still exist.
  */
 async function notifyChannelFollowers(promptId: string, orgId: string, body: string) {
-  const recent = await pool.query(
-    `SELECT 1 FROM notifications
-      WHERE type = 'channel:prompt'
-        AND payload->>'org_id' = $1
-        AND created_at > NOW() - INTERVAL '${NOTIFY_COOLDOWN_HOURS} hours'
-      LIMIT 1`,
-    [orgId],
-  );
-  if (recent.rowCount) {
-    console.log(`[channelFeed] prompt ${promptId}: followers notified within the last ` +
-      `${NOTIFY_COOLDOWN_HOURS}h, skipping`);
-    return;
-  }
-
+  // Who would hear about it, before claiming anything. Claiming first meant a
+  // channel with no followers burned its cooldown telling nobody, and the next
+  // prompt — after it gained one — was silently skipped.
   const { rows } = await pool.query(
     `SELECT f.user_id, o.name AS org_name, o.slug AS org_slug
        FROM org_followers f
@@ -95,6 +88,25 @@ async function notifyChannelFollowers(promptId: string, orgId: string, body: str
     [orgId],
   );
   if (!rows.length) return;
+
+  // Claim the slot atomically. A read-then-write is a check-then-act: two
+  // prompts posted together would both see no recent notification and both fan
+  // out. The UPDATE only matches when the cooldown has lapsed, so exactly one
+  // caller wins it.
+  const claimed = await pool.query(
+    `UPDATE organizations
+        SET followers_notified_at = NOW()
+      WHERE id = $1
+        AND (followers_notified_at IS NULL
+             OR followers_notified_at < NOW() - INTERVAL '${NOTIFY_COOLDOWN_HOURS} hours')
+      RETURNING id`,
+    [orgId],
+  );
+  if (claimed.rowCount === 0) {
+    console.log(`[channelFeed] prompt ${promptId}: followers notified within the last `
+      + `${NOTIFY_COOLDOWN_HOURS}h, skipping`);
+    return;
+  }
 
   await createNotificationsForUsers(
     rows.map((r: { user_id: string }) => r.user_id),

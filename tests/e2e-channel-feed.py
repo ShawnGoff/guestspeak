@@ -237,13 +237,38 @@ check("a second prompt within the cooldown does not notify again",
 check("but the prompt itself still posted",
       sql(f"SELECT count(*) FROM channel_prompts WHERE org_id='{norg_id}'"), "2")
 
-# Backdate the notification past the window and the next one gets through.
-sql(f"UPDATE notifications SET created_at = NOW() - INTERVAL '7 hours' "
-    f"WHERE type='channel:prompt' AND payload->>'org_id'='{norg_id}'")
+# The clock lives on the channel now, not on the notification rows.
+check("the cooldown is recorded on the channel",
+      sql(f"SELECT followers_notified_at IS NOT NULL FROM organizations WHERE id='{norg_id}'"), "t")
+
+# Deleting the notifications must NOT reset it — that was the old flaw: a
+# follower clearing theirs, or an account deletion, silently reopened the window.
+sql(f"DELETE FROM notifications WHERE type='channel:prompt' AND payload->>'org_id'='{norg_id}'")
+call("POST", f"/orgs/{norg_id}/prompts", nh["token"], {"body": "After clearing notifications"})
+time.sleep(1)
+check("clearing notifications does not reopen the window",
+      notes(follower["user"]["id"]), "0")
+
+# Backdate the channel's clock and the next one gets through.
+sql(f"UPDATE organizations SET followers_notified_at = NOW() - INTERVAL '7 hours' "
+    f"WHERE id='{norg_id}'")
 call("POST", f"/orgs/{norg_id}/prompts", nh["token"], {"body": "Third question, next day"})
 time.sleep(1)
 check("once the cooldown has passed, followers hear again",
-      notes(follower["user"]["id"]), "2")
+      notes(follower["user"]["id"]), "1")
+
+# A channel with no followers must not burn its cooldown on nobody.
+_, lonely = call("POST", "/orgs", nh["token"],
+                 {"name": f"Lonely {stamp}", "slug": f"lonely{stamp}"})
+call("POST", f"/orgs/{lonely['id']}/prompts", nh["token"], {"body": "Nobody is listening yet"})
+time.sleep(1)
+check("no followers means the clock is not started",
+      sql(f"SELECT followers_notified_at IS NULL FROM organizations WHERE id='{lonely['id']}'"), "t")
+call("POST", f"/orgs/{lonely['id']}/follow", nonfollower["token"])
+call("POST", f"/orgs/{lonely['id']}/prompts", nh["token"], {"body": "Now someone is"})
+time.sleep(1)
+check("so the first real follower still hears the next prompt",
+      notes(nonfollower["user"]["id"]), "1")
 
 # ── 11. Fixing your own reply ────────────────────────────────────────────────
 # One reply per prompt made a typo permanent: you could not fix it and could not
