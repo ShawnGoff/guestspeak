@@ -4,6 +4,7 @@ import slugify from 'slugify';
 import { randomBytes } from 'crypto';
 import { pool } from '../db/pool';
 import { AppError } from '../middleware/errorHandler';
+import { QUESTION_AUTHOR_SQL, QUESTION_AUTHOR_JOINS } from '../lib/questionHelpers';
 
 const CreateOrgSchema = z.object({
   name: z.string().min(1).max(255),
@@ -214,13 +215,14 @@ export async function getOrg(req: Request, res: Response, next: NextFunction) {
       `SELECT
          q.id, q.body AS text, q.vote_count, (q.status = 'answered') AS is_answered,
          s.title AS session_title, s.slug AS session_slug,
-         CASE
-           WHEN q.post_anonymously THEN 'Anon' || q.anon_number
-           ELSE COALESCE(u.username, 'Anonymous')
-         END AS author_username
+         -- Was COALESCE(u.username, 'Anonymous') with no participant join, so a
+         -- guest's highlighted question read "Anonymous" here while showing
+         -- their chosen name in the session it came from — and a deleted
+         -- account was labelled anonymous rather than removed.
+         ${QUESTION_AUTHOR_SQL} AS author_username
        FROM questions q
        JOIN sessions s ON s.id = q.session_id
-       LEFT JOIN users u ON u.id = q.author_id AND NOT q.post_anonymously
+       ${QUESTION_AUTHOR_JOINS}
        WHERE s.org_id = $1
          AND s.visibility = 'public'
          AND q.status != 'hidden'

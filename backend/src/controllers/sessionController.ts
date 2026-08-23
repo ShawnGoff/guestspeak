@@ -11,6 +11,7 @@ import { rejectIfBanned } from '../lib/wordFilter';
 import { sendSessionLive } from '../lib/mailer';
 import { feedModeFor, FEED_POLL_INTERVAL_MS } from '../lib/feedPolicy';
 import { envIntMin } from '../lib/env';
+import { QUESTION_AUTHOR_SQL, QUESTION_AUTHOR_JOINS } from '../lib/questionHelpers';
 import {
   GUEST_REGEN_LIMIT, GUEST_CREDIT_CAP, USER_CREDIT_CAP, CREDIT_REGEN_MINUTES,
 } from '../lib/credits';
@@ -837,17 +838,9 @@ export async function exportSession(req: Request, res: Response, next: NextFunct
     const questionsResult = await pool.query(
       `SELECT q.body, q.vote_count, q.status, q.is_pinned, q.host_reply,
               q.host_replied_at, q.created_at,
-              CASE
-                WHEN q.post_anonymously THEN 'Anon' || q.anon_number
-                ELSE COALESCE(q.author_display_name, u.username, sp.guest_username, 'Removed participant')
-              END AS author
+              ${QUESTION_AUTHOR_SQL} AS author
        FROM questions q
-       LEFT JOIN users u ON u.id = q.author_id AND NOT q.post_anonymously
-       LEFT JOIN session_participants sp
-         ON sp.session_id = q.session_id
-         AND NOT q.post_anonymously
-         AND q.author_guest_token IS NOT NULL
-         AND sp.guest_token = q.author_guest_token
+       ${QUESTION_AUTHOR_JOINS}
        WHERE q.session_id = $1 AND q.status NOT IN ('hidden', 'pending')
        ORDER BY q.is_pinned DESC, q.vote_count DESC, q.created_at ASC`,
       [id],

@@ -36,6 +36,17 @@ def sql(q):
     return subprocess.run(["psql", DB, "-tAc", q],
                           capture_output=True, text=True, check=True).stdout.strip()
 
+def call_raw(method, path, token=None):
+    """Like call(), but returns the body as text — the CSV export is not JSON."""
+    req = urllib.request.Request(API + path, method=method)
+    if token:
+        req.add_header("Authorization", "Bearer " + token)
+    try:
+        with urllib.request.urlopen(req, timeout=15) as r:
+            return r.status, r.read().decode(errors="replace")
+    except urllib.error.HTTPError as e:
+        return e.code, e.read().decode(errors="replace")
+
 results = []
 def check(label, got, want):
     good = got == want
@@ -354,6 +365,47 @@ code2, _ = call("POST", "/admin/bans", ad_host,
 check("an admin can ban the author by question", code2, 201)
 check("and the ban landed on the right guest",
       sql(f"SELECT count(*) FROM platform_bans WHERE guest_token='{real_token}'"), "1")
+
+# ── The byline is the same everywhere it appears ────────────────────────────
+# The masking CASE was written out in four places and had already drifted: the
+# channel page's copy never consulted the display-name snapshot or a guest's
+# chosen name, so the same question read differently depending on where you
+# looked, and a deleted account was labelled anonymous rather than removed.
+section("BYLINE — one projection, so anonymity cannot drift between queries")
+by_host = new_host("byl")
+_, by_sess = call("POST", "/sessions", by_host,
+                  {"title": f"Byline {stamp}", "visibility": "public", "credits_per_user": 6})
+by_sid = by_sess["id"]
+call("POST", f"/sessions/{by_sid}/go-live", by_host)
+
+# A guest with a chosen name, posting openly.
+_, byg = call("POST", "/auth/guest")
+GUEST_NAME = f"NamedGuest{stamp}"
+call("POST", f"/sessions/{by_sid}/join", byg["token"], {"guest_username": GUEST_NAME})
+_, gq = call("POST", "/questions", byg["token"],
+             {"session_id": by_sid, "body": "A guest question with a real byline"})
+sql(f"UPDATE questions SET vote_count = 5 WHERE id='{gq['id']}'")
+
+# And a registered user posting anonymously.
+_, byu = call("POST", "/auth/register", body={
+    "email": f"byu{stamp}@t.com", "username": f"byu{stamp}", "password": "password123"})
+call("POST", f"/sessions/{by_sid}/join", byu["token"])
+_, aq = call("POST", "/questions", byu["token"],
+             {"session_id": by_sid, "body": "An anonymous question", "post_anonymously": True})
+
+_, feed = call("GET", f"/questions?sessionId={by_sid}")
+rows = {r["id"]: r for r in feed.get("data") or []}
+check("a named guest shows their name in the feed",
+      rows.get(gq["id"], {}).get("author_username"), GUEST_NAME)
+check("an anonymous post shows Anon in the feed",
+      str(rows.get(aq["id"], {}).get("author_username", "")).startswith("Anon"), True)
+check("and carries no participant id",
+      rows.get(aq["id"], {}).get("participant_id"), None)
+
+# The CSV export is a separate query and must agree.
+code, csv = call_raw("GET", f"/sessions/{by_sid}/export", by_host)
+check("the export agrees on the guest's name", GUEST_NAME in csv, True)
+check("and does not leak the anonymous author", f"byu{stamp}" in csv, False)
 
 print(f"\nRESULT: {sum(results)}/{len(results)} passed",
       "— ALL PASS" if all(results) else "— FAILURES PRESENT")

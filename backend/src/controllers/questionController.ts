@@ -6,7 +6,10 @@ import { broadcast, broadcastByRole, broadcastElevated } from '../sse/broadcaste
 import { resolveCallerRole, requireHostOrOrgAdmin, type CallerRole } from '../db/permissions';
 import { filterText } from '../lib/wordFilter';
 import { createNotificationsForUsers } from './notificationController';
-import { fetchPublicQuestion } from '../lib/questionHelpers';
+import {
+  fetchPublicQuestion,
+  QUESTION_AUTHOR_SQL, QUESTION_AUTHOR_JOINS, QUESTION_MOD_COLUMNS,
+} from '../lib/questionHelpers';
 import { spendCredit } from '../lib/credits';
 import { cacheKey, getCached, setCached, invalidateSession } from '../lib/feedCache';
 type SortOption = 'echoes' | 'recent' | 'answered' | 'starred';
@@ -106,26 +109,10 @@ export async function getQuestions(req: Request, res: Response, next: NextFuncti
               q.host_reply, q.host_replied_at, q.created_at, q.edited_at,
               q.parent_question_id, q.thread_root_id,
               q.post_anonymously, q.anon_number,
-              -- For anon posts: return "Anon{n}" as the display name; hide real identity from everyone.
-              -- Named posts read the snapshot taken at post time, so removing or
-              -- renaming a guest never rewrites bylines already on screen.
-              CASE
-                WHEN q.post_anonymously THEN 'Anon' || q.anon_number
-                ELSE COALESCE(q.author_display_name, u.username, sp.guest_username, 'Removed participant')
-              END AS author_username,
-              -- participant_id and is_muted only for non-anon posts (avoids identity-via-mod-action)
-              CASE WHEN q.post_anonymously THEN NULL ELSE sp.id END AS participant_id,
-              CASE WHEN q.post_anonymously THEN NULL ELSE sp.is_muted END AS author_is_muted
+              ${QUESTION_AUTHOR_SQL} AS author_username,
+              ${QUESTION_MOD_COLUMNS}
        FROM questions q
-       LEFT JOIN users u ON u.id = q.author_id AND NOT q.post_anonymously
-       LEFT JOIN session_participants sp
-         ON sp.session_id = q.session_id
-         AND NOT q.post_anonymously
-         AND (
-           (q.author_guest_token IS NOT NULL AND sp.guest_token = q.author_guest_token)
-           OR
-           (q.author_id IS NOT NULL AND sp.user_id = q.author_id)
-         )
+       ${QUESTION_AUTHOR_JOINS}
        WHERE ${conditions.join(' AND ')}
        ORDER BY ${orderBy}
        ${limitClause}`,
