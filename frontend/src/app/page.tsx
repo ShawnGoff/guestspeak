@@ -287,7 +287,7 @@ function Hero() {
             </h1>
 
             <p className="text-lg sm:text-xl text-purple-200/90 mb-10 max-w-xl lg:max-w-none">
-              Your audience asks, adds Echoes to what resonates, and the best questions rise to the top — whether they&apos;re in the room, tuned in live, or sending questions days ahead. Any browser, no account needed to join.
+              Your audience asks, Echoes what resonates, and the best questions rise — in the room, tuned in live, or days ahead. No account needed to join.
             </p>
 
             {/* CTAs */}
@@ -345,31 +345,6 @@ function Hero() {
   );
 }
 
-// ─── Demo Strip ──────────────────────────────────────────────────────────────
-
-function DemoStrip() {
-  return (
-    <section className="py-10 px-4 border-y border-brand-border/40">
-      <div className="max-w-6xl mx-auto">
-        <div className="rounded-2xl bg-gradient-to-r from-brand-orange/10 via-brand-purple/10 to-brand-orange/5 border border-brand-orange/20 px-6 sm:px-10 py-7 flex flex-col sm:flex-row items-center justify-between gap-6">
-          <div>
-            <p className="text-xs text-brand-orange font-semibold uppercase tracking-widest mb-1">Interactive demo</p>
-            <p className="text-white font-bold text-lg leading-snug">See both sides — host and audience</p>
-            <p className="text-purple-200/80 text-sm mt-1">Ask a question, add an Echo, then flip over to the host controls — all live.</p>
-          </div>
-          <Link
-            href="/demo"
-            className="btn-primary px-8 py-3.5 shrink-0 whitespace-nowrap text-sm"
-          >
-            <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse mr-1.5" />
-            Try the demo →
-          </Link>
-        </div>
-      </div>
-    </section>
-  );
-}
-
 // ─── How it works ────────────────────────────────────────────────────────────
 
 const HOW_IT_WORKS = [
@@ -395,7 +370,7 @@ const HOW_IT_WORKS = [
 
 function HowItWorks() {
   return (
-    <section className="py-14 sm:py-20 px-4">
+    <section className="pt-10 pb-14 sm:py-20 px-4">
       <div className="max-w-6xl mx-auto">
         <SectionLabel>How it works</SectionLabel>
         <h2 className="text-3xl sm:text-5xl font-extrabold text-white text-center mb-3 sm:mb-4">
@@ -458,14 +433,14 @@ const FEATURES = [
 
 function Features() {
   return (
-    <section className="py-14 sm:py-24 px-4 border-t border-brand-border/40">
+    <section className="pt-10 pb-14 sm:py-24 px-4 border-t border-brand-border/40">
       <div className="max-w-6xl mx-auto">
         <SectionLabel>Features</SectionLabel>
         <h2 className="text-3xl sm:text-5xl font-extrabold text-white text-center mb-3 sm:mb-4">
-          Everything you need,<br />nothing you don&apos;t
+          Built for the way<br />shows actually run
         </h2>
         <p className="text-purple-200/80 text-center text-base sm:text-lg mb-8 sm:mb-16 max-w-xl mx-auto">
-          Built for AMAs, panels, radio shows, podcasts, classrooms, town halls — live in the room or listening from anywhere.
+          AMAs, panels, radio, podcasts, classrooms — live in the room or listening anywhere.
         </p>
 
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -705,7 +680,10 @@ export default function HomePage() {
     <main className="overflow-x-hidden">
       <Nav />
       <Hero />
-      <DemoStrip />
+      {/* DemoStrip removed: the hero already carries a "Try the interactive
+          demo" link 765px above where the strip sat, pointing at the same
+          place. It was 326px spent restating a link the visitor had just
+          scrolled past. */}
       <HowItWorks />
       <Features />
       <CTA />
