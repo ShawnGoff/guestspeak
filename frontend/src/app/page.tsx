@@ -395,13 +395,13 @@ const HOW_IT_WORKS = [
 
 function HowItWorks() {
   return (
-    <section className="py-20 px-4">
+    <section className="py-14 sm:py-20 px-4">
       <div className="max-w-6xl mx-auto">
         <SectionLabel>How it works</SectionLabel>
-        <h2 className="text-4xl sm:text-5xl font-extrabold text-white text-center mb-4">
+        <h2 className="text-3xl sm:text-5xl font-extrabold text-white text-center mb-3 sm:mb-4">
           Simple for everyone
         </h2>
-        <p className="text-purple-200/80 text-center text-lg mb-16 max-w-xl mx-auto">
+        <p className="text-purple-200/80 text-center text-base sm:text-lg mb-8 sm:mb-16 max-w-xl mx-auto">
           Hosts see what their audience actually wants to talk about. Three steps, that&apos;s it.
         </p>
 
@@ -429,17 +429,16 @@ function HowItWorks() {
 
 // ─── Features ────────────────────────────────────────────────────────────────
 
+/**
+ * Three, not six.
+ *
+ * The six cards were a third of the mobile page — 1,891px of 5,858, more than
+ * two full screens — and six icon cards is the least-read pattern on a landing
+ * page. These are the three a competitor does not have; the ones cut (real
+ * time, moderation, mobile) are assumed rather than argued, so listing them
+ * spent height without changing anybody's mind.
+ */
 const FEATURES = [
-  {
-    icon: <BoltIcon />,
-    title: 'Real-time, always',
-    desc: 'Questions and Echoes land in front of everyone the moment they happen — no refreshing, no waiting.',
-  },
-  {
-    icon: <ShieldIcon />,
-    title: 'Moderation built in',
-    desc: 'Pin the big questions, hide the off-topic ones, mark things answered — host controls that stay out of your way.',
-  },
   {
     icon: <SimilarIcon />,
     title: 'Duplicate detection',
@@ -451,11 +450,6 @@ const FEATURES = [
     desc: 'Everyone holds a few questions and Echoes at a time and earns one back every ten minutes. Enough friction that people post what they mean — and no ceiling on anyone who stays all day.',
   },
   {
-    icon: <MobileIcon />,
-    title: 'Mobile first',
-    desc: 'Built for the phone already in your audience\'s hand. Fast, thumb-friendly, ready before the host finishes reading out the join code.',
-  },
-  {
     icon: <GuestIcon />,
     title: 'No account required',
     desc: 'Attendees jump straight in. An account is only needed to host or moderate a session.',
@@ -464,13 +458,13 @@ const FEATURES = [
 
 function Features() {
   return (
-    <section className="py-24 px-4 border-t border-brand-border/40">
+    <section className="py-14 sm:py-24 px-4 border-t border-brand-border/40">
       <div className="max-w-6xl mx-auto">
         <SectionLabel>Features</SectionLabel>
-        <h2 className="text-4xl sm:text-5xl font-extrabold text-white text-center mb-4">
+        <h2 className="text-3xl sm:text-5xl font-extrabold text-white text-center mb-3 sm:mb-4">
           Everything you need,<br />nothing you don&apos;t
         </h2>
-        <p className="text-purple-200/80 text-center text-lg mb-16 max-w-xl mx-auto">
+        <p className="text-purple-200/80 text-center text-base sm:text-lg mb-8 sm:mb-16 max-w-xl mx-auto">
           Built for AMAs, panels, radio shows, podcasts, classrooms, town halls — live in the room or listening from anywhere.
         </p>
 
@@ -715,7 +709,13 @@ export default function HomePage() {
       <HowItWorks />
       <Features />
       <CTA />
-      <EarlyAccess />
+      {/* Desktop only. It sits after the final call to action, and anyone who
+          scrolled seven screens past that on a phone is not signing up for
+          tips — it was 363px of a 5,858px page, spent on the least likely
+          reader. */}
+      <div className="hidden sm:block">
+        <EarlyAccess />
+      </div>
       <Footer />
     </main>
   );
