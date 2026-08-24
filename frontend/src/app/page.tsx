@@ -25,20 +25,25 @@ function Nav() {
     <nav className="fixed top-0 inset-x-0 z-50 border-b border-brand-border/50 backdrop-blur-md bg-brand-bg/80">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 flex items-center justify-between h-16">
         <Logo />
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1 sm:gap-2">
           {/* Same box as every other page's nav. A code read out on air should
               land somewhere obvious wherever the listener happens to be, and
               the home page is where most of them arrive. */}
           <JoinByCode />
-          <Link href="/discover" className="hidden sm:block btn-ghost text-sm py-2 px-4">
+          {/* Was hidden below sm, which left the mobile home page with no way
+              to reach Discover at all — the only route for somebody who wants
+              to look around and has neither a join code nor a session to run.
+              Padding is tighter here than on desktop because all three links
+              plus the logo fill the bar exactly at 375px. */}
+          <Link href="/discover" className="btn-ghost text-sm py-2 px-2.5 sm:px-4 min-h-[44px] flex items-center">
             Discover
           </Link>
           {!signedIn && (
-            <Link href="/login" className="btn-ghost text-sm py-2 px-4">
+            <Link href="/login" className="btn-ghost text-sm py-2 px-2.5 sm:px-4 min-h-[44px] flex items-center">
               Sign in
             </Link>
           )}
-          <Link href="/create" className="btn-primary text-sm py-2 px-4">
+          <Link href="/create" className="btn-primary text-sm py-2 px-3 sm:px-4 min-h-[44px] flex items-center">
             <span className="sm:hidden">Create</span>
             <span className="hidden sm:inline">Create session</span>
           </Link>
@@ -57,7 +62,10 @@ function Nav() {
 function Logo() {
   return (
     <Link href="/" className="flex items-center gap-2 select-none">
-      <span className="font-display text-xl font-bold tracking-tight leading-none">
+      {/* A step smaller on mobile. With Discover restored, the logo and three
+          links filled the 375px bar exactly — 2px of gap — and the wordmark is
+          the one piece that can give some back without losing a destination. */}
+      <span className="font-display text-lg sm:text-xl font-bold tracking-tight leading-none">
         Guest<span className="text-brand-orange">Speak</span>
       </span>
     </Link>
