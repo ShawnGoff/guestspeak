@@ -98,9 +98,12 @@ export default function AppNav({
           <Link href="/" className="text-xl font-bold tracking-tight text-white">
             Guest<span className="text-brand-orange">Speak</span>
           </Link>
+          {/* min-h so the hit area clears 44px on a phone. As text alone this
+              link was 20px tall, and the nav is on nearly every page — the
+              single smallest target in the product. */}
           <Link
             href="/discover"
-            className={`text-sm font-medium transition-colors ${
+            className={`text-sm font-medium transition-colors min-h-[44px] flex items-center ${
               pathname === '/discover'
                 ? 'text-brand-amber'
                 : 'text-purple-200/75 hover:text-white'

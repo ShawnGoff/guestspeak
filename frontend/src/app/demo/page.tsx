@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { plural } from '@/lib/plural';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
@@ -258,7 +259,7 @@ export default function DiscoverPage() {
             <h2 className="text-lg font-bold text-white">Live now</h2>
             <span className="flex items-center gap-1.5 text-[11px] font-bold text-red-400 bg-red-500/10 border border-red-500/20 px-2 py-0.5 rounded-full">
               <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse" />
-              {LIVE_SESSIONS.length} sessions
+              {plural(LIVE_SESSIONS.length, 'session')}
             </span>
           </div>
           <div className="grid md:grid-cols-2 gap-4">

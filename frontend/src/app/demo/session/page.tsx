@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, Suspense } from 'react';
+import { plural } from '@/lib/plural';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 
@@ -906,7 +907,7 @@ function SessionPageInner() {
                       </span>
                       <div className="flex-1 min-w-0">
                         <p className="text-xs text-white/80 leading-relaxed line-clamp-2">{q.text}</p>
-                        <p className="text-[11px] text-brand-orange mt-0.5">{q.echoes} echoes</p>
+                        <p className="text-[11px] text-brand-orange mt-0.5">{plural(q.echoes, 'echo', 'echoes')}</p>
                       </div>
                     </div>
                   ))}
@@ -928,7 +929,7 @@ function SessionPageInner() {
                     <Avatar name={p.name} color={p.color} size="xs" />
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-semibold text-white/70 truncate">{p.name}</p>
-                      <p className="text-[11px] text-white/60">{p.echoes} echoes received</p>
+                      <p className="text-[11px] text-white/60">{plural(p.echoes, 'echo', 'echoes')} received</p>
                     </div>
                     <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${i === 0 ? 'bg-brand-amber/20 text-brand-amber' : 'bg-white/5 text-white/65'}`}>
                       {p.echoes}

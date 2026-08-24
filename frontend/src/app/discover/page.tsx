@@ -259,7 +259,7 @@ export default function DiscoverPage() {
               <button
                 key={cat}
                 onClick={() => handleCategoryToggle(cat)}
-                className={`px-3 py-1 rounded-full text-xs font-semibold transition-colors ${
+                className={`px-3.5 py-2 min-h-[36px] rounded-full text-xs font-semibold transition-colors ${
                   activeCategory === cat
                     ? 'bg-brand-orange text-white'
                     : 'bg-brand-bg border border-brand-border text-purple-200/75 hover:border-brand-purple'

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { plural } from '@/lib/plural';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { api, resolveAsset } from '@/lib/api';
@@ -376,7 +377,7 @@ function SessionRow({ session: s, onCopy, copiedCode, onDelete, isDeleting }: {
         </Link>
         <div className="flex items-center gap-4 mt-1 text-xs text-purple-200/70">
           <span>{s.participant_count} joined</span>
-          <span>{s.question_count} questions</span>
+          <span>{plural(s.question_count, 'question')}</span>
           {s.starts_at && s.status !== 'live' && (
             <span>{formatDate(s.starts_at)}</span>
           )}

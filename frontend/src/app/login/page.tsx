@@ -41,7 +41,7 @@ export default function LoginPage() {
     <AuthShell
       title="Take the mic"
       subtitle="Sign in or create a free account — you only need one to host or moderate."
-      footer={<>Just joining a session? <Link href="/discover" className="text-brand-orange hover:text-brand-amber">Browse sessions →</Link></>}
+      footer={<>Just joining a session? <Link href="/discover" className="text-brand-orange hover:text-brand-amber inline-block py-2.5 -my-2.5">Browse sessions →</Link></>}
     >
       {/* Primary CTA for new users */}
       <Link href={registerHref} className="btn-primary w-full py-3 text-sm text-center block mb-4">
@@ -62,7 +62,14 @@ export default function LoginPage() {
         <div>
           <div className="flex items-center justify-between mb-1.5">
             <label className="block text-xs font-semibold text-purple-200/85">Password</label>
-            <Link href="/forgot-password" className="text-xs text-brand-orange hover:text-brand-amber transition-colors">Forgot password?</Link>
+            {/* 16px tall as bare text. This is the link for somebody who already
+                cannot get in — the last one that should be fiddly. */}
+            <Link
+              href="/forgot-password"
+              className="text-xs text-brand-orange hover:text-brand-amber transition-colors inline-flex items-center min-h-[44px] px-1 -mx-1"
+            >
+              Forgot password?
+            </Link>
           </div>
           <input
             type="password"

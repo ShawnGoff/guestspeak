@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { plural } from '@/lib/plural';
 import Link from 'next/link';
 import { api, resolveAsset } from '@/lib/api';
 import type { Organization, Session } from '@ask-away/shared/types';
@@ -386,7 +387,7 @@ function PastSessionsSection({ sessions }: { sessions: PastSession[] }) {
                   <span>{new Date(s.ends_at).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}</span>
                 )}
                 {s.participant_count > 0 && <span>{fmtNum(s.participant_count)} attended</span>}
-                {s.question_count > 0 && <span>{s.question_count} questions</span>}
+                {s.question_count > 0 && <span>{plural(s.question_count, 'question')}</span>}
               </div>
             </div>
             <ChevronRight />

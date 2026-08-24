@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { plural } from '@/lib/plural';
 import Link from 'next/link';
 import { api } from '@/lib/api';
 import { isLoggedIn } from '@/lib/auth';
@@ -125,7 +126,7 @@ export default function UserProfilePage({ params }: { params: { username: string
                     {s.title}
                   </p>
                   <p className="text-xs text-purple-200/70 mt-0.5">
-                    {s.participant_count} joined · {s.question_count} questions
+                    {s.participant_count} joined · {plural(s.question_count, 'question')}
                     {s.starts_at && ` · ${new Date(s.starts_at).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}`}
                   </p>
                 </div>

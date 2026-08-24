@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { plural } from '@/lib/plural';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { api, sseUrl } from '@/lib/api';
@@ -1148,7 +1149,7 @@ export default function SessionPageClient({ params }: SessionPageProps) {
                     </span>
                     <div className="flex-1 min-w-0">
                       <p className="text-xs text-purple-200/80 leading-relaxed line-clamp-2">{q.body}</p>
-                      <p className="text-[11px] text-brand-orange mt-0.5">{q.vote_count} echoes</p>
+                      <p className="text-[11px] text-brand-orange mt-0.5">{plural(q.vote_count, 'echo', 'echoes')}</p>
                     </div>
                   </div>
                 ))}
@@ -1190,7 +1191,7 @@ export default function SessionPageClient({ params }: SessionPageProps) {
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-xs font-semibold text-purple-200/85 truncate">{p.name}</p>
-                        <p className="text-[11px] text-purple-200/70">{p.echoes} echoes received</p>
+                        <p className="text-[11px] text-purple-200/70">{plural(p.echoes, 'echo', 'echoes')} received</p>
                       </div>
                       <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${i === 0 ? 'bg-brand-amber/20 text-brand-amber' : 'bg-white/5 text-purple-200/65'}`}>
                         {p.echoes}
@@ -1383,17 +1384,36 @@ function SessionHeader({ session, isLiveSoon, credits, isMod, hostView, particip
               {hostView ? '★ Host view' : 'Host view'}
             </button>
           )}
-          <div className="flex items-center gap-3 lg:hidden">
-            <Link href="/discover" className="text-xs text-purple-200/85 hover:text-white transition-colors">← Discover</Link>
+          {/* Touch targets, not just text. These were 16px-tall links and a
+              14px icon — under half the 44px a thumb hits reliably — and the
+              report control carried only a title attribute, which a touch
+              device never shows and a screen reader treats as optional. The
+              negative margin keeps the visual spacing while the hit area
+              grows. */}
+          <div className="flex items-center gap-1 -mr-2 lg:hidden">
+            <Link
+              href="/discover"
+              className="text-xs text-purple-200/85 hover:text-white transition-colors px-2 min-h-[44px] flex items-center"
+            >
+              ← Discover
+            </Link>
             {isMod
               ? null
-              : <Link href="/dashboard" className="text-xs text-purple-200/75 hover:text-white transition-colors">Dashboard</Link>
+              : (
+                <Link
+                  href="/dashboard"
+                  className="text-xs text-purple-200/75 hover:text-white transition-colors px-2 min-h-[44px] flex items-center"
+                >
+                  Dashboard
+                </Link>
+              )
             }
             {!isMod && onReport && (
               <button
                 onClick={onReport}
+                aria-label="Report this session"
                 title="Report this session"
-                className="text-purple-200/40 hover:text-red-400/70 transition-colors"
+                className="text-purple-200/40 hover:text-red-400/70 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
               >
                 <FlagIcon />
               </button>
@@ -1990,7 +2010,9 @@ function FeaturedQuestionCard({ question, isEchoed, isMine, creditsLeft, onEcho,
           >
             <span className="text-xl font-black leading-none">↑</span>
             <span className="text-2xl font-black leading-none">{question.vote_count}</span>
-            <span className="text-[10px] font-semibold tracking-wide opacity-60">echoes</span>
+            <span className="text-[10px] font-semibold tracking-wide opacity-60">
+              {question.vote_count === 1 ? 'echo' : 'echoes'}
+            </span>
           </button>
         </div>
       </div>
@@ -2158,7 +2180,9 @@ function QuestionCard({ question, isEchoed, isMine, creditsLeft, onEcho,
           >
             <span className="text-base font-black leading-none">↑</span>
             <span className="text-xl font-black leading-none">{question.vote_count}</span>
-            <span className="text-[10px] font-semibold tracking-wide opacity-60">echoes</span>
+            <span className="text-[10px] font-semibold tracking-wide opacity-60">
+              {question.vote_count === 1 ? 'echo' : 'echoes'}
+            </span>
           </button>
         </div>
       </div>

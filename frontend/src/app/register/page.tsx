@@ -42,7 +42,7 @@ export default function RegisterPage() {
     <AuthShell
       title="Create your account"
       subtitle="Free, forever — and only needed if you're hosting or moderating."
-      footer={<>Already have one? <Link href="/login" className="text-brand-orange hover:text-brand-amber">Sign in</Link></>}
+      footer={<>Already have one? <Link href="/login" className="text-brand-orange hover:text-brand-amber inline-block py-2.5 -my-2.5">Sign in</Link></>}
     >
       <form onSubmit={handleSubmit} className="space-y-4">
         <Field label="Email" type="email" value={email} onChange={setEmail} placeholder="you@example.com" />
