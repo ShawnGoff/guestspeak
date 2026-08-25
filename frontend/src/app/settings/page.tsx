@@ -116,7 +116,7 @@ export default function SettingsPage() {
 
   return (
     <div className="min-h-screen bg-brand-bg">
-      <AppNav right={<Link href="/dashboard" className="text-sm text-purple-200/75 hover:text-white transition-colors">Dashboard</Link>} />
+      <AppNav right={<Link href="/dashboard" className="text-sm text-purple-200/75 hover:text-white transition-colors inline-flex items-center min-h-[44px]">Dashboard</Link>} />
 
       <main className="max-w-2xl mx-auto px-4 py-10 space-y-6">
         <div>
@@ -272,7 +272,7 @@ export default function SettingsPage() {
                 <button
                   type="button"
                   onClick={() => setShowDelete(true)}
-                  className="px-5 py-2.5 text-sm font-semibold rounded-lg border border-red-500/40 text-red-400 hover:bg-red-500/10 transition-colors"
+                  className="px-5 py-2.5 min-h-[44px] text-sm font-semibold rounded-lg border border-red-500/40 text-red-400 hover:bg-red-500/10 transition-colors"
                 >
                   Delete my account
                 </button>

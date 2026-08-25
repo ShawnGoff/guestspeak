@@ -145,10 +145,15 @@ export default function DiscoverPage() {
     }, 400);
   }
 
+  /** Apply a category outright. The select already carries "All channels" as
+      its empty option, so it has no need of the chips' tap-again-to-clear. */
+  function selectCategory(cat: string) {
+    setActiveCategory(cat);
+    fetchChannels(nameQuery, cat, gpsRef.current, citySearch);
+  }
+
   function handleCategoryToggle(cat: string) {
-    const next = activeCategory === cat ? '' : cat;
-    setActiveCategory(next);
-    fetchChannels(nameQuery, next, gpsRef.current, citySearch);
+    selectCategory(activeCategory === cat ? '' : cat);
   }
 
   const locationLabel =
@@ -160,9 +165,19 @@ export default function DiscoverPage() {
   return (
     <div className="min-h-screen bg-brand-bg">
       <AppNav maxWidth="4xl" right={
-        <div className="flex gap-2">
-          <Link href="/login" className="btn-ghost text-sm py-2 px-4">Sign in</Link>
-          <Link href="/create" className="btn-primary text-sm py-2 px-4">Create session</Link>
+        <div className="flex gap-1 sm:gap-2">
+          {/* Sign in was shown unconditionally, so a signed-in visitor got it
+              sitting next to their own account menu. Gated on `mounted` for the
+              same reason as the following list below — localStorage is not
+              available during the server render. It is also what pushed this
+              bar to six items and 446px of content in a 375px viewport. */}
+          {mounted && !isLoggedIn() && (
+            <Link href="/login" className="btn-ghost text-sm py-2 px-2.5 sm:px-4">Sign in</Link>
+          )}
+          <Link href="/create" className="btn-primary text-sm py-2 px-3 sm:px-4 whitespace-nowrap">
+            <span className="sm:hidden">Create</span>
+            <span className="hidden sm:inline">Create session</span>
+          </Link>
         </div>
       } />
 
@@ -240,7 +255,7 @@ export default function DiscoverPage() {
               onClick={requestLocation}
               disabled={locationStatus === 'requesting' || locationStatus === 'granted'}
               title="Use my location"
-              className={`flex items-center gap-1.5 text-sm font-medium px-4 py-2.5 rounded-xl border flex-shrink-0 transition-colors ${
+              className={`flex items-center gap-1.5 text-sm font-medium px-4 py-2.5 min-h-[44px] rounded-xl border flex-shrink-0 transition-colors ${
                 locationStatus === 'granted'    ? 'border-emerald-700/50 bg-emerald-900/20 text-emerald-400 cursor-default' :
                 locationStatus === 'denied'     ? 'border-red-700/50 bg-red-900/20 text-red-400 cursor-default' :
                 locationStatus === 'requesting' ? 'border-brand-border text-purple-200/70 cursor-wait' :
@@ -248,26 +263,47 @@ export default function DiscoverPage() {
               }`}
             >
               <LocationIcon className="w-4 h-4" />
-              <span className="hidden sm:inline">{locationLabel}</span>
+              <span>{locationLabel}</span>
             </button>
           </form>
 
-          {/* Category chips — filter channels */}
-          <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t border-brand-border/40">
-            <span className="text-xs text-purple-200/60 self-center mr-1">Filter channels:</span>
-            {ORG_CATEGORIES.map(cat => (
-              <button
-                key={cat}
-                onClick={() => handleCategoryToggle(cat)}
-                className={`px-3.5 py-2 min-h-[36px] rounded-full text-xs font-semibold transition-colors ${
-                  activeCategory === cat
-                    ? 'bg-brand-orange text-white'
-                    : 'bg-brand-bg border border-brand-border text-purple-200/75 hover:border-brand-purple'
-                }`}
+          {/* Category filter.
+              The filter is single-select — picking a category replaces the
+              last one. On a phone the twelve chips spent five rows and most of
+              the first screen saying that, which is what a select says in one
+              row. Chips stay from sm up, where they wrap to two rows and are
+              worth the space: they double as a list of what is on offer. */}
+          <div className="mt-3 pt-3 border-t border-brand-border/40">
+            <label className="sm:hidden flex items-center gap-2">
+              <span className="text-xs text-purple-200/60 flex-shrink-0">Filter channels:</span>
+              <select
+                value={activeCategory}
+                onChange={e => selectCategory(e.target.value)}
+                className="input flex-1"
               >
-                {cat}
-              </button>
-            ))}
+                <option value="">All channels</option>
+                {ORG_CATEGORIES.map(cat => (
+                  <option key={cat} value={cat}>{cat}</option>
+                ))}
+              </select>
+            </label>
+
+            <div className="hidden sm:flex flex-wrap gap-2">
+              <span className="text-xs text-purple-200/60 self-center mr-1">Filter channels:</span>
+              {ORG_CATEGORIES.map(cat => (
+                <button
+                  key={cat}
+                  onClick={() => handleCategoryToggle(cat)}
+                  className={`px-3.5 py-2 min-h-[44px] rounded-full text-xs font-semibold transition-colors ${
+                    activeCategory === cat
+                      ? 'bg-brand-orange text-white'
+                      : 'bg-brand-bg border border-brand-border text-purple-200/75 hover:border-brand-purple'
+                  }`}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 

@@ -146,7 +146,7 @@ export default function NotificationBell() {
         ref={buttonRef}
         onClick={handleOpen}
         title="Notifications"
-        className={`relative transition-colors p-1 ${
+        className={`relative transition-colors w-11 h-11 flex items-center justify-center ${
           open ? 'text-brand-amber' : 'text-purple-200/70 hover:text-white'
         }`}
       >

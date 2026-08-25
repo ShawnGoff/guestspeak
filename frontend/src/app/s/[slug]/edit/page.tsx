@@ -153,9 +153,12 @@ export default function EditSessionPage({ params }: { params: { slug: string } }
 
   return (
     <div className="min-h-screen bg-brand-bg">
+      {/* Wraps to three lines at 375px without the nowrap, which is what made
+          this a 74px-wide target. Shortened on a phone so the bar still fits. */}
       <AppNav right={
-        <Link href={`/s/${params.slug}`} className="text-sm text-purple-200/75 hover:text-white transition-colors">
-          ← Back to session
+        <Link href={`/s/${params.slug}`} className="text-sm text-purple-200/75 hover:text-white transition-colors inline-flex items-center min-h-[44px] whitespace-nowrap">
+          <span className="sm:hidden">← Back</span>
+          <span className="hidden sm:inline">← Back to session</span>
         </Link>
       } />
 
@@ -228,7 +231,7 @@ export default function EditSessionPage({ params }: { params: { slug: string } }
                 <input
                   type="range" min={1} max={6} value={credits}
                   onChange={e => setCredits(Number(e.target.value))}
-                  className="flex-1 accent-brand-orange"
+                  className="flex-1 accent-brand-orange h-11 cursor-pointer"
                 />
                 <div className="flex gap-1.5">
                   {Array.from({ length: 6 }).map((_, i) => (

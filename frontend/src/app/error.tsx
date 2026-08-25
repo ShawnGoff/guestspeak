@@ -15,7 +15,7 @@ export default function GlobalError({
   }, [error]);
 
   return (
-    <div className="min-h-screen bg-brand-bg flex flex-col items-center justify-center px-4 text-center">
+    <div className="relative min-h-screen bg-brand-bg flex flex-col items-center justify-center px-4 text-center overflow-hidden">
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[400px] h-[250px] rounded-full bg-red-500/10 blur-[80px] pointer-events-none" />
 
       <div className="relative max-w-sm">

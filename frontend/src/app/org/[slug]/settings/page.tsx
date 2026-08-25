@@ -222,8 +222,12 @@ export default function OrgSettingsPage({ params }: { params: { slug: string } }
     <div className="min-h-screen bg-brand-bg">
       <AppNav right={
         <>
-          <Link href={`/org/${org.slug}`} className="text-sm text-purple-200/75 hover:text-white transition-colors">View page</Link>
-          <Link href="/dashboard" className="text-sm text-purple-200/75 hover:text-white transition-colors">Dashboard</Link>
+          <Link href={`/org/${org.slug}`} className="text-sm text-purple-200/75 hover:text-white transition-colors inline-flex items-center min-h-[44px] whitespace-nowrap">View page</Link>
+          {/* This is the only page carrying two of its own nav controls, and at
+              375px the six items left the account menu with no clearance —
+              "View page" was wrapping onto two lines at 33px wide. Dashboard is
+              in the account menu, so dropping it here loses no destination. */}
+          <Link href="/dashboard" className="hidden sm:inline-flex text-sm text-purple-200/75 hover:text-white transition-colors items-center min-h-[44px]">Dashboard</Link>
         </>
       } />
 
@@ -264,7 +268,7 @@ export default function OrgSettingsPage({ params }: { params: { slug: string } }
             <div>
               <p className="text-sm font-semibold text-white mb-0.5">Channel photo</p>
               <p className="text-xs text-purple-200/70">JPEG, PNG, or WebP · max 5 MB</p>
-              <button type="button" onClick={() => fileRef.current?.click()} className="mt-2 text-xs text-brand-orange hover:text-brand-amber transition-colors">
+              <button type="button" onClick={() => fileRef.current?.click()} className="mt-2 text-xs text-brand-orange hover:text-brand-amber transition-colors inline-flex items-center min-h-[44px] px-1">
                 {avatarPreview ? 'Change photo' : 'Upload photo'}
               </button>
             </div>
@@ -454,7 +458,7 @@ export default function OrgSettingsPage({ params }: { params: { slug: string } }
               <button
                 onClick={deleteChannel}
                 disabled={deletingChannel}
-                className="flex-shrink-0 text-sm px-4 py-2 rounded-xl border border-red-700/50 text-red-400 hover:bg-red-900/20 transition-colors disabled:opacity-40"
+                className="flex-shrink-0 text-sm px-4 py-2 min-h-[44px] rounded-xl border border-red-700/50 text-red-400 hover:bg-red-900/20 transition-colors disabled:opacity-40"
               >
                 {deletingChannel ? 'Deleting…' : 'Delete channel'}
               </button>

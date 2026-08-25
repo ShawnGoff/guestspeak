@@ -4,7 +4,7 @@ export default function Footer() {
   return (
     <footer className="border-t border-brand-border/40 py-8 px-4 mt-auto">
       <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
-        <Link href="/" className="font-display font-bold tracking-tight text-lg">
+        <Link href="/" className="font-display font-bold tracking-tight text-lg inline-flex items-center min-h-[44px]">
           Guest<span className="text-brand-orange">Speak</span>
         </Link>
         <p className="text-purple-200/70 text-sm">

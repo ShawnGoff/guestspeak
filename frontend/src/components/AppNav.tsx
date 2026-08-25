@@ -46,7 +46,7 @@ export function UserMenu({ user }: { user: AuthUser }) {
       <button
         onClick={() => setOpen(v => !v)}
         title={`@${user.username}`}
-        className={`transition-colors p-1 ${open ? 'text-brand-amber' : 'text-purple-200/70 hover:text-white'}`}
+        className={`transition-colors w-11 h-11 flex items-center justify-center ${open ? 'text-brand-amber' : 'text-purple-200/70 hover:text-white'}`}
       >
         <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <circle cx="12" cy="8" r="4" />
@@ -59,6 +59,16 @@ export function UserMenu({ user }: { user: AuthUser }) {
           <p className="px-4 py-2 text-xs text-purple-200/70 border-b border-brand-border/50 truncate">
             @{user.username}
           </p>
+          {/* Dashboard lives here as well as in the bar. Pages that need two
+              page-specific controls of their own have no room for it at 375px,
+              and this menu is on every signed-in page. */}
+          <Link
+            href="/dashboard"
+            onClick={() => setOpen(false)}
+            className="flex items-center gap-2 px-4 py-2.5 text-sm text-purple-200/90 hover:text-white hover:bg-brand-border/20 transition-colors"
+          >
+            Dashboard
+          </Link>
           <Link
             href="/settings"
             onClick={() => setOpen(false)}
@@ -92,10 +102,14 @@ export default function AppNav({
 
   return (
     <nav className="sticky top-0 z-40 bg-brand-bg/90 backdrop-blur border-b border-brand-border/50">
-      <div className={`${mw} mx-auto px-4 h-14 flex items-center justify-between gap-3`}>
+      {/* Spacing is tighter below sm on purpose. Signed in, this bar holds the
+          logo, Discover, a page-specific control, the bell and the account
+          menu; at the desktop gaps that came to ~429px of content in a 375px
+          bar, so the account menu sat outside the right padding. */}
+      <div className={`${mw} mx-auto px-3 sm:px-4 h-14 flex items-center justify-between gap-2 sm:gap-3`}>
         {/* Left — logo + persistent nav links */}
-        <div className="flex items-center gap-5 flex-shrink-0">
-          <Link href="/" className="text-xl font-bold tracking-tight text-white">
+        <div className="flex items-center gap-3 sm:gap-5 flex-shrink-0">
+          <Link href="/" className="text-lg sm:text-xl font-bold tracking-tight text-white inline-flex items-center min-h-[44px]">
             Guest<span className="text-brand-orange">Speak</span>
           </Link>
           {/* min-h so the hit area clears 44px on a phone. As text alone this
@@ -114,7 +128,7 @@ export default function AppNav({
         </div>
 
         {/* Right — page-specific controls + notifications + user settings */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-1 sm:gap-3">
           <JoinByCode />
           {right}
           {user && !user.is_guest && (

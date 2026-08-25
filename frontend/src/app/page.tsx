@@ -61,7 +61,7 @@ function Nav() {
 
 function Logo() {
   return (
-    <Link href="/" className="flex items-center gap-2 select-none">
+    <Link href="/" className="flex items-center gap-2 select-none min-h-[44px]">
       {/* A step smaller on mobile. With Discover restored, the logo and three
           links filled the 375px bar exactly — 2px of gap — and the wordmark is
           the one piece that can give some back without losing a destination. */}
@@ -334,7 +334,7 @@ function Hero() {
 
             <Link
               href="/demo"
-              className="inline-flex items-center gap-1.5 text-brand-amber/70 hover:text-brand-amber text-sm font-medium transition-colors"
+              className="inline-flex items-center gap-1.5 min-h-[44px] text-brand-amber/70 hover:text-brand-amber text-sm font-medium transition-colors"
             >
               <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
               Try the interactive demo
@@ -498,7 +498,7 @@ function EarlyAccess() {
   }
 
   return (
-    <section className="py-12 px-4 border-t border-brand-border/40">
+    <section className="py-12 px-4 border-t border-brand-border/40 overflow-hidden">
       <div className="max-w-xl mx-auto text-center relative">
         <div className="absolute left-1/2 -translate-x-1/2 w-[500px] h-[200px] bg-brand-orange/8 blur-[100px] pointer-events-none" />
 

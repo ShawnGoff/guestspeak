@@ -100,7 +100,7 @@ export default function NewOrgPage() {
 
   return (
     <div className="min-h-screen bg-brand-bg">
-      <AppNav right={<Link href="/dashboard" className="text-sm text-purple-200/75 hover:text-white transition-colors">Dashboard</Link>} />
+      <AppNav right={<Link href="/dashboard" className="text-sm text-purple-200/75 hover:text-white transition-colors inline-flex items-center min-h-[44px]">Dashboard</Link>} />
 
       <main className="max-w-2xl mx-auto px-4 py-10">
         <h1 className="text-2xl font-extrabold text-white mb-1">Create a channel</h1>
@@ -141,7 +141,7 @@ export default function NewOrgPage() {
               <button
                 type="button"
                 onClick={() => fileRef.current?.click()}
-                className="mt-2 text-xs text-brand-orange hover:text-brand-amber transition-colors"
+                className="mt-2 text-xs text-brand-orange hover:text-brand-amber transition-colors inline-flex items-center min-h-[44px] px-1"
               >
                 {avatarPreview ? 'Change photo' : 'Upload photo'}
               </button>

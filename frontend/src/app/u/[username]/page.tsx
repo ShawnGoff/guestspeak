@@ -80,7 +80,7 @@ export default function UserProfilePage({ params }: { params: { username: string
         <>
           <Link href="/search" className="text-sm text-purple-200/75 hover:text-white transition-colors">Find people</Link>
           {isLoggedIn() && (
-            <Link href="/dashboard" className="text-sm text-purple-200/75 hover:text-white transition-colors">Dashboard</Link>
+            <Link href="/dashboard" className="text-sm text-purple-200/75 hover:text-white transition-colors inline-flex items-center min-h-[44px]">Dashboard</Link>
           )}
         </>
       } />

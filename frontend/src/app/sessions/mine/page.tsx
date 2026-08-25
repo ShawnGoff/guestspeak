@@ -95,7 +95,7 @@ export default function MySessionsPage() {
             <button
               key={f.value}
               onClick={() => setFilter(f.value)}
-              className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+              className={`flex-1 py-1.5 min-h-[40px] rounded-lg text-xs font-semibold transition-colors ${
                 filter === f.value ? 'bg-brand-purple text-white' : 'text-purple-200/75 hover:text-white'
               }`}
             >
@@ -165,7 +165,7 @@ function SessionRow({ session: s, onCopy, copiedCode, onDelete, isDeleting }: {
             </span>
           )}
         </div>
-        <Link href={`/s/${s.slug}`} className="font-bold text-white hover:text-brand-amber transition-colors line-clamp-1">
+        <Link href={`/s/${s.slug}`} className="block py-2.5 -my-1 font-bold text-white hover:text-brand-amber transition-colors line-clamp-1">
           {s.title}
         </Link>
         <div className="flex items-center gap-4 mt-1 text-xs text-purple-200/70">
@@ -184,7 +184,7 @@ function SessionRow({ session: s, onCopy, copiedCode, onDelete, isDeleting }: {
         {s.status !== 'closed' && (
           <button
             onClick={() => onCopy(s.join_code)}
-            className={`flex items-center gap-1.5 font-mono text-sm px-3 py-1.5 rounded-lg border transition-colors ${
+            className={`flex items-center gap-1.5 font-mono text-sm px-3 py-1.5 min-h-[44px] rounded-lg border transition-colors ${
               copied
                 ? 'border-emerald-500/50 text-emerald-400 bg-emerald-500/10'
                 : 'border-brand-border text-white hover:border-brand-purple'
@@ -205,7 +205,7 @@ function SessionRow({ session: s, onCopy, copiedCode, onDelete, isDeleting }: {
             onClick={() => onDelete(s.id, s.title)}
             disabled={isDeleting}
             title="Delete session"
-            className="text-purple-200/60 hover:text-red-400 transition-colors disabled:opacity-40 p-1.5"
+            className="text-purple-200/60 hover:text-red-400 transition-colors disabled:opacity-40 w-11 h-11 flex items-center justify-center"
           >
             {isDeleting ? <span className="text-xs">…</span> : <TrashIcon />}
           </button>

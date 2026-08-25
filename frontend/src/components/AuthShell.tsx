@@ -14,14 +14,22 @@ export function AuthShell({ title, subtitle, children, footer }: {
   footer: React.ReactNode;
 }) {
   return (
-    <div className="min-h-screen bg-brand-bg flex flex-col items-center justify-center px-4">
+    // relative + overflow-hidden, and it needs both. The glow below is 500px
+    // wide plus a 100px blur either side, so on a 375px phone it reaches ~63px
+    // past the right edge — every auth page (sign in, register, both password
+    // reset steps) scrolled sideways on a decoration nobody can even see.
+    // overflow-hidden alone does nothing here: with no positioned ancestor the
+    // glow resolves against the viewport, and an ancestor that is not the
+    // containing block cannot clip it. Measured at 375px: document scrollWidth
+    // 437 without `relative`, 375 with it.
+    <div className="relative min-h-screen bg-brand-bg flex flex-col items-center justify-center px-4 overflow-hidden">
       {/* Background glow */}
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[500px] h-[300px] rounded-full bg-brand-purple/15 blur-[100px] pointer-events-none" />
 
       <div className="relative w-full max-w-sm">
         {/* Logo */}
         <div className="text-center mb-8">
-          <Link href="/" className="inline-block">
+          <Link href="/" className="inline-flex items-center justify-center min-h-[44px]">
             <span className="text-3xl font-bold tracking-tight text-white">Guest<span className="text-brand-orange">Speak</span></span>
           </Link>
         </div>

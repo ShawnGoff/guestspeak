@@ -146,7 +146,7 @@ export default function DashboardPage() {
       <nav className="sticky top-0 z-40 bg-brand-bg/90 backdrop-blur border-b border-brand-border/50">
         <div className="max-w-5xl mx-auto px-4 h-14 flex items-center justify-between gap-3">
           <div className="flex items-center gap-5 flex-shrink-0">
-            <Link href="/" className="text-xl font-bold tracking-tight text-white">Guest<span className="text-brand-orange">Speak</span></Link>
+            <Link href="/" className="text-lg sm:text-xl font-bold tracking-tight text-white inline-flex items-center min-h-[44px]">Guest<span className="text-brand-orange">Speak</span></Link>
             <Link href="/discover" className="text-sm font-medium text-purple-200/75 hover:text-white transition-colors hidden sm:block">Discover</Link>
           </div>
 
@@ -244,7 +244,7 @@ export default function DashboardPage() {
               <section className="space-y-4">
                 <div className="flex items-center justify-between">
                   <h2 className="text-xs font-bold text-brand-orange uppercase tracking-widest">My Sessions</h2>
-                  <Link href="/sessions/mine" className="text-xs text-purple-200/70 hover:text-brand-orange transition-colors flex items-center gap-1">
+                  <Link href="/sessions/mine" className="text-xs text-purple-200/70 hover:text-brand-orange transition-colors flex items-center gap-1 min-h-[44px] px-1">
                     {archivedCount > 0 && <span className="px-1.5 py-0.5 rounded-full bg-brand-border/40 font-mono">{archivedCount} archived</span>}
                     View all →
                   </Link>
@@ -274,7 +274,7 @@ export default function DashboardPage() {
                         <div className="flex items-center gap-2 mb-1">
                           <StatusBadge status={s.status} />
                         </div>
-                        <Link href={`/s/${s.slug}`} className="font-bold text-white hover:text-brand-amber transition-colors line-clamp-1">
+                        <Link href={`/s/${s.slug}`} className="block py-2.5 -my-1 font-bold text-white hover:text-brand-amber transition-colors line-clamp-1">
                           {s.title}
                         </Link>
                         <div className="flex items-center gap-4 mt-1 text-xs text-purple-200/70">
@@ -300,26 +300,26 @@ export default function DashboardPage() {
 
       {/* Mobile footer nav — visible on small screens only */}
       <nav className="sm:hidden fixed bottom-0 inset-x-0 bg-brand-bg/95 backdrop-blur border-t border-brand-border/50 flex items-center justify-around px-4 py-2 z-40">
-        <Link href="/search" className="flex flex-col items-center gap-0.5 text-purple-200/85 hover:text-white transition-colors py-1">
+        <Link href="/search" className="flex flex-col items-center justify-center gap-0.5 text-purple-200/85 hover:text-white transition-colors py-1 min-w-[64px] min-h-[44px]">
           <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" />
           </svg>
           <span className="text-[10px] font-medium">Find</span>
         </Link>
-        <Link href="/create" className="flex flex-col items-center gap-0.5 text-brand-orange py-1">
+        <Link href="/create" className="flex flex-col items-center justify-center gap-0.5 text-brand-orange py-1 min-w-[64px] min-h-[44px]">
           <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
             <path d="M12 5v14M5 12h14" />
           </svg>
           <span className="text-[10px] font-medium">New</span>
         </Link>
-        <Link href="/settings" className="flex flex-col items-center gap-0.5 text-purple-200/85 hover:text-white transition-colors py-1">
+        <Link href="/settings" className="flex flex-col items-center justify-center gap-0.5 text-purple-200/85 hover:text-white transition-colors py-1 min-w-[64px] min-h-[44px]">
           <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="12" cy="12" r="3" />
             <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
           </svg>
           <span className="text-[10px] font-medium">Settings</span>
         </Link>
-        <button onClick={handleSignOut} className="flex flex-col items-center gap-0.5 text-purple-200/85 hover:text-white transition-colors py-1">
+        <button onClick={handleSignOut} className="flex flex-col items-center justify-center gap-0.5 text-purple-200/85 hover:text-white transition-colors py-1 min-w-[64px] min-h-[44px]">
           <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" />
           </svg>
@@ -372,7 +372,7 @@ function SessionRow({ session: s, onCopy, copiedCode, onDelete, isDeleting }: {
           )}
           <VisibilityPill visibility={s.visibility} />
         </div>
-        <Link href={`/s/${s.slug}`} className="font-bold text-white hover:text-brand-amber transition-colors line-clamp-1">
+        <Link href={`/s/${s.slug}`} className="block py-2.5 -my-1 font-bold text-white hover:text-brand-amber transition-colors line-clamp-1">
           {s.title}
         </Link>
         <div className="flex items-center gap-4 mt-1 text-xs text-purple-200/70">
@@ -393,7 +393,7 @@ function SessionRow({ session: s, onCopy, copiedCode, onDelete, isDeleting }: {
           <button
             onClick={() => onCopy(s.join_code)}
             title="Copy join code"
-            className={`flex items-center gap-1.5 font-mono text-sm px-3 py-1.5 rounded-lg border transition-colors ${
+            className={`flex items-center gap-1.5 font-mono text-sm px-3 py-1.5 min-h-[44px] rounded-lg border transition-colors ${
               copied
                 ? 'border-emerald-500/50 text-emerald-400 bg-emerald-500/10'
                 : 'border-brand-border text-white hover:border-brand-purple'
@@ -411,7 +411,7 @@ function SessionRow({ session: s, onCopy, copiedCode, onDelete, isDeleting }: {
             onClick={() => onDelete(s.id, s.title)}
             disabled={isDeleting}
             title="Delete session"
-            className="text-purple-200/60 hover:text-red-400 transition-colors disabled:opacity-40 p-1.5"
+            className="text-purple-200/60 hover:text-red-400 transition-colors disabled:opacity-40 w-11 h-11 flex items-center justify-center"
           >
             {isDeleting ? (
               <span className="text-xs">…</span>
@@ -556,7 +556,7 @@ function DiscoverFeed({ data, orgs }: { data: DiscoverResponse | null; orgs: Dis
         <div className="flex items-center gap-1 p-1 bg-brand-card rounded-xl border border-brand-border">
           <button
             onClick={() => setTab('sessions')}
-            className={`text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors ${
+            className={`text-xs font-semibold px-3 py-1.5 min-h-[40px] rounded-lg transition-colors ${
               tab === 'sessions' ? 'bg-brand-purple text-white' : 'text-purple-200/75 hover:text-white'
             }`}
           >
@@ -564,14 +564,14 @@ function DiscoverFeed({ data, orgs }: { data: DiscoverResponse | null; orgs: Dis
           </button>
           <button
             onClick={() => setTab('channels')}
-            className={`text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors ${
+            className={`text-xs font-semibold px-3 py-1.5 min-h-[40px] rounded-lg transition-colors ${
               tab === 'channels' ? 'bg-brand-purple text-white' : 'text-purple-200/75 hover:text-white'
             }`}
           >
             Channels
           </button>
         </div>
-        <Link href="/discover" className="text-xs text-purple-200/70 hover:text-brand-orange transition-colors">
+        <Link href="/discover" className="text-xs text-purple-200/70 hover:text-brand-orange transition-colors inline-flex items-center min-h-[44px] px-1">
           Browse all →
         </Link>
       </div>

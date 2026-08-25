@@ -195,7 +195,7 @@ export default function CreateSessionPage() {
   // ── Form ──────────────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-brand-bg">
-      <AppNav right={<Link href="/dashboard" className="text-sm text-purple-200/75 hover:text-white transition-colors">Dashboard</Link>} />
+      <AppNav right={<Link href="/dashboard" className="text-sm text-purple-200/75 hover:text-white transition-colors inline-flex items-center min-h-[44px]">Dashboard</Link>} />
 
       <main className="max-w-2xl mx-auto px-4 py-10">
         <h1 className="text-2xl font-extrabold text-white mb-1">Create a session</h1>
@@ -279,7 +279,7 @@ export default function CreateSessionPage() {
                   max={6}
                   value={credits}
                   onChange={e => setCredits(Number(e.target.value))}
-                  className="flex-1 accent-brand-orange"
+                  className="flex-1 accent-brand-orange h-11 cursor-pointer"
                 />
                 <div className="flex gap-1.5">
                   {Array.from({ length: 6 }).map((_, i) => (

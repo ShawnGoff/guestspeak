@@ -56,6 +56,16 @@
 }
 
 @layer components {
+  /* The floor for anything you tap. The base padding here already clears it,
+     but call sites routinely shrink a button with `text-sm py-2` and that was
+     landing them at 34-40px — "Save changes", "Delete channel", "Preview",
+     the join-code copy button. A min-height holds the floor regardless of what
+     padding a utility class puts on top. */
+  .btn-primary,
+  .btn-ghost {
+    min-height: 44px;
+  }
+
   /* Primary orange CTA button */
   .btn-primary {
     @apply inline-flex items-center justify-center gap-2
@@ -99,6 +109,14 @@
   .input option { background: #1A0A2E; }
   .input::-webkit-calendar-picker-indicator { filter: invert(0.7); cursor: pointer; }
 
+  /* The credits slider. The input is given h-11 at its call sites so the drag
+     band is 44px rather than the 16px the native control defaults to; the
+     track is drawn at its normal thickness and centred in that box, so the
+     control looks unchanged and only the grab area grows. */
+  input[type="range"] {
+    background: transparent;
+  }
+
   /* Orange text gradient — for display headings */
   .text-orange-gradient {
     @apply bg-clip-text text-transparent;
@@ -114,5 +132,33 @@
   .badge-live::before {
     content: '';
     @apply block w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse;
+  }
+}
+
+/* ── Phone text fields ──────────────────────────────────────────────────────
+   iOS Safari zooms the whole page in when you focus a field whose text is
+   under 16px, and it does not zoom back out — so filling in a form left you
+   on a sideways-scrolled viewport you had to pinch your way out of, once per
+   field. Create-a-session has seven fields; it was unusable on a phone.
+
+   This is deliberately a blunt global rule rather than a fix on `.input`.
+   Only about half the fields in the product use that class — the rest are
+   hand-rolled with `text-sm`, which is a Tailwind utility and so beats
+   anything set in a component layer. `!important` outside the layers is what
+   actually wins, and it means a new field written with `text-sm` tomorrow is
+   correct on a phone without anyone remembering this rule exists.
+
+   Desktop keeps the smaller text: there is no zoom behaviour to trip there,
+   and 16px everywhere would coarsen the dense host-facing forms. */
+@media (max-width: 639px) {
+  input:not([type='checkbox']):not([type='radio']):not([type='range']),
+  textarea,
+  select {
+    font-size: 16px !important;
+    /* Same reasoning as the buttons: hand-rolled fields land at 38-42px on
+       `py-2` / `py-2.5`, just under the floor. min-height is additive to
+       whatever padding a utility sets, so it holds the floor without
+       changing any field that already clears it. */
+    min-height: 44px;
   }
 }
