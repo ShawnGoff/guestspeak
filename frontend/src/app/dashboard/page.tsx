@@ -261,7 +261,7 @@ export default function DashboardPage() {
                         <div className="flex items-center gap-2 mb-1">
                           <StatusBadge status={s.status} />
                         </div>
-                        <Link href={`/s/${s.slug}`} className="block py-2.5 -my-1 font-bold text-white hover:text-brand-amber transition-colors line-clamp-1">
+                        <Link href={`/s/${s.slug}`} className="block truncate py-2.5 -my-1 font-bold text-white hover:text-brand-amber transition-colors">
                           {s.title}
                         </Link>
                         <div className="flex items-center gap-4 mt-1 text-xs text-purple-200/70">

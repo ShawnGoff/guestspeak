@@ -94,7 +94,7 @@ export default function SessionCard({ session: s, onCopy, copiedCode, onDelete, 
         </div>
         <Link
           href={`/s/${s.slug}`}
-          className="block py-2.5 -my-1 font-bold text-white hover:text-brand-amber transition-colors line-clamp-1"
+          className="block truncate py-2.5 -my-1 font-bold text-white hover:text-brand-amber transition-colors"
         >
           {s.title}
         </Link>
