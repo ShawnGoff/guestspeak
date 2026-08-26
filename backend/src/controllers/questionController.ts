@@ -165,6 +165,18 @@ export async function createQuestion(req: Request, res: Response, next: NextFunc
       throw new AppError(403, 'This session is private');
     }
 
+    // Staff cannot post anonymously. Refused rather than ignored: silently
+    // dropping the flag would publish their name on a question they asked to
+    // be anonymous, which is the worse of the two failures.
+    //
+    // This is the enforcement, not the hidden toggle in the composer. Elevated
+    // roles skip the credit deduction below, so an anonymous post from a host
+    // drew from no pool at all — the 2-post anon allowance that bounds everyone
+    // else simply did not apply to them.
+    if (postAnonymously && isElevated) {
+      throw new AppError(403, 'Hosts and moderators cannot post anonymously');
+    }
+
     // A follow-up outlives both gates below, deliberately. The right is earned
     // by being answered, and someone answered near the end of a show — or who
     // only sees it afterwards — would otherwise lose it to a clock they had no

@@ -5,15 +5,21 @@ import { AppError } from '../middleware/errorHandler';
 import { requireHostOrOrgAdmin, resolveCallerRole } from '../db/permissions';
 import { broadcastTo } from '../sse/broadcaster';
 
+/**
+ * An omitted permission means granted, matching the panel: a moderator is
+ * appointed with the full set and the host revokes from there. Defaulting to
+ * false meant any caller that left a field out silently created a moderator
+ * who could not do that job.
+ */
 const AddModeratorSchema = z.object({
   user_id: z.string().uuid(),
-  can_mark_answered: z.boolean().default(false),
-  can_star: z.boolean().default(false),
-  can_flag: z.boolean().default(false),
-  can_hide: z.boolean().default(false),
-  can_mute: z.boolean().default(false),
-  can_remove: z.boolean().default(false),
-  can_approve: z.boolean().default(false),
+  can_mark_answered: z.boolean().default(true),
+  can_star: z.boolean().default(true),
+  can_flag: z.boolean().default(true),
+  can_hide: z.boolean().default(true),
+  can_mute: z.boolean().default(true),
+  can_remove: z.boolean().default(true),
+  can_approve: z.boolean().default(true),
 });
 
 const UpdatePermissionsSchema = z.object({

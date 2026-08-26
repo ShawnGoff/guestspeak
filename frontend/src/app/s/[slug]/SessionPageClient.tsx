@@ -1063,6 +1063,17 @@ export default function SessionPageClient({ params }: SessionPageProps) {
             {/* Featured top question */}
             {featuredQuestion && (
               <FeaturedQuestionCard
+                /* Keyed, and it matters more here than in a list. This slot
+                   holds whichever root currently leads on echoes, so a question
+                   arriving mid-session can swap the occupant underneath the
+                   viewer. Without a key React kept the same instance and only
+                   changed the props, so every bit of local state inside carried
+                   over to a different question: an open follow-up composer
+                   stayed open — now posting to the new occupant — and
+                   useInlineEdit's draft, seeded from question.body on mount
+                   only, still held the previous question's text, so saving an
+                   edit wrote the old body onto the new question. */
+                key={featuredQuestion.id}
                 question={featuredQuestion}
                 isEchoed={echoedIds.has(featuredQuestion.id)}
                 isMine={myQuestionIds.has(featuredQuestion.id)}
@@ -1610,7 +1621,9 @@ function CreditDisplay({ credits, max, nextCreditSecs, creditCap, regenCap, isRe
 
   return (
     <div className="flex items-center gap-1.5">
-      <span className="text-xs text-purple-200/85 hidden sm:inline">Credits</span>
+      {/* Shown on a phone too. Hidden below sm, the meter was six dots and a
+          bare number with nothing saying what they counted. */}
+      <span className="text-xs text-purple-200/85">Credits</span>
       <div className="flex gap-1">
         {Array.from({ length: cap }).map((_, i) => (
           <div key={i} className={`w-2.5 h-2.5 rounded-full transition-colors ${i < credits ? 'bg-brand-orange' : 'bg-brand-border/60'}`} />
@@ -2315,8 +2328,13 @@ function SubmitBar({ body, setBody, credits, anonCredits, submitting, similarQue
           </span>
         </div>
         <div className="flex flex-col items-end gap-2 self-end">
-          {/* Anonymous toggle — registered users only */}
-          {isRegistered && (
+          {/* Anonymous toggle — registered users only, and not staff.
+              A host or moderator asking anonymously in their own session is
+              not a thing they should be able to do, and the accounting made
+              it worse: elevated roles skip the credit path entirely, so their
+              anonymous posts drew from no pool and were unlimited. The server
+              refuses the flag from staff now; this just stops offering it. */}
+          {isRegistered && !isMod && (
             <button
               type="button"
               onClick={onToggleAnon}

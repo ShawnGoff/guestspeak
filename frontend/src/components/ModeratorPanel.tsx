@@ -22,14 +22,23 @@ interface UserResult {
   username: string;
 }
 
+/**
+ * A new moderator starts with everything, and the host takes away what they
+ * do not want them to have.
+ *
+ * The other way round meant appointing someone and then discovering, mid-show,
+ * that they could not hide the thing you appointed them to hide. Hiding,
+ * removing and approving were the three off by default, which is to say the
+ * three you actually need when a session goes wrong.
+ */
 const DEFAULT_PERMS = {
   can_mark_answered: true,
   can_star: true,
   can_flag: true,
-  can_hide: false,
+  can_hide: true,
   can_mute: true,
-  can_remove: false,
-  can_approve: false,
+  can_remove: true,
+  can_approve: true,
 };
 
 const PERM_LABELS: { key: keyof typeof DEFAULT_PERMS; label: string }[] = [
