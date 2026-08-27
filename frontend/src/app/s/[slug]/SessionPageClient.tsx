@@ -548,10 +548,15 @@ export default function SessionPageClient({ params }: SessionPageProps) {
         ...(postAnonymously && { post_anonymously: true }),
       });
       setBody(''); setSimilarQuestions([]);
-      if (postAnonymously) {
-        setAnonCredits(c => c - 1);
-      } else {
-        setCredits(c => c - 1);
+      // Staff post free — the guard above already skips them, but the counter
+      // was decremented anyway, which is how a host's balance reached zero and
+      // took the echo button with it.
+      if (!isMod) {
+        if (postAnonymously) {
+          setAnonCredits(c => c - 1);
+        } else {
+          setCredits(c => c - 1);
+        }
       }
       setMyQuestionIds(prev => new Set([...prev, q.id]));
     } catch (err: any) {
@@ -578,10 +583,22 @@ export default function SessionPageClient({ params }: SessionPageProps) {
   // ── Add Echo ──────────────────────────────────────────────────────────────
 
   async function addEcho(questionId: string) {
-    if (credits < 1 || echoedIds.has(questionId)) return;
+    // Staff echo freely — the server already exempts them (it only calls
+    // spendCredit when the caller is not elevated), so guarding on a balance
+    // here locked hosts out of a thing the API would have allowed. A host who
+    // asked six questions ran their counter to zero and lost the echo button.
+    if ((!isMod && credits < 1) || echoedIds.has(questionId)) return;
     try {
-      await api.post<{ vote_count: number }>(`/questions/${questionId}/echo`, {});
-      setCredits(c => c - 1);
+      const { vote_count } = await api.post<{ vote_count: number }>(
+        `/questions/${questionId}/echo`, {},
+      );
+      // Use the count we were just handed. It used to be discarded and the
+      // number only moved when the echo came back over SSE — so on the polling
+      // fallback the credit was spent and the total sat unchanged until the
+      // next poll. The SSE handler is idempotent, so an echo arriving after
+      // this simply sets the same value.
+      setQuestions(prev => prev.map(q => (q.id === questionId ? { ...q, vote_count } : q)));
+      if (!isMod) setCredits(c => c - 1);
       setEchoedIds(prev => new Set([...prev, questionId]));
     } catch (err: any) { setError(err.message); }
   }
@@ -1077,7 +1094,7 @@ export default function SessionPageClient({ params }: SessionPageProps) {
                 question={featuredQuestion}
                 isEchoed={echoedIds.has(featuredQuestion.id)}
                 isMine={myQuestionIds.has(featuredQuestion.id)}
-                creditsLeft={credits}
+                canAffordEcho={isMod || credits > 0}
                 onEcho={() => addEcho(featuredQuestion.id)}
                 hostView={isMod && hostView}
                 onStar={() => setQuestionStatus(featuredQuestion.id, featuredQuestion.status === 'starred' ? 'new' : 'starred')}
@@ -1122,7 +1139,7 @@ export default function SessionPageClient({ params }: SessionPageProps) {
                 question={q}
                 isEchoed={echoedIds.has(q.id)}
                 isMine={myQuestionIds.has(q.id)}
-                creditsLeft={credits}
+                canAffordEcho={isMod || credits > 0}
                 onEcho={() => addEcho(q.id)}
                 hostView={isMod && hostView}
                 onStar={() => setQuestionStatus(q.id, q.status === 'starred' ? 'new' : 'starred')}
@@ -1929,12 +1946,14 @@ function FollowUpThread({
   );
 }
 
-function FeaturedQuestionCard({ question, isEchoed, isMine, creditsLeft, onEcho,
+function FeaturedQuestionCard({ question, isEchoed, isMine, canAffordEcho, onEcho,
   hostView, onStar, onAnswered, onHide, onPin, onSpotlight, onReply,
   onMute, onRemove, editSecondsLeft = 0, onEditSave,
   canFollowUp = false, onFollowUp, replies = [] }: {
   question: Question & { is_pinned?: boolean; is_spotlighted?: boolean };
-  isEchoed: boolean; isMine: boolean; creditsLeft: number;
+  isEchoed: boolean; isMine: boolean;
+  /** Whether this viewer may spend on an echo — staff always can. */
+  canAffordEcho: boolean;
   onEcho: () => void; hostView: boolean;
   onStar: () => void; onAnswered: () => void; onHide: () => void;
   onPin: () => void; onSpotlight: () => void; onReply: () => void;
@@ -1945,7 +1964,7 @@ function FeaturedQuestionCard({ question, isEchoed, isMine, creditsLeft, onEcho,
   onFollowUp?: (body: string) => Promise<void>;
   replies?: Question[];
 }) {
-  const canEcho = !isEchoed && !isMine && creditsLeft > 0 && question.status !== 'hidden';
+  const canEcho = !isEchoed && !isMine && canAffordEcho && question.status !== 'hidden';
   const isSpotlighted = !!question.is_spotlighted;
   const edit = useInlineEdit(question, editSecondsLeft, onEditSave);
 
@@ -2035,14 +2054,15 @@ function FeaturedQuestionCard({ question, isEchoed, isMine, creditsLeft, onEcho,
 
 // ─── Question card ────────────────────────────────────────────────────────────
 
-function QuestionCard({ question, isEchoed, isMine, creditsLeft, onEcho,
+function QuestionCard({ question, isEchoed, isMine, canAffordEcho, onEcho,
   hostView, onStar, onAnswered, onHide, onPin, onSpotlight, onReply,
   onMute, onRemove, editSecondsLeft = 0, onEditSave,
   canFollowUp = false, onFollowUp, replies = [] }: {
   question: Question & { is_pinned?: boolean; is_spotlighted?: boolean };
   isEchoed: boolean;
   isMine: boolean;
-  creditsLeft: number;
+  /** Whether this viewer may spend on an echo — staff always can. */
+  canAffordEcho: boolean;
   onEcho: () => void;
   hostView: boolean;
   onStar: () => void;
@@ -2059,7 +2079,7 @@ function QuestionCard({ question, isEchoed, isMine, creditsLeft, onEcho,
   onFollowUp?: (body: string) => Promise<void>;
   replies?: Question[];
 }) {
-  const canEcho = !isEchoed && !isMine && creditsLeft > 0 && question.status !== 'hidden';
+  const canEcho = !isEchoed && !isMine && canAffordEcho && question.status !== 'hidden';
   const edit = useInlineEdit(question, editSecondsLeft, onEditSave);
   const isSpotlighted = !!question.is_spotlighted;
   const isPinned = !!question.is_pinned;
