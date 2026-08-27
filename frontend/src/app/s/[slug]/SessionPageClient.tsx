@@ -117,6 +117,23 @@ export default function SessionPageClient({ params }: SessionPageProps) {
   const [participantCount, setParticipantCount]   = useState<number | null>(null);
   const [newQuestionsCount, setNewQuestionsCount] = useState(0);
   const atTopRef = useRef(true);
+  /**
+   * Display order held still while the viewer is reading down the list.
+   *
+   * Sorting by echoes means the order changes whenever anyone votes, and it
+   * changed under whoever was looking at it. Reach for the echo button on the
+   * third question, someone else echoes the fifth, it takes the slot you were
+   * aiming at and you vote for the wrong thing. At the top of the feed that
+   * live re-sort is the point — it is the leaderboard. A few hundred pixels
+   * down it is nothing but a moving target.
+   *
+   * Ranks captured when the viewer scrolls away from the top; null means live.
+   * Counts still update on the cards throughout — the numbers move, the cards
+   * do not.
+   */
+  const [frozenOrder, setFrozenOrder] = useState<Map<string, number> | null>(null);
+  /** Latest live order, so the scroll handler has something to capture. */
+  const liveOrderRef = useRef<Map<string, number>>(new Map());
 
   const similarTimer = useRef<ReturnType<typeof setTimeout>>();
   const sseRef = useRef<EventSource | null>(null);
@@ -462,7 +479,14 @@ export default function SessionPageClient({ params }: SessionPageProps) {
     function onScroll() {
       const top = window.scrollY < 100;
       atTopRef.current = top;
-      if (top) setNewQuestionsCount(0);
+      if (top) {
+        setNewQuestionsCount(0);
+        setFrozenOrder(null);
+      } else {
+        // Capture once. Already frozen returns the same Map, so React bails
+        // out and this stays free to call on every scroll event.
+        setFrozenOrder(prev => prev ?? new Map(liveOrderRef.current));
+      }
     }
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => window.removeEventListener('scroll', onScroll);
@@ -835,7 +859,7 @@ export default function SessionPageClient({ params }: SessionPageProps) {
     if (sort === 'hidden' && !(isMod && hostView)) setSort('echoes');
   }, [sort, isMod, hostView]);
 
-  const displayedQuestions = [...questions].filter(q => {
+  const liveOrderedQuestions = [...questions].filter(q => {
     // Hidden questions are only ever visible to session staff, and only on the
     // Hidden tab. They used to sit inline in every tab for a moderator, which
     // meant something removed from the audience's view still appeared at the top
@@ -860,6 +884,21 @@ export default function SessionPageClient({ params }: SessionPageProps) {
     if (sort === 'starred')  return (b.status === 'starred'  ? 1 : 0) - (a.status === 'starred'  ? 1 : 0);
     return 0;
   });
+
+  // Recorded every render so the scroll handler can capture the order the
+  // viewer was actually looking at when they scrolled away.
+  liveOrderRef.current = new Map(liveOrderedQuestions.map((q, i) => [q.id, i]));
+
+  // Frozen: keep the captured order. Anything that arrived since is not in the
+  // snapshot and sorts to the end rather than pushing into the middle — it is
+  // already announced by the "N new questions" pill, and going back to the top
+  // is what asks for the list to settle into its real order. Removals need no
+  // handling: a hidden question leaves `questions` and simply is not here.
+  const displayedQuestions = frozenOrder
+    ? [...liveOrderedQuestions].sort((a, b) =>
+        (frozenOrder.get(a.id) ?? Number.MAX_SAFE_INTEGER)
+        - (frozenOrder.get(b.id) ?? Number.MAX_SAFE_INTEGER))
+    : liveOrderedQuestions;
 
   const submissionClosed = session?.submission_cutoff_at
     ? new Date() > new Date(session.submission_cutoff_at)
@@ -1310,13 +1349,17 @@ export default function SessionPageClient({ params }: SessionPageProps) {
           onClick={() => {
             window.scrollTo({ top: 0, behavior: 'smooth' });
             setNewQuestionsCount(0);
+            // Released here as well as in the scroll handler. The smooth scroll
+            // settles a moment later, and tapping this is an explicit ask to
+            // see the list as it actually stands now.
+            setFrozenOrder(null);
           }}
           className="fixed top-[4.5rem] left-1/2 -translate-x-1/2 z-40
                      bg-brand-purple text-white text-sm font-bold
                      px-5 py-3 rounded-full shadow-xl border border-brand-purple/60
                      hover:bg-brand-purple/90 transition-colors flex items-center gap-1.5 min-h-[44px]"
         >
-          ↑ {newQuestionsCount} new question{newQuestionsCount !== 1 ? 's' : ''}
+          ↑ {plural(newQuestionsCount, 'new question')}
         </button>
       )}
 
