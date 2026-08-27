@@ -1121,3 +1121,48 @@ export async function updateQuestionBody(req: Request, res: Response, next: Next
     next(err);
   }
 }
+
+/**
+ * GET /api/sessions/:id/mine — which questions in this session are the
+ * caller's own.
+ *
+ * Its own endpoint rather than an `is_mine` column on the feed, because the
+ * audience feed is cached on (session, sort, limit, offset) with no caller in
+ * the key. A per-caller field there would be served to whoever asked next,
+ * which is both wrong and a disclosure of who wrote what.
+ *
+ * The client used to derive this from sessionStorage — only the questions you
+ * posted in that tab counted as yours. That is fine until the tab closes, and
+ * the follow-up right is deliberately good for FOLLOW_UP_GRACE_HOURS after the
+ * session ends. Anyone taking the product up on that came back the next day to
+ * a fresh tab, an empty set, and no follow-up button on a question the server
+ * would still have accepted one for.
+ *
+ * Never cached: the answer differs per caller and changes as they post.
+ */
+export async function listMyQuestionIds(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { id: sessionId } = req.params;
+    const userId = req.user?.isGuest === false ? req.user.userId : null;
+    const guestToken = req.user?.guestToken ?? null;
+
+    // Anonymous with no identity at all owns nothing. Not an error — a fresh
+    // visitor asks this before they have posted anything.
+    if (!userId && !guestToken) {
+      res.json({ ids: [] });
+      return;
+    }
+
+    const result = await pool.query(
+      `SELECT id FROM questions
+        WHERE session_id = $1
+          AND (($2::uuid IS NOT NULL AND author_id = $2)
+            OR ($3::text IS NOT NULL AND author_guest_token = $3))`,
+      [sessionId, userId, guestToken],
+    );
+
+    res.json({ ids: result.rows.map((r: { id: string }) => r.id) });
+  } catch (err) {
+    next(err);
+  }
+}

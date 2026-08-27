@@ -142,8 +142,9 @@ export default function SessionPageClient({ params }: SessionPageProps) {
     if (!myIdsHydrated) return;
     try {
       sessionStorage.setItem(mineKey, JSON.stringify([...myQuestionIds]));
-    } catch { /* nothing to do — the button just will not survive a reload */ }
+    } catch { /* the server copy below is the real source; this is a fast path */ }
   }, [myQuestionIds, myIdsHydrated, mineKey]);
+
 
   /** Seconds left to edit a question, or 0 when it is not mine or too late. */
   const editSecondsLeft = useCallback((q: Question) => {
@@ -203,6 +204,35 @@ export default function SessionPageClient({ params }: SessionPageProps) {
   const [joinCount, setJoinCount] = useState(0);
   const [feedModeOverride, setFeedModeOverride] = useState<'polling' | null>(null);
   const feedMode = feedModeOverride ?? session?.feed_mode ?? 'live';
+
+  // Authorship, from the server rather than from this tab.
+  //
+  // sessionStorage above only ever knew about questions posted in this tab, so
+  // closing it forfeited the edit window and — the one that actually matters —
+  // the follow-up on an answered question. That right is deliberately good for
+  // a day after the session ends, and taking the product up on that means
+  // coming back in a new tab, which had an empty set and no button.
+  //
+  // Merged rather than assigned: a question posted moments ago is already in
+  // local state and must not be dropped if this response was in flight when it
+  // went out. Runs on join too — a guest picks their name after mount, and the
+  // identity that owns anything only exists from that point.
+  useEffect(() => {
+    if (!sessionId) return;
+    let cancelled = false;
+    api.get<{ ids: string[] }>(`/sessions/${sessionId}/mine`)
+      .then(({ ids }) => {
+        if (cancelled || !ids?.length) return;
+        setMyQuestionIds(prev => {
+          const merged = new Set(prev);
+          let added = false;
+          for (const id of ids) if (!merged.has(id)) { merged.add(id); added = true; }
+          return added ? merged : prev;   // same Set when nothing changed
+        });
+      })
+      .catch(() => { /* the sessionStorage hint still stands */ });
+    return () => { cancelled = true; };
+  }, [sessionId, joinCount]);
 
   const sortRef = useRef(sort);
   useEffect(() => { sortRef.current = sort; }, [sort]);

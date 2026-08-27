@@ -17,6 +17,7 @@ import {
   reportSession,
 } from '../controllers/sessionController';
 import { muteParticipant, removeParticipant } from '../controllers/moderatorController';
+import { listMyQuestionIds } from '../controllers/questionController';
 import { requireAuth, requireRegistered, optionalAuth } from '../middleware/auth';
 import moderatorRoutes from './moderators';
 import sseRoutes from './sse';
@@ -67,6 +68,11 @@ router.post('/:id/join', optionalAuth, joinSession);
 
 // POST /api/sessions/:id/heartbeat — credit regen tick (guest or registered)
 router.post('/:id/heartbeat', optionalAuth, heartbeat);
+
+// GET /api/sessions/:id/mine — the caller's own question ids in this session.
+// Separate from the feed because the feed is cached without the caller in the
+// key; see listMyQuestionIds. optionalAuth so a guest's token is read too.
+router.get('/:id/mine', optionalAuth, listMyQuestionIds);
 
 // PATCH /api/sessions/:id/participants/:participantId/mute  — mute/unmute (host or mod)
 router.patch('/:id/participants/:participantId/mute', requireAuth, muteParticipant);
