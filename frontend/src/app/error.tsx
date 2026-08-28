@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
+import * as Sentry from '@sentry/nextjs';
 
 export default function GlobalError({
   error,
@@ -10,7 +11,9 @@ export default function GlobalError({
   reset: () => void;
 }) {
   useEffect(() => {
-    // Log to your error reporting service here (e.g. Sentry)
+    // The boundary catches the error, so nothing else will report it. Sentry is
+    // inert without a DSN, so this is a no-op locally and in CI.
+    Sentry.captureException(error);
     console.error(error);
   }, [error]);
 
