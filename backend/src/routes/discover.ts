@@ -59,6 +59,18 @@ router.get('/', optionalAuth, async (req: Request, res: Response, next: NextFunc
     );
 
     // ── Nearby / Public ───────────────────────────────────────────────────
+    //
+    // Upcoming only. This used to take `status IN ('upcoming','live')`, which
+    // is every session live_now had already returned — so with ten shows on
+    // air the page carried twenty-six links to seventeen sessions, each live
+    // one printed twice.
+    //
+    // Worse than the repetition: the client titles this section "Upcoming"
+    // whenever the visitor has not granted location, which is every first
+    // visit. So a show that was on air right then was filed under "Upcoming".
+    //
+    // A live session near you is still reachable — live_now is not filtered by
+    // distance, so it is above this section already.
     let nearbyResult;
 
     if (lat !== null && lng !== null) {
@@ -73,7 +85,7 @@ router.get('/', optionalAuth, async (req: Request, res: Response, next: NextFunc
          JOIN users u ON u.id = s.host_id
          LEFT JOIN organizations o ON o.id = s.org_id
          WHERE s.visibility = 'public'
-           AND s.status IN ('upcoming', 'live')
+           AND s.status = 'upcoming'
            AND s.lat IS NOT NULL AND s.lng IS NOT NULL
            AND earth_distance(
                  ll_to_earth($1, $2),
@@ -90,7 +102,7 @@ router.get('/', optionalAuth, async (req: Request, res: Response, next: NextFunc
          JOIN users u ON u.id = s.host_id
          LEFT JOIN organizations o ON o.id = s.org_id
          WHERE s.visibility = 'public'
-           AND s.status IN ('upcoming', 'live')
+           AND s.status = 'upcoming'
            AND s.city ILIKE $1
          ORDER BY s.starts_at ASC NULLS LAST, s.created_at DESC
          LIMIT 20`,
@@ -105,7 +117,7 @@ router.get('/', optionalAuth, async (req: Request, res: Response, next: NextFunc
            FROM sessions s
            JOIN users u ON u.id = s.host_id
            LEFT JOIN organizations o ON o.id = s.org_id
-           WHERE s.visibility = 'public' AND s.status IN ('upcoming', 'live')
+           WHERE s.visibility = 'public' AND s.status = 'upcoming'
            ORDER BY s.starts_at ASC NULLS LAST
            LIMIT 20`,
         );
@@ -116,7 +128,7 @@ router.get('/', optionalAuth, async (req: Request, res: Response, next: NextFunc
          FROM sessions s
          JOIN users u ON u.id = s.host_id
          LEFT JOIN organizations o ON o.id = s.org_id
-         WHERE s.visibility = 'public' AND s.status IN ('upcoming', 'live')
+         WHERE s.visibility = 'public' AND s.status = 'upcoming'
          ORDER BY s.starts_at ASC NULLS LAST
          LIMIT 20`,
       );
