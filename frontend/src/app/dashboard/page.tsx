@@ -190,7 +190,38 @@ export default function DashboardPage() {
           <DashboardSkeleton />
         ) : (
           <div className="space-y-10">
-            {/* Channels — always visible */}
+            {/* Sessions first — the reason a host opens this page mid-show.
+                Closed sessions are not rendered here at all; they collapse into the
+                "N archived" pill, so an archive that grows for months costs no
+                vertical space and cannot push the channels off screen. */}
+            {sessions.length === 0 ? (
+              <EmptyState />
+            ) : (
+              <section className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-xs font-bold text-brand-orange uppercase tracking-widest">My Sessions</h2>
+                  <Link href="/sessions/mine" className="text-xs text-purple-200/70 hover:text-brand-orange transition-colors flex items-center gap-1 min-h-[44px] px-1">
+                    {archivedCount > 0 && <span className="px-1.5 py-0.5 rounded-full bg-brand-border/40 font-mono">{archivedCount} archived</span>}
+                    View all →
+                  </Link>
+                </div>
+                {live.length > 0 && (
+                  <SessionGroup title="Live" sessions={live} onCopy={copyCode} copiedCode={copiedCode} />
+                )}
+                {upcoming.length > 0 && (
+                  <SessionGroup title="Upcoming" sessions={upcoming} onCopy={copyCode} copiedCode={copiedCode} />
+                )}
+                {live.length === 0 && upcoming.length === 0 && (
+                  <p className="text-sm text-purple-200/70 py-4">
+                    Nothing live or upcoming right now. <Link href="/create" className="text-brand-orange hover:text-brand-amber">Start a session →</Link>
+                  </p>
+                )}
+              </section>
+            )}
+
+            {/* Channels, below sessions deliberately: a channel is configuration you
+                set up once, a session is what you are running right now. With four
+                channels the live session sat about 1,180px down the page. */}
             <section>
               <h2 className="text-xs font-bold text-brand-orange uppercase tracking-widest mb-3">My Channels</h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -223,32 +254,6 @@ export default function DashboardPage() {
                 </Link>
               </div>
             </section>
-
-            {/* Sessions */}
-            {sessions.length === 0 ? (
-              <EmptyState />
-            ) : (
-              <section className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-xs font-bold text-brand-orange uppercase tracking-widest">My Sessions</h2>
-                  <Link href="/sessions/mine" className="text-xs text-purple-200/70 hover:text-brand-orange transition-colors flex items-center gap-1 min-h-[44px] px-1">
-                    {archivedCount > 0 && <span className="px-1.5 py-0.5 rounded-full bg-brand-border/40 font-mono">{archivedCount} archived</span>}
-                    View all →
-                  </Link>
-                </div>
-                {live.length > 0 && (
-                  <SessionGroup title="Live" sessions={live} onCopy={copyCode} copiedCode={copiedCode} />
-                )}
-                {upcoming.length > 0 && (
-                  <SessionGroup title="Upcoming" sessions={upcoming} onCopy={copyCode} copiedCode={copiedCode} />
-                )}
-                {live.length === 0 && upcoming.length === 0 && (
-                  <p className="text-sm text-purple-200/70 py-4">
-                    Nothing live or upcoming right now. <Link href="/create" className="text-brand-orange hover:text-brand-amber">Start a session →</Link>
-                  </p>
-                )}
-              </section>
-            )}
 
             {/* Recently attended */}
             {attendedSessions.length > 0 && (
