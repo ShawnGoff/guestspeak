@@ -90,22 +90,38 @@ export default function OrgPage({ params }: OrgPageProps) {
       } />
 
       {/* Live now banner */}
+      {/* Every live session, not just the first.
+          Nothing stops a channel running several at once and there is a real
+          reason to: a station puts up a discussion for the show itself and a
+          separate session per guest. This rendered live[0] and silently
+          dropped the rest, so on a full slate whichever session happened to
+          sort first was the only one anybody could see. */}
       {live.length > 0 && (
         <div className="bg-red-500/10 border-b border-red-500/20">
-          <div className="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3 min-w-0">
-              <span className="flex items-center gap-1.5 text-xs font-bold text-red-400 bg-red-500/20 border border-red-500/30 px-2.5 py-1 rounded-full shrink-0">
-                <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse" />
-                LIVE NOW
-              </span>
-              <p className="text-white font-semibold text-sm truncate">{live[0].title}</p>
+          <div className="max-w-3xl mx-auto px-4 py-3">
+            {/* With one session the badge sits inline, as it always has. With
+                several it heads the list and carries the count. */}
+            {live.length > 1 && (
+              <div className="mb-2">
+                <LiveNowBadge count={live.length} />
+              </div>
+            )}
+            <div className="flex flex-col gap-2">
+              {live.map(s => (
+                <div key={s.id} className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    {live.length === 1 && <LiveNowBadge />}
+                    <p className="text-white font-semibold text-sm truncate">{s.title}</p>
+                  </div>
+                  <Link
+                    href={`/s/${s.slug}`}
+                    className="btn-primary text-xs py-2 px-4 shrink-0"
+                  >
+                    Join →
+                  </Link>
+                </div>
+              ))}
             </div>
-            <Link
-              href={`/s/${live[0].slug}`}
-              className="btn-primary text-xs py-2 px-4 shrink-0"
-            >
-              Join →
-            </Link>
           </div>
         </div>
       )}
@@ -301,6 +317,19 @@ function SectionHeader({ title, subtitle }: { title: string; subtitle?: string }
       <h2 className="text-sm font-bold text-white uppercase tracking-wider">{title}</h2>
       {subtitle && <p className="text-xs text-purple-200/70 mt-0.5">{subtitle}</p>}
     </div>
+  );
+}
+
+/**
+ * The LIVE NOW badge. Carries a count when the channel has more than one
+ * session running, so the list below it reads as a set rather than a repeat.
+ */
+function LiveNowBadge({ count }: { count?: number }) {
+  return (
+    <span className="inline-flex items-center gap-1.5 text-xs font-bold text-red-400 bg-red-500/20 border border-red-500/30 px-2.5 py-1 rounded-full shrink-0">
+      <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse" />
+      LIVE NOW{count && count > 1 ? ` · ${count}` : ''}
+    </span>
   );
 }
 
