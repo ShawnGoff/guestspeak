@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { api, resolveAsset } from '@/lib/api';
 import type { Organization, Session } from '@ask-away/shared/types';
 import AppNav from '@/components/AppNav';
+import ChannelAvatar from '@/components/ChannelAvatar';
 import ChannelFeed from '@/components/ChannelFeed';
 import FollowChannel from '@/components/FollowChannel';
 
@@ -132,15 +133,13 @@ export default function OrgPage({ params }: OrgPageProps) {
         <div>
           <div className="flex items-start gap-5 mb-5">
             {/* Avatar */}
-            <div className="w-16 h-16 rounded-2xl bg-brand-card border border-brand-border flex-shrink-0 flex items-center justify-center overflow-hidden">
-              {org.avatar_url ? (
-                <img src={resolveAsset(org.avatar_url)} alt={org.name} className="w-full h-full object-cover" />
-              ) : (
-                <span className="text-2xl font-extrabold text-orange-gradient">
-                  {org.name.charAt(0).toUpperCase()}
-                </span>
-              )}
-            </div>
+            <ChannelAvatar
+              name={org.name}
+              seed={org.slug}
+              src={org.avatar_url}
+              className="w-16 h-16 rounded-2xl"
+              textClassName="text-2xl"
+            />
 
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">

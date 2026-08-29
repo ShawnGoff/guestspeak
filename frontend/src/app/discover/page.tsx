@@ -8,6 +8,7 @@ import { isLoggedIn } from '@/lib/auth';
 import type { Session, DiscoverResponse, OrgSearchResult } from '@ask-away/shared/types';
 import { ORG_CATEGORIES } from '@/lib/categories';
 import AppNav from '@/components/AppNav';
+import ChannelAvatar from '@/components/ChannelAvatar';
 
 // ─── Page ────────────────────────────────────────────────────────────────────
 
@@ -413,19 +414,16 @@ function SessionCard({ session, showDistance }: { session: Session & { distance_
         <div className="min-w-0">
           {session.org_name && (
             <div className="flex items-center gap-1.5 mb-1 min-w-0">
-              {session.org_avatar_url ? (
-                <img
-                  src={resolveAsset(session.org_avatar_url)}
-                  alt={session.org_name}
-                  className="w-4 h-4 rounded-full object-cover flex-shrink-0"
-                />
-              ) : (
-                <div className="w-4 h-4 rounded-full bg-brand-purple/30 flex items-center justify-center flex-shrink-0">
-                  <span className="text-[8px] font-bold text-purple-300">
-                    {session.org_name.charAt(0).toUpperCase()}
-                  </span>
-                </div>
-              )}
+              {/* 16px: one letter, because two are unreadable at this size and
+                  the channel name sits immediately beside it. The colour is
+                  what carries the identity here. */}
+              <ChannelAvatar
+                name={session.org_name.charAt(0)}
+                seed={session.org_slug ?? session.org_name}
+                src={session.org_avatar_url}
+                className="w-4 h-4 rounded-full"
+                textClassName="text-[8px]"
+              />
               <p className="text-xs text-brand-orange/70 truncate flex items-center gap-1">
                 {session.org_name}
                 {session.org_is_verified && (
@@ -493,15 +491,13 @@ function SessionCard({ session, showDistance }: { session: Session & { distance_
 function ChannelCard({ org }: { org: OrgSearchResult }) {
   return (
     <Link href={`/org/${org.slug}`} className="card p-5 flex gap-4 hover:border-brand-purple/50 transition-colors group">
-      <div className="flex-shrink-0 w-12 h-12 rounded-full bg-brand-bg border border-brand-border overflow-hidden flex items-center justify-center">
-        {org.avatar_url ? (
-          <img src={resolveAsset(org.avatar_url)} alt={org.name} className="w-full h-full object-cover" />
-        ) : (
-          <span className="text-lg font-bold text-purple-200/60">
-            {org.name.charAt(0).toUpperCase()}
-          </span>
-        )}
-      </div>
+      <ChannelAvatar
+        name={org.name}
+        seed={org.slug}
+        src={org.avatar_url}
+        className="w-12 h-12 rounded-full"
+        textClassName="text-base"
+      />
 
       <div className="min-w-0 flex-1">
         <h3 className="font-bold text-white text-sm group-hover:text-brand-amber transition-colors truncate">

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { plural } from '@/lib/plural';
+import ChannelAvatar from '@/components/ChannelAvatar';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { api, sseUrl } from '@/lib/api';
@@ -2666,16 +2667,14 @@ function WelcomeScreen({ session, onEnter }: {
     <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center bg-brand-bg px-4 py-8 overflow-y-auto">
       <div className="card p-8 w-full max-w-sm text-center my-auto">
         {/* Channel avatar */}
-        {(session as any).org_avatar_url ? (
-          <img
+        {session.org_name ? (
+          <ChannelAvatar
+            name={session.org_name}
+            seed={(session as any).org_slug ?? session.org_name}
             src={(session as any).org_avatar_url}
-            alt=""
-            className="w-16 h-16 rounded-full mx-auto mb-4 object-cover ring-2 ring-brand-border"
+            className="w-16 h-16 rounded-full mx-auto mb-4"
+            textClassName="text-2xl"
           />
-        ) : session.org_name ? (
-          <div className="w-16 h-16 rounded-full mx-auto mb-4 bg-brand-purple/50 border border-brand-border flex items-center justify-center">
-            <span className="text-white font-bold text-2xl">{session.org_name[0].toUpperCase()}</span>
-          </div>
         ) : (
           <div className="w-16 h-16 rounded-full mx-auto mb-4 bg-brand-orange/20 border border-brand-orange/30 flex items-center justify-center">
             <span className="text-brand-orange font-bold text-2xl">Q</span>

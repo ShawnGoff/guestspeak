@@ -8,6 +8,7 @@ import { api, resolveAsset } from '@/lib/api';
 import { getUser, clearAuth, isLoggedIn, isGuest } from '@/lib/auth';
 import type { DiscoverResponse, Session } from '@ask-away/shared/types';
 import SessionCard, { StatusBadge, formatDate, type MySession } from '@/components/SessionCard';
+import ChannelAvatar from '@/components/ChannelAvatar';
 
 interface MyOrg {
   id: string;
@@ -231,11 +232,13 @@ export default function DashboardPage() {
                     href={`/org/${org.slug}`}
                     className="card p-4 flex items-center gap-3 hover:border-brand-purple transition-colors group"
                   >
-                    <div className="w-10 h-10 rounded-xl bg-brand-border/40 flex items-center justify-center flex-shrink-0 text-lg font-bold text-white group-hover:bg-brand-purple/20 transition-colors">
-                      {org.avatar_url
-                        ? <img src={resolveAsset(org.avatar_url)} alt={org.name} className="w-full h-full rounded-xl object-cover" />
-                        : org.name.charAt(0).toUpperCase()}
-                    </div>
+                    <ChannelAvatar
+                      name={org.name}
+                      seed={org.slug}
+                      src={org.avatar_url}
+                      className="w-10 h-10 rounded-xl"
+                      textClassName="text-sm"
+                    />
                     <div className="min-w-0">
                       <p className="font-semibold text-white text-sm truncate">{org.name}</p>
                       <p className="text-xs text-purple-200/70 capitalize">{org.role}</p>
@@ -554,11 +557,13 @@ function DiscoverChannelCard({ org }: { org: DiscoverOrg }) {
       href={`/org/${org.slug}`}
       className="card p-4 flex items-center gap-3 hover:border-brand-purple/50 transition-colors group"
     >
-      <div className="w-10 h-10 rounded-xl bg-brand-border/40 flex items-center justify-center flex-shrink-0 text-sm font-bold text-white group-hover:bg-brand-purple/20 transition-colors overflow-hidden">
-        {org.avatar_url
-          ? <img src={resolveAsset(org.avatar_url)} alt={org.name} className="w-full h-full object-cover" />
-          : org.name.charAt(0).toUpperCase()}
-      </div>
+      <ChannelAvatar
+        name={org.name}
+        seed={org.slug}
+        src={org.avatar_url}
+        className="w-10 h-10 rounded-xl"
+        textClassName="text-sm"
+      />
       <div className="min-w-0 flex-1">
         <p className="font-semibold text-white text-sm truncate group-hover:text-brand-amber transition-colors">{org.name}</p>
         <p className="text-xs text-purple-200/70 truncate">
