@@ -131,7 +131,12 @@ export default function OrgPage({ params }: OrgPageProps) {
 
         {/* Channel header */}
         <div>
-          <div className="flex items-start gap-5 mb-5">
+          {/* Wraps on a phone. Avatar, name, description, Edit and Follow all
+              in one row left the description 81px wide — nine lines of two
+              words each on a 375px screen. The buttons drop to their own row
+              instead; min-w on the text is what forces the wrap rather than
+              letting it squeeze. */}
+          <div className="flex items-start gap-4 sm:gap-5 mb-5 flex-wrap sm:flex-nowrap">
             {/* Avatar */}
             <ChannelAvatar
               name={org.name}
@@ -141,7 +146,7 @@ export default function OrgPage({ params }: OrgPageProps) {
               textClassName="text-2xl"
             />
 
-            <div className="flex-1 min-w-0">
+            <div className="flex-1 min-w-[12rem]">
               <div className="flex items-center gap-2">
                 <h1 className="text-2xl font-extrabold text-white">{org.name}</h1>
                 {org.is_verified && <VerifiedBadge />}
@@ -162,7 +167,7 @@ export default function OrgPage({ params }: OrgPageProps) {
               )}
             </div>
 
-            <div className="flex items-center gap-2 flex-shrink-0">
+            <div className="flex items-center gap-2 flex-shrink-0 w-full sm:w-auto">
               {isManager && (
                 <Link
                   href={`/org/${params.slug}/settings`}
