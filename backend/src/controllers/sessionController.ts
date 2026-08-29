@@ -7,7 +7,7 @@ import { AppError } from '../middleware/errorHandler';
 import { requireHostOrOrgAdmin, resolveCallerRole } from '../db/permissions';
 import { broadcast } from '../sse/broadcaster';
 import { createNotificationsForUsers } from './notificationController';
-import { rejectIfBanned } from '../lib/wordFilter';
+import { rejectIfBanned, rejectIfBannedHandle } from '../lib/wordFilter';
 import { sendSessionLive } from '../lib/mailer';
 import { feedModeFor, FEED_POLL_INTERVAL_MS } from '../lib/feedPolicy';
 import { envIntMin } from '../lib/env';
@@ -444,7 +444,7 @@ export async function joinSession(req: Request, res: Response, next: NextFunctio
     // Guests must supply a display name
     if (!userId) {
       if (!guest_username) throw new AppError(400, 'A display name is required to join');
-      await rejectIfBanned(guest_username);
+      await rejectIfBannedHandle(guest_username);
 
       // Block names already claimed by registered users
       const taken = await pool.query(

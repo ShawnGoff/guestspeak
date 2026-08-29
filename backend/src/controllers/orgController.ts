@@ -5,6 +5,7 @@ import { randomBytes } from 'crypto';
 import { pool } from '../db/pool';
 import { AppError } from '../middleware/errorHandler';
 import { QUESTION_AUTHOR_SQL, QUESTION_AUTHOR_JOINS } from '../lib/questionHelpers';
+import { rejectIfBanned, rejectIfBannedHandle } from '../lib/wordFilter';
 
 const CreateOrgSchema = z.object({
   name: z.string().min(1).max(255),
@@ -60,6 +61,12 @@ export async function createOrg(req: Request, res: Response, next: NextFunction)
   try {
     const data = CreateOrgSchema.parse(req.body);
     const callerId = req.user!.userId;
+
+    // A channel name goes straight onto Discover, so it is held to the same
+    // rule as a username rather than the looser prose one. Nothing checked it
+    // at all before — a channel could be called anything.
+    await rejectIfBannedHandle(data.name);
+    if (data.description) await rejectIfBanned(data.description);
 
     // Cap: free accounts can own at most 3 channels
     const countResult = await pool.query(
@@ -253,6 +260,9 @@ export async function updateOrg(req: Request, res: Response, next: NextFunction)
     await requireOrgOwnerOrAdmin(id, req.user!.userId);
 
     const data = UpdateOrgSchema.parse(req.body);
+    // Renaming has to clear the same bar as creating.
+    if (data.name) await rejectIfBannedHandle(data.name);
+    if (data.description) await rejectIfBanned(data.description);
     const fields = Object.keys(data).filter(k => (data as any)[k] !== undefined);
     if (!fields.length) { res.json({ message: 'No changes' }); return; }
 

@@ -6,7 +6,7 @@ import { pool } from '../db/pool';
 import { signToken } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
 import { sendPasswordReset } from '../lib/mailer';
-import { rejectIfBanned } from '../lib/wordFilter';
+import { rejectIfBanned, rejectIfBannedHandle } from '../lib/wordFilter';
 
 /** Single source of truth — changing a password must not weaken its hash. */
 const BCRYPT_ROUNDS = 12;
@@ -61,7 +61,7 @@ export async function register(req: Request, res: Response, next: NextFunction) 
     // proof of possession: you can only claim a guest identity you are able to
     // authenticate as.
     const guest_token = req.user?.isGuest ? req.user.guestToken : undefined;
-    await rejectIfBanned(username);
+    await rejectIfBannedHandle(username);
     const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
 
     await client.query('BEGIN');
@@ -457,12 +457,28 @@ export async function checkUsername(req: Request, res: Response, next: NextFunct
     const username = (req.query.username as string ?? '').trim();
     if (!username) throw new AppError(400, 'username is required');
 
+    // Appropriateness as well as availability. Answering only the second
+    // meant the signup form showed a green tick for a name registration was
+    // about to refuse, which reads as a bug in the form rather than a rule.
+    let allowed = true;
+    try {
+      await rejectIfBannedHandle(username);
+    } catch {
+      allowed = false;
+    }
+
     const result = await pool.query(
       `SELECT id FROM users WHERE LOWER(username) = LOWER($1) AND is_guest = false`,
       [username],
     );
+    const free = result.rowCount === 0;
 
-    res.json({ available: result.rowCount === 0 });
+    res.json({
+      available: free && allowed,
+      // Separated so the form can say which of the two it is.
+      taken: !free,
+      disallowed: !allowed,
+    });
   } catch (err) {
     next(err);
   }
