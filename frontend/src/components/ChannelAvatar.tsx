@@ -65,7 +65,15 @@ export function initialsFor(name: string): string {
   // No letters at all — an emoji-only or numeric name. Signalled with '' so
   // the component can draw a microphone, which beats a literal question mark.
   if (words.length === 0) return '';
-  if (words.length === 1) return words[0][0].toUpperCase();
+  if (words.length === 1) {
+    const w = words[0];
+    // One word still wants two letters, so the second can carry the accent.
+    // camelCase first — StackConf is SC, GuestSpeak is GS — then fall back to
+    // the first two characters.
+    const camel = w.match(/^(\p{Lu}?\p{Ll}+)(\p{Lu})/u);
+    if (camel) return (camel[1][0] + camel[2]).toUpperCase();
+    return w.length > 1 ? w.slice(0, 2).toUpperCase() : w[0].toUpperCase();
+  }
   return (words[0][0] + words[1][0]).toUpperCase();
 }
 
@@ -114,15 +122,15 @@ export default function ChannelAvatar({
 
   return (
     <div
-      className={`flex items-center justify-center flex-shrink-0 ${className}`}
-      style={{ backgroundColor: colourFor(seed) }}
+      className={`flex items-center justify-center flex-shrink-0 bg-brand-card border border-brand-border ${className}`}
       // The letters are decoration over the name, which is always beside it.
       aria-hidden
     >
       {initials
         ? (
-          <span className={`font-bold text-white leading-none ${textClassName}`}>
-            {initials}
+          <span className={`font-bold leading-none ${textClassName}`}>
+            <span className="text-white">{initials[0]}</span>
+            {initials[1] && <span className="text-brand-orange">{initials[1]}</span>}
           </span>
         )
         : (
