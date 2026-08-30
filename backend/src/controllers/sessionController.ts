@@ -312,13 +312,70 @@ export async function goLive(req: Request, res: Response, next: NextFunction) {
 
     res.json(result.rows[0]);
 
-    // Fan out notifications + emails to org followers (fire-and-forget — never blocks response)
-    notifyOrgFollowers(result.rows[0]).catch(err =>
-      console.error('[goLive] notification fan-out failed:', err),
-    );
+    // Fan out notifications + emails (fire-and-forget — never blocks response)
+    Promise.allSettled([
+      notifyOrgFollowers(result.rows[0]),
+      notifyReminderHolders(result.rows[0]),
+    ]).then(rs => rs.forEach(r => {
+      // Settled, not chained: a channel with no followers must not stop the
+      // reminders going out, and vice versa.
+      if (r.status === 'rejected') console.error('[goLive] notification fan-out failed:', r.reason);
+    }));
   } catch (err) {
     next(err);
   }
+}
+
+/**
+ * Notify everyone who asked to be told about this one session.
+ *
+ * Anyone already following the channel is skipped: they are getting the same
+ * 'session:live' from the follower fan-out, and two identical rows in the bell
+ * for one session reads as a bug. Their reminder is still stamped, so the row
+ * records that they asked and never fires later.
+ *
+ * In-app only. The go-live email is the channel-follow product — its unsubscribe
+ * copy and its opt-out both say "a channel you follow" — and a reminder is not
+ * that. Sending one under that header would make unsubscribing from follow mail
+ * silently cancel reminders too.
+ */
+async function notifyReminderHolders(session: {
+  id: string; title: string; slug: string; org_id: string | null;
+}) {
+  // Claim in the same statement that reads, so a reopen — or two go-live calls
+  // racing — cannot send twice. Anyone already stamped is not returned.
+  const { rows } = await pool.query<{ user_id: string; is_follower: boolean }>(
+    `UPDATE session_reminders r
+        SET notified_at = NOW()
+       FROM users u
+      WHERE r.session_id = $1
+        AND r.notified_at IS NULL
+        AND u.id = r.user_id
+        AND u.is_guest = false
+        AND u.deleted_at IS NULL
+      RETURNING r.user_id,
+                EXISTS (SELECT 1 FROM org_followers f
+                         WHERE f.org_id = $2::uuid AND f.user_id = r.user_id) AS is_follower`,
+    [session.id, session.org_id],
+  );
+  const recipients = rows.filter(r => !r.is_follower).map(r => r.user_id);
+  if (!recipients.length) return;
+
+  let orgName = '', orgSlug = '';
+  if (session.org_id) {
+    const org = await pool.query<{ name: string; slug: string }>(
+      `SELECT name, slug FROM organizations WHERE id = $1`, [session.org_id],
+    );
+    if (org.rows[0]) ({ name: orgName, slug: orgSlug } = org.rows[0]);
+  }
+
+  await createNotificationsForUsers(recipients, 'session:live', {
+    session_id:    session.id,
+    session_slug:  session.slug,
+    session_title: session.title,
+    org_name:      orgName,
+    org_slug:      orgSlug,
+  });
 }
 
 /** Notify all followers of a session's org that the session is now live. */

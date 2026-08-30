@@ -4,11 +4,13 @@ import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { api, resolveAsset } from '@/lib/api';
-import { isLoggedIn } from '@/lib/auth';
+import { isLoggedIn, getUser } from '@/lib/auth';
+import type { AuthUser } from '@/lib/auth';
 import type { Session, DiscoverResponse, OrgSearchResult } from '@ask-away/shared/types';
 import { ORG_CATEGORIES } from '@/lib/categories';
 import AppNav from '@/components/AppNav';
 import ChannelAvatar from '@/components/ChannelAvatar';
+import RemindMe from '@/components/RemindMe';
 import { plural } from '@/lib/plural';
 
 // ─── Page ────────────────────────────────────────────────────────────────────
@@ -49,6 +51,16 @@ export default function DiscoverPage() {
   const [locationStatus, setLocationStatus] = useState<'idle' | 'requesting' | 'granted' | 'denied'>('idle');
   const gpsRef = useRef<{ lat: number; lng: number } | null>(null);
 
+  /**
+   * Who is looking, and which upcoming sessions they have already flagged.
+   *
+   * One request for the page rather than a flag per card: the nearby query has
+   * four variants, and joining reminders into each is four chances to get the
+   * signed-out case wrong. The set is small and belongs to the viewer.
+   */
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [reminded, setReminded] = useState<Set<string>>(new Set());
+
   // Channel results
   const [channels, setChannels]             = useState<OrgSearchResult[] | null>(null);
   const [channelsLoading, setChannelsLoading] = useState(false);
@@ -58,7 +70,27 @@ export default function DiscoverPage() {
     setMounted(true);
     fetchSessions();
     fetchChannels('', '', null, '');
+
+    const u = getUser();
+    setUser(u);
+    // Guests have no account for a notification to land in, so there is
+    // nothing to fetch and the button will send them to sign up.
+    if (u && !u.is_guest) {
+      api.get<{ sessionIds: string[] }>('/sessions/reminders')
+        .then(r => setReminded(new Set(r.sessionIds)))
+        // A failure here means buttons render unset. Tapping one still works
+        // and the server's ON CONFLICT makes a redundant set a no-op.
+        .catch(() => {});
+    }
   }, []);
+
+  function toggleReminder(id: string, on: boolean) {
+    setReminded(prev => {
+      const next = new Set(prev);
+      if (on) next.add(id); else next.delete(id);
+      return next;
+    });
+  }
 
   async function fetchSessions(
     lat?: number, lng?: number, city?: string,
@@ -338,7 +370,7 @@ export default function DiscoverPage() {
             {mounted && isLoggedIn() && (data?.following ?? []).length > 0 && (
               <Section title="From people you follow" empty="" className="mb-10">
                 {(data?.following ?? []).map(s => (
-                  <SessionCard key={s.id} session={s} showDistance={false} />
+                  <SessionCard key={s.id} session={s} showDistance={false} user={user} reminded={reminded.has(s.id)} onRemindToggle={toggleReminder} />
                 ))}
               </Section>
             )}
@@ -351,7 +383,7 @@ export default function DiscoverPage() {
             >
               {groupByChannel(data?.live_now ?? []).map(group =>
                 group.sessions.length === 1
-                  ? <SessionCard key={group.sessions[0].id} session={group.sessions[0]} showDistance={false} />
+                  ? <SessionCard key={group.sessions[0].id} session={group.sessions[0]} showDistance={false} user={user} reminded={reminded.has(group.sessions[0].id)} onRemindToggle={toggleReminder} />
                   : <ChannelGroupCard key={group.key} group={group} />,
               )}
             </Section>
@@ -402,7 +434,7 @@ export default function DiscoverPage() {
               className="mt-4"
             >
               {(data?.nearby ?? []).map(s => (
-                <SessionCard key={s.id} session={s} showDistance />
+                <SessionCard key={s.id} session={s} showDistance user={user} reminded={reminded.has(s.id)} onRemindToggle={toggleReminder} />
               ))}
             </Section>
 
@@ -579,13 +611,24 @@ function ChannelGroupCard({ group }: { group: ChannelGroup }) {
   );
 }
 
-function SessionCard({ session, showDistance }: { session: Session & { distance_km?: number; participant_count?: number; org_avatar_url?: string }; showDistance: boolean }) {
+function SessionCard({ session, showDistance, user, reminded, onRemindToggle }: {
+  session: Session & { distance_km?: number; participant_count?: number; org_avatar_url?: string };
+  showDistance: boolean;
+  user: AuthUser | null;
+  reminded: boolean;
+  onRemindToggle: (id: string, on: boolean) => void;
+}) {
   const isLive = session.status === 'live';
   const isLiveSoon = session.status === 'upcoming' && session.starts_at
     && (new Date(session.starts_at).getTime() - Date.now()) < 30 * 60 * 1000;
 
+  // The whole card was an anchor. A <button> inside an <a> is invalid HTML, so
+  // the anchor becomes an overlay covering the card and the button sits above
+  // it — the standard "stretched link", which keeps the entire card clickable
+  // and gives the reminder its own hit area.
   return (
-    <Link href={`/s/${session.slug}`} className="card p-5 flex flex-col gap-3 hover:border-brand-purple/50 transition-colors group">
+    <div className="relative card p-5 flex flex-col gap-3 hover:border-brand-purple/50 transition-colors group">
+      <Link href={`/s/${session.slug}`} className="absolute inset-0 rounded-2xl" aria-label={session.title} />
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           {session.org_name && (
@@ -638,8 +681,8 @@ function SessionCard({ session, showDistance }: { session: Session & { distance_
         <p className="text-purple-200/75 text-xs leading-relaxed line-clamp-2">{session.description}</p>
       )}
 
-      <div className="flex items-center justify-between text-xs text-purple-200/70 mt-auto pt-1">
-        <span>{session.host_username}</span>
+      <div className="flex items-center justify-between gap-3 text-xs text-purple-200/70 mt-auto pt-1">
+        <span className="truncate">{session.host_username}</span>
         <div className="flex items-center gap-3">
           {showDistance && session.distance_km !== undefined && (
             <span>{Math.round(session.distance_km)} km away</span>
@@ -658,7 +701,23 @@ function SessionCard({ session, showDistance }: { session: Session & { distance_
           )}
         </div>
       </div>
-    </Link>
+
+      {/* Its own row rather than the meta line. Tried it there first: at 375px
+          a card already carrying a host name, a count and a start time pushed
+          "4 joined" and "12:11 PM" onto two lines and truncated the host to
+          "tomas_lindqv…". This is the card's one action — it gets the space. */}
+      {session.status === 'upcoming' && (
+        <div className="flex justify-end">
+          <RemindMe
+            sessionId={session.id}
+            user={user}
+            initialReminded={reminded}
+            onChange={on => onRemindToggle(session.id, on)}
+            className="relative z-10"
+          />
+        </div>
+      )}
+    </div>
   );
 }
 

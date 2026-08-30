@@ -16,6 +16,7 @@ import {
   exportSession,
   reportSession,
 } from '../controllers/sessionController';
+import { setReminder, clearReminder, listMyReminders } from '../controllers/reminderController';
 import { muteParticipant, removeParticipant } from '../controllers/moderatorController';
 import { listMyQuestionIds } from '../controllers/questionController';
 import { requireAuth, requireRegistered, optionalAuth } from '../middleware/auth';
@@ -33,6 +34,10 @@ router.post('/', requireRegistered, createSession);
 // GET  /api/sessions/mine          — caller's hosted sessions (must be before /:slug)
 router.get('/mine', requireAuth, listMySessions);
 
+// GET /api/sessions/reminders — ids the caller is reminded about. Before
+// /:slug, or the slug route swallows the literal.
+router.get('/reminders', requireRegistered, listMyReminders);
+
 // GET  /api/sessions/attended      — sessions caller attended as a participant (must be before /:slug)
 router.get('/attended', requireAuth, listAttendedSessions);
 
@@ -47,6 +52,11 @@ router.patch('/:id', requireAuth, updateSession);
 
 // POST /api/sessions/:id/go-live  — go live (host only)
 router.post('/:id/go-live', requireRegistered, goLive);
+
+// POST/DELETE /api/sessions/:id/reminder — tell me when this one starts.
+// requireRegistered, not requireAuth: a guest has no account to notify.
+router.post('/:id/reminder', requireRegistered, setReminder);
+router.delete('/:id/reminder', requireRegistered, clearReminder);
 
 // POST /api/sessions/:id/close    — close (host only)
 router.post('/:id/close', requireRegistered, closeSession);
