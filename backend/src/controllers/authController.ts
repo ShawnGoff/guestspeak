@@ -463,8 +463,19 @@ export async function checkUsername(req: Request, res: Response, next: NextFunct
     let allowed = true;
     try {
       await rejectIfBannedHandle(username);
-    } catch {
-      allowed = false;
+    } catch (err: any) {
+      // Only a refusal means the name is disallowed. A bare `catch` here
+      // reported a broken filter as a rejected name, and did it convincingly:
+      // when the migration adding banned_words.match_mode had not run, the
+      // query threw, every username came back disallowed, and the endpoint
+      // returned 200 the whole time. Registration was 500-ing in parallel and
+      // this said nothing about it. Anything that is not a 400 is ours, and it
+      // goes to the error handler where it is visible.
+      if (err?.statusCode === 400 || err?.status === 400) {
+        allowed = false;
+      } else {
+        throw err;
+      }
     }
 
     const result = await pool.query(
