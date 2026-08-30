@@ -234,7 +234,6 @@ export default function DashboardPage() {
                   >
                     <ChannelAvatar
                       name={org.name}
-                      seed={org.slug}
                       src={org.avatar_url}
                       className="w-10 h-10 rounded-xl"
                       textClassName="text-sm"
@@ -559,7 +558,6 @@ function DiscoverChannelCard({ org }: { org: DiscoverOrg }) {
     >
       <ChannelAvatar
         name={org.name}
-        seed={org.slug}
         src={org.avatar_url}
         className="w-10 h-10 rounded-xl"
         textClassName="text-sm"

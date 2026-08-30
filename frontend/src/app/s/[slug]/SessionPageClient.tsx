@@ -2685,7 +2685,6 @@ function WelcomeScreen({ session, onEnter }: {
         {session.org_name ? (
           <ChannelAvatar
             name={session.org_name}
-            seed={(session as any).org_slug ?? session.org_name}
             src={(session as any).org_avatar_url}
             className="w-16 h-16 rounded-full mx-auto mb-4"
             textClassName="text-2xl"

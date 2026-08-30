@@ -572,7 +572,6 @@ function ChannelGroupCard({ group }: { group: ChannelGroup }) {
       >
         <ChannelAvatar
           name={group.orgName ?? ''}
-          seed={group.orgSlug ?? group.key}
           src={group.orgAvatarUrl}
           className="w-10 h-10 rounded-xl"
           textClassName="text-sm"
@@ -638,7 +637,6 @@ function SessionCard({ session, showDistance, user, reminded, onRemindToggle }: 
                   what carries the identity here. */}
               <ChannelAvatar
                 name={session.org_name.charAt(0)}
-                seed={session.org_slug ?? session.org_name}
                 src={session.org_avatar_url}
                 className="w-4 h-4 rounded-full"
                 textClassName="text-[8px]"
@@ -728,7 +726,6 @@ function ChannelCard({ org }: { org: OrgSearchResult }) {
     <Link href={`/org/${org.slug}`} className="card p-5 flex gap-4 hover:border-brand-purple/50 transition-colors group">
       <ChannelAvatar
         name={org.name}
-        seed={org.slug}
         src={org.avatar_url}
         className="w-12 h-12 rounded-full"
         textClassName="text-base"

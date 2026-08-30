@@ -140,7 +140,6 @@ export default function OrgPage({ params }: OrgPageProps) {
             {/* Avatar */}
             <ChannelAvatar
               name={org.name}
-              seed={org.slug}
               src={org.avatar_url}
               className="w-16 h-16 rounded-2xl"
               textClassName="text-2xl"

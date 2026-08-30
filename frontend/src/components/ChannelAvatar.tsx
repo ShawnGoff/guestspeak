@@ -1,46 +1,21 @@
 import { resolveAsset } from '@/lib/api';
 
 /**
- * The tile shown for a channel — its uploaded logo, or a coloured fallback.
+ * The tile shown for a channel — its uploaded logo, or a wordmark fallback.
  *
  * The fallback used to be the first letter of the name, written out in eight
  * places. That breaks precisely where it matters most: a station names its
  * shows "KGMZ Morning Drive", "KGMZ Newsroom", "KGMZ Weekend Edition", and all
  * three rendered an identical "K".
  *
- * A microphone glyph was the obvious alternative and is worse — it would make
- * every channel in the product identical rather than just the ones sharing an
- * initial, which is the opposite of what a tile in a list of six is for. The
- * microphone belongs on the upload control in channel settings, where the
- * message is "this is a channel, give it a logo" rather than "which channel is
- * this".
+ * So: up to two initials, set the way the GuestSpeak wordmark is — first letter
+ * white, second orange. That ties every channel back to the product it is on
+ * while the letters themselves do the identifying.
  *
- * So: up to two initials, on a colour derived from the slug. At 40px the colour
- * does most of the identifying and the letters settle the rest.
+ * A microphone appears only when a name yields no letters at all. As the
+ * general fallback it would be worse than the single letter it replaced,
+ * making every channel identical rather than just the ones sharing an initial.
  */
-
-/**
- * Eight backgrounds, each carrying white text at 4.99:1 or better.
- *
- * Amber and rose both clear contrast and are still excluded: red is what "Live"
- * means everywhere else in the product, and orange is the CTA colour. A channel
- * tile in either would read as a status or a highlight rather than an identity.
- *
- * Spread across the hues that remain rather than bunched. A first attempt held
- * indigo, teal, cyan, emerald and blue — five neighbours out of eight — and on
- * nine real channels it produced three teals and never reached indigo, fuchsia
- * or slate at all.
- */
-const PALETTE = [
-  '#1D4ED8', // blue
-  '#0369A1', // sky
-  '#0F766E', // teal
-  '#047857', // emerald
-  '#4D7C0F', // lime
-  '#7C3AED', // violet
-  '#A21CAF', // fuchsia
-  '#475569', // slate
-];
 
 /** Words that are never the identifying part of a name. */
 const SKIP = new Set(['the', 'a', 'an', 'of', 'and']);
@@ -77,31 +52,10 @@ export function initialsFor(name: string): string {
   return (words[0][0] + words[1][0]).toUpperCase();
 }
 
-/**
- * Stable colour for a channel. Keyed on the slug rather than the name so
- * renaming a show does not change the colour its audience recognises.
- */
-export function colourFor(seed: string): string {
-  // FNV-1a. `hash * 31 + char` was the obvious choice and the wrong one here:
-  // channel slugs from one station share a prefix ("kgmz-morning-drive",
-  // "kgmz-newsroom"), and it mapped those neighbours onto neighbouring buckets.
-  // Measured over the same nine slugs, this reaches six of the eight colours
-  // where that reached five, and its worst collision is two rather than three.
-  let hash = 0x811c9dc5;
-  const s = seed ?? '';
-  for (let i = 0; i < s.length; i++) {
-    hash ^= s.charCodeAt(i);
-    hash = Math.imul(hash, 0x01000193);
-  }
-  return PALETTE[(hash >>> 0) % PALETTE.length];
-}
-
 export default function ChannelAvatar({
-  name, seed, src, className = '', textClassName = '',
+  name, src, className = '', textClassName = '',
 }: {
   name: string;
-  /** Slug or username — whatever is stable for this channel. */
-  seed: string;
   src?: string | null;
   /** Sets the box: width, height and corner radius. */
   className?: string;
