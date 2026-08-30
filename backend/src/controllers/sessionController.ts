@@ -8,6 +8,7 @@ import { requireHostOrOrgAdmin, resolveCallerRole } from '../db/permissions';
 import { broadcast } from '../sse/broadcaster';
 import { createNotificationsForUsers } from './notificationController';
 import { rejectIfBanned, rejectIfBannedHandle } from '../lib/wordFilter';
+import { unsubscribeUrl } from '../lib/unsubscribe';
 import { sendSessionLive } from '../lib/mailer';
 import { feedModeFor, FEED_POLL_INTERVAL_MS } from '../lib/feedPolicy';
 import { envIntMin } from '../lib/env';
@@ -329,10 +330,15 @@ async function notifyOrgFollowers(session: {
   const appUrl = process.env.APP_URL ?? 'http://localhost:3000';
 
   // Fetch org name + all registered followers (with email for mailer)
+  // email_opted_out is carried rather than filtered in SQL: the in-app
+  // notification still goes to everyone. Turning off the email is not the same
+  // as leaving the channel, and someone who did the first still wants the bell.
   const { rows } = await pool.query(
-    `SELECT of2.user_id, u.email, o.name AS org_name, o.slug AS org_slug
+    `SELECT of2.user_id, u.email, o.name AS org_name, o.slug AS org_slug,
+            COALESCE((u.notification_prefs->>'email_session_live')::boolean, true) = false
+              AS email_opted_out
      FROM org_followers of2
-     JOIN users u ON u.id = of2.user_id AND u.is_guest = false
+     JOIN users u ON u.id = of2.user_id AND u.is_guest = false AND u.deleted_at IS NULL
      JOIN organizations o ON o.id = of2.org_id
      WHERE of2.org_id = $1`,
     [session.org_id],
@@ -355,12 +361,17 @@ async function notifyOrgFollowers(session: {
 
   // Emails (one per follower, settle independently)
   const sessionUrl = `${appUrl}/s/${session.slug}`;
+  const emailable = rows.filter((r: any) => !r.email_opted_out);
+  if (emailable.length < rows.length) {
+    console.log(`[notify] ${rows.length - emailable.length} follower(s) opted out of go-live email`);
+  }
   await Promise.allSettled(
-    rows.map((r: any) =>
+    emailable.map((r: any) =>
       sendSessionLive(r.email as string, {
         orgName,
         sessionTitle: session.title,
         sessionUrl,
+        unsubscribeUrl: unsubscribeUrl(r.user_id as string),
       }),
     ),
   );

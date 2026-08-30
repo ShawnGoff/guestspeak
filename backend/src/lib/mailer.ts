@@ -49,6 +49,24 @@ interface Message {
   subject: string;
   text: string;
   html: string;
+  /** RFC 8058 unsubscribe headers, on bulk mail only. */
+  headers?: Record<string, string>;
+}
+
+/**
+ * Escape for interpolation into the HTML body.
+ *
+ * Channel names and session titles are user-controlled and were being dropped
+ * into the markup raw, so a name containing a quote or an angle bracket broke
+ * the email — and worse in a client that renders what it is given.
+ */
+function esc(text: string): string {
+  return String(text ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 /**
@@ -69,6 +87,7 @@ async function deliver(msg: Message): Promise<unknown> {
       body: JSON.stringify({
         from: msg.from, to: [msg.to], subject: msg.subject,
         text: msg.text, html: msg.html,
+        ...(msg.headers ? { headers: msg.headers } : {}),
       }),
       signal: AbortSignal.timeout(15_000),
     });
@@ -111,31 +130,47 @@ const FROM = process.env.SMTP_FROM ?? 'GuestSpeak <noreply@guestspeak.app>';
 
 export async function sendSessionLive(
   to: string,
-  opts: { orgName: string; sessionTitle: string; sessionUrl: string },
+  opts: {
+    orgName: string; sessionTitle: string; sessionUrl: string;
+    /** Required. This is bulk mail and must carry a way off the list. */
+    unsubscribeUrl: string;
+  },
 ) {
-  const { orgName, sessionTitle, sessionUrl } = opts;
+  const { orgName, sessionTitle, sessionUrl, unsubscribeUrl } = opts;
   warnIfUnconfigured();
 
-  const msg = {
+  const msg: Message = {
     from: FROM,
     to,
     subject: `🎙 ${orgName} is live: ${sessionTitle}`,
-    text: `${orgName} just started a live Q&A session.\n\n${sessionTitle}\n\nJoin here: ${sessionUrl}`,
+    text: `${orgName} just started a live Q&A session.\n\n${sessionTitle}\n\n`
+      + `Join here: ${sessionUrl}\n\n`
+      + `---\nYou receive this because you follow ${orgName} on GuestSpeak.\n`
+      + `Stop these emails: ${unsubscribeUrl}`,
     html: `
       <div style="font-family:sans-serif;max-width:480px;margin:0 auto;">
         <h2 style="color:#F5921E;">GuestSpeak</h2>
         <p style="color:#888;font-size:13px;">A channel you follow just went live.</p>
-        <h3 style="margin:0 0 4px;">${orgName}</h3>
-        <p style="font-size:17px;font-weight:bold;margin:0 0 20px;">${sessionTitle}</p>
-        <a href="${sessionUrl}"
+        <h3 style="margin:0 0 4px;">${esc(orgName)}</h3>
+        <p style="font-size:17px;font-weight:bold;margin:0 0 20px;">${esc(sessionTitle)}</p>
+        <a href="${esc(sessionUrl)}"
            style="display:inline-block;background:#F5921E;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:bold;font-size:15px;">
           Join session →
         </a>
         <p style="color:#aaa;font-size:12px;margin-top:24px;">
-          You received this because you follow ${orgName} on GuestSpeak.
+          You receive this because you follow ${esc(orgName)} on GuestSpeak.<br>
+          <a href="${esc(unsubscribeUrl)}" style="color:#aaa;">Stop these emails</a>
         </p>
       </div>
     `,
+    // RFC 8058. The header is what Gmail and Yahoo look for from a bulk
+    // sender, and List-Unsubscribe-Post is what makes their built-in
+    // unsubscribe button a single POST rather than a page the person has to
+    // work through. Both, or the button does not appear.
+    headers: {
+      'List-Unsubscribe': `<${unsubscribeUrl}>`,
+      'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+    },
   };
 
   const info = await deliver(msg);
