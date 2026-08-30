@@ -10,16 +10,51 @@ import { sendToUsers, publicKey, type PushPayload } from '../lib/push';
  * Insert notifications for a batch of users in one statement.
  * Fire-and-forget friendly — does nothing if userIds is empty.
  */
+/**
+ * Which preference key silences which notification type.
+ *
+ * A type absent from this map cannot be turned off — that is the right default
+ * for anything transactional, and the wrong one for anything a person might
+ * reasonably tire of, so adding a type means deciding which it is.
+ */
+const PREF_KEY_FOR: Record<string, string | undefined> = {
+  'session:live':      'app_session_live',
+  'channel:prompt':    'app_channel_prompt',
+  'question:replied':  'app_question_replied',
+};
+
 export async function createNotificationsForUsers(
   userIds: string[],
   type: string,
   payload: Record<string, unknown>,
 ): Promise<void> {
   if (!userIds.length) return;
+
+  // Drop anyone who has turned this type off, here rather than at each call
+  // site. Three senders create notifications and a settings page offers a
+  // toggle for each; filtering per sender means a fourth sender ships with the
+  // toggle silently ignored, which is worse than not offering it. The key is
+  // derived from the type, so a new type is opt-out-able the moment it exists.
+  //
+  // Absent key means on, so this is a no-op for anyone who has never touched
+  // their settings.
+  const prefKey = PREF_KEY_FOR[type];
+  let recipients = userIds;
+  if (prefKey) {
+    const { rows } = await pool.query<{ id: string }>(
+      `SELECT id FROM users
+        WHERE id = ANY($1::uuid[])
+          AND COALESCE((notification_prefs->>$2)::boolean, true) = true`,
+      [userIds, prefKey],
+    );
+    recipients = rows.map(r => r.id);
+    if (!recipients.length) return;
+  }
+
   await pool.query(
     `INSERT INTO notifications (user_id, type, payload)
      SELECT unnest($1::uuid[]), $2, $3`,
-    [userIds, type, JSON.stringify(payload)],
+    [recipients, type, JSON.stringify(payload)],
   );
 
   // Push rides along here rather than at each call site: this is the one place
@@ -31,7 +66,7 @@ export async function createNotificationsForUsers(
   // request that triggered it.
   const push = pushCopy(type, payload);
   if (push) {
-    sendToUsers(userIds, push).catch(err =>
+    sendToUsers(recipients, push).catch(err =>
       console.error('[notifications] push delivery failed:', err),
     );
   }

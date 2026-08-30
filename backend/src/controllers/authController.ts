@@ -25,10 +25,32 @@ const RegisterSchema = z.object({
   password: z.string().min(8),
 });
 
+/**
+ * Notification opt-outs the account holder can set for themselves.
+ *
+ * Named for what they turn off, and every one defaults to on — an absent key
+ * means subscribed, so a type added later is on until someone says otherwise.
+ * Password reset is deliberately absent: transactional mail answers something
+ * the person just did and is not theirs to disable.
+ */
+const NotificationPrefsSchema = z.object({
+  /** Email when a channel you follow goes live. The in-app one is separate. */
+  email_session_live: z.boolean().optional(),
+  /** In-app when a channel you follow goes live. */
+  app_session_live: z.boolean().optional(),
+  /** In-app when a channel you follow posts to its feed. */
+  app_channel_prompt: z.boolean().optional(),
+  /** In-app when a host replies to a question you asked. */
+  app_question_replied: z.boolean().optional(),
+}).strict();
+
+export type NotificationPrefs = z.infer<typeof NotificationPrefsSchema>;
+
 const UpdateMeSchema = z.object({
   code_prefix: z.string().min(2).max(8).regex(/^[A-Z0-9]+$/).optional().nullable(),
   current_password: z.string().optional(),
   new_password: z.string().min(8).optional(),
+  notification_prefs: NotificationPrefsSchema.optional(),
 }).refine(d => {
   // If changing password, both fields required
   if (d.new_password && !d.current_password) return false;
@@ -161,7 +183,8 @@ export async function searchUsers(req: Request, res: Response, next: NextFunctio
 export async function getMe(req: Request, res: Response, next: NextFunction) {
   try {
     const result = await pool.query(
-      `SELECT id, email, username, code_prefix, created_at FROM users WHERE id = $1`,
+      `SELECT id, email, username, code_prefix, created_at, notification_prefs
+         FROM users WHERE id = $1`,
       [req.user!.userId],
     );
     if (!result.rows[0]) throw new AppError(404, 'User not found');
@@ -200,10 +223,24 @@ export async function updateMe(req: Request, res: Response, next: NextFunction) 
       await client.query(`UPDATE users SET code_prefix = $1 WHERE id = $2`, [prefix, userId]);
     }
 
+    // Notification preferences.
+    //
+    // Merged with `||` rather than assigned, so a form that sends one toggle
+    // does not silently clear the others — and so the unsubscribe link, which
+    // writes the same column from outside any session, is not overwritten by
+    // the next unrelated save.
+    if (data.notification_prefs) {
+      await client.query(
+        `UPDATE users SET notification_prefs = notification_prefs || $1::jsonb WHERE id = $2`,
+        [JSON.stringify(data.notification_prefs), userId],
+      );
+    }
+
     await client.query('COMMIT');
 
     const result = await client.query(
-      `SELECT id, email, username, code_prefix, created_at FROM users WHERE id = $1`,
+      `SELECT id, email, username, code_prefix, created_at, notification_prefs
+         FROM users WHERE id = $1`,
       [userId],
     );
     res.json(result.rows[0]);

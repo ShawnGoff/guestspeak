@@ -14,7 +14,28 @@ interface MeResponse {
   username: string;
   code_prefix: string | null;
   created_at: string;
+  notification_prefs: NotificationPrefs;
 }
+
+/** Opt-outs. An absent key means on, so {} is "everything". */
+type NotificationPrefs = Partial<Record<PrefKey, boolean>>;
+
+type PrefKey =
+  | 'app_session_live'
+  | 'email_session_live'
+  | 'app_channel_prompt'
+  | 'app_question_replied';
+
+const NOTIFICATION_SETTINGS: { key: PrefKey; label: string; detail: string }[] = [
+  { key: 'app_session_live',     label: 'A channel goes live',
+    detail: 'In the app, when a channel you follow starts a session.' },
+  { key: 'email_session_live',   label: 'A channel goes live — by email',
+    detail: 'The same thing, in your inbox.' },
+  { key: 'app_channel_prompt',   label: 'A channel posts to its feed',
+    detail: 'In the app, when a channel you follow asks its audience something.' },
+  { key: 'app_question_replied', label: 'A host replies to your question',
+    detail: 'In the app, when someone answers something you asked.' },
+];
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -23,6 +44,35 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(true);
 
   // Join code prefix
+  const [prefs, setPrefs]           = useState<NotificationPrefs>({});
+  const [prefSaving, setPrefSaving] = useState<PrefKey | null>(null);
+  const [prefMsg, setPrefMsg]       = useState<{ ok: boolean; text: string } | null>(null);
+
+  /**
+   * Saves on toggle rather than behind a Save button — there is nothing to
+   * review and a half-set form is worse than none. The switch moves first and
+   * rolls back if the request fails, so it never shows a state the server did
+   * not accept.
+   */
+  async function togglePref(key: PrefKey) {
+    const next = !(prefs[key] ?? true) ? true : false;
+    const previous = prefs;
+    setPrefs(p => ({ ...p, [key]: next }));
+    setPrefSaving(key);
+    setPrefMsg(null);
+    try {
+      const updated = await api.patch<MeResponse>('/auth/me', {
+        notification_prefs: { [key]: next },
+      });
+      setPrefs(updated.notification_prefs ?? {});
+    } catch (err: any) {
+      setPrefs(previous);
+      setPrefMsg({ ok: false, text: err?.message ?? 'Could not save that' });
+    } finally {
+      setPrefSaving(null);
+    }
+  }
+
   const [prefix, setPrefix]         = useState('');
   const [prefixSaving, setPrefixSaving] = useState(false);
   const [prefixMsg, setPrefixMsg]   = useState<{ ok: boolean; text: string } | null>(null);
@@ -44,7 +94,7 @@ export default function SettingsPage() {
     setMounted(true);
     if (!isLoggedIn() || isGuest()) { router.push('/login?next=/settings'); return; }
     api.get<MeResponse>('/auth/me')
-      .then(u => { setMe(u); setPrefix(u.code_prefix ?? ''); })
+      .then(u => { setMe(u); setPrefix(u.code_prefix ?? ''); setPrefs(u.notification_prefs ?? {}); })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [router]);
@@ -130,6 +180,55 @@ export default function SettingsPage() {
           </div>
         ) : (
           <>
+            {/* ── Notifications ───────────────────────────────────────────── */}
+            <div className="card p-6 space-y-4">
+              <div>
+                <h2 className="text-xs font-bold text-brand-orange uppercase tracking-widest mb-1">Notifications</h2>
+                <p className="text-purple-200/75 text-sm">
+                  Everything is on unless you turn it off. Account emails — password
+                  resets and the like — are not affected.
+                </p>
+              </div>
+
+              <div className="divide-y divide-brand-border/40">
+                {NOTIFICATION_SETTINGS.map(({ key, label, detail }) => {
+                  const on = prefs[key] ?? true;
+                  return (
+                    <label
+                      key={key}
+                      className="flex items-start justify-between gap-4 py-3 cursor-pointer min-h-[44px]"
+                    >
+                      <span className="min-w-0">
+                        <span className="block text-sm font-semibold text-white">{label}</span>
+                        <span className="block text-xs text-purple-200/70 mt-0.5">{detail}</span>
+                      </span>
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={on}
+                        aria-label={label}
+                        disabled={prefSaving === key}
+                        onClick={() => togglePref(key)}
+                        className={`relative shrink-0 w-11 h-6 rounded-full transition-colors mt-0.5
+                                    disabled:opacity-50 ${on ? 'bg-brand-orange' : 'bg-brand-border'}`}
+                      >
+                        <span
+                          className={`absolute top-0.5 w-5 h-5 rounded-full bg-white transition-transform
+                                      ${on ? 'translate-x-[1.375rem]' : 'translate-x-0.5'}`}
+                        />
+                      </button>
+                    </label>
+                  );
+                })}
+              </div>
+
+              {prefMsg && (
+                <p className={`text-xs ${prefMsg.ok ? 'text-emerald-400' : 'text-red-300'}`}>
+                  {prefMsg.text}
+                </p>
+              )}
+            </div>
+
             {/* ── Join code prefix ─────────────────────────────────────────── */}
             <div className="card p-6 space-y-4">
               <div>
