@@ -9,6 +9,7 @@ import type { Session, DiscoverResponse, OrgSearchResult } from '@ask-away/share
 import { ORG_CATEGORIES } from '@/lib/categories';
 import AppNav from '@/components/AppNav';
 import ChannelAvatar from '@/components/ChannelAvatar';
+import { plural } from '@/lib/plural';
 
 // ─── Page ────────────────────────────────────────────────────────────────────
 
@@ -327,9 +328,11 @@ export default function DiscoverPage() {
               badge={<LiveBadge />}
               empty="Nothing live at the moment — check back soon, or start your own."
             >
-              {(data?.live_now ?? []).map(s => (
-                <SessionCard key={s.id} session={s} showDistance={false} />
-              ))}
+              {groupByChannel(data?.live_now ?? []).map(group =>
+                group.sessions.length === 1
+                  ? <SessionCard key={group.sessions[0].id} session={group.sessions[0]} showDistance={false} />
+                  : <ChannelGroupCard key={group.key} group={group} />,
+              )}
             </Section>
 
             {/* Nearby / Upcoming */}
@@ -402,6 +405,119 @@ function Section({ title, badge, children, empty, className }: {
 }
 
 // ─── Session card ─────────────────────────────────────────────────────────────
+
+/**
+ * A channel's concurrent sessions, collapsed into one row.
+ *
+ * A conference legitimately runs four things at once — a keynote, two tracks
+ * and a workshop — and a station puts up a show plus a session per guest. Left
+ * flat, one channel takes four of the twenty slots on the page and pushes
+ * everyone else off it.
+ *
+ * Grouped rather than capped, deliberately. A cap would hide real sessions and
+ * pick the survivor arbitrarily; this shows all of them behind one row that
+ * says how many there are. Order within a group and between groups is
+ * whatever the API returned, so the busiest still sorts first.
+ *
+ * A channel with one session is not a group and renders as an ordinary card —
+ * a "1 session live" header would be noise on what is already a single row.
+ */
+interface ChannelGroup {
+  key: string;
+  orgName: string | null;
+  orgSlug: string | null;
+  orgAvatarUrl?: string | null;
+  sessions: (Session & { distance_km?: number; participant_count?: number; org_avatar_url?: string })[];
+}
+
+function groupByChannel(
+  sessions: (Session & { participant_count?: number; org_avatar_url?: string })[],
+): ChannelGroup[] {
+  const groups: ChannelGroup[] = [];
+  const byOrg = new Map<string, ChannelGroup>();
+
+  for (const s of sessions) {
+    const orgSlug = (s as any).org_slug as string | undefined;
+    // A session with no channel is its own group of one — personal sessions
+    // have nothing to collapse under.
+    if (!s.org_name || !orgSlug) {
+      groups.push({ key: s.id, orgName: null, orgSlug: null, sessions: [s] });
+      continue;
+    }
+    const existing = byOrg.get(orgSlug);
+    if (existing) {
+      existing.sessions.push(s);
+    } else {
+      const group: ChannelGroup = {
+        key: orgSlug,
+        orgName: s.org_name,
+        orgSlug,
+        orgAvatarUrl: s.org_avatar_url,
+        sessions: [s],
+      };
+      byOrg.set(orgSlug, group);
+      // Pushed on first sight, so a channel keeps the position of its
+      // best-ranked session rather than jumping to the front on its second.
+      groups.push(group);
+    }
+  }
+  return groups;
+}
+
+function ChannelGroupCard({ group }: { group: ChannelGroup }) {
+  const [open, setOpen] = useState(false);
+  // Number(), because Postgres COUNT() is a bigint and node-postgres hands
+  // bigints back as strings to avoid losing precision. Added without it, three
+  // sessions of 15, 13 and 5 rendered as "01513 5" — the reduce concatenated.
+  const total = group.sessions.reduce((n, s) => n + Number(s.participant_count ?? 0), 0);
+
+  return (
+    <div className="card p-5">
+      <button
+        onClick={() => setOpen(o => !o)}
+        aria-expanded={open}
+        className="w-full flex items-center gap-3 text-left min-h-[44px]"
+      >
+        <ChannelAvatar
+          name={group.orgName ?? ''}
+          seed={group.orgSlug ?? group.key}
+          src={group.orgAvatarUrl}
+          className="w-10 h-10 rounded-xl"
+          textClassName="text-sm"
+        />
+        <span className="min-w-0 flex-1">
+          <span className="block text-sm font-semibold text-white truncate">{group.orgName}</span>
+          <span className="block text-xs text-purple-200/70">
+            {plural(group.sessions.length, 'session')} live
+            {total > 0 && ` · ${total} joined`}
+          </span>
+        </span>
+        <span className={`text-purple-200/60 transition-transform shrink-0 ${open ? 'rotate-90' : ''}`} aria-hidden>
+          ›
+        </span>
+      </button>
+
+      {open && (
+        <div className="mt-3 pt-3 border-t border-brand-border/40 flex flex-col gap-2">
+          {group.sessions.map(s => (
+            <Link
+              key={s.id}
+              href={`/s/${s.slug}`}
+              className="flex items-center justify-between gap-3 min-h-[44px] group"
+            >
+              <span className="text-sm text-white truncate group-hover:text-brand-amber transition-colors">
+                {s.title}
+              </span>
+              <span className="text-xs text-purple-200/70 shrink-0">
+                {plural(Number(s.participant_count ?? 0), 'joined', 'joined')}
+              </span>
+            </Link>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function SessionCard({ session, showDistance }: { session: Session & { distance_km?: number; participant_count?: number; org_avatar_url?: string }; showDistance: boolean }) {
   const isLive = session.status === 'live';
