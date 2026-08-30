@@ -43,6 +43,9 @@ export default function DiscoverPage() {
   const [cityInput, setCityInput]           = useState('');
   const [citySearch, setCitySearch]         = useState('');
   const [activeCategory, setActiveCategory] = useState('');
+  /** How far ahead Upcoming reaches, and how it is ordered. */
+  const [timeWindow, setTimeWindow] = useState<'all' | 'week' | 'today' | 'hour'>('all');
+  const [sortBy, setSortBy]         = useState<'soon' | 'popular' | 'new'>('soon');
   const [locationStatus, setLocationStatus] = useState<'idle' | 'requesting' | 'granted' | 'denied'>('idle');
   const gpsRef = useRef<{ lat: number; lng: number } | null>(null);
 
@@ -57,10 +60,18 @@ export default function DiscoverPage() {
     fetchChannels('', '', null, '');
   }, []);
 
-  async function fetchSessions(lat?: number, lng?: number, city?: string) {
+  async function fetchSessions(
+    lat?: number, lng?: number, city?: string,
+    win: 'all' | 'week' | 'today' | 'hour' = timeWindow,
+    sort: 'soon' | 'popular' | 'new' = sortBy,
+  ) {
     setLoading(true);
     try {
       const params = new URLSearchParams();
+      // Passed explicitly rather than read from state, because a handler that
+      // sets state and refetches in the same tick would send the old value.
+      if (win !== 'all')  params.set('window', win);
+      if (sort !== 'soon') params.set('sort', sort);
       if (lat !== undefined && lng !== undefined) {
         params.set('lat', String(lat));
         params.set('lng', String(lng));
@@ -156,6 +167,16 @@ export default function DiscoverPage() {
 
   function handleCategoryToggle(cat: string) {
     selectCategory(activeCategory === cat ? '' : cat);
+  }
+
+  function changeWindow(win: 'all' | 'week' | 'today' | 'hour') {
+    setTimeWindow(win);
+    fetchSessions(gpsRef.current?.lat, gpsRef.current?.lng, citySearch, win, sortBy);
+  }
+
+  function changeSort(sort: 'soon' | 'popular' | 'new') {
+    setSortBy(sort);
+    fetchSessions(gpsRef.current?.lat, gpsRef.current?.lng, citySearch, timeWindow, sort);
   }
 
   const locationLabel =
@@ -336,10 +357,49 @@ export default function DiscoverPage() {
             </Section>
 
             {/* Nearby / Upcoming */}
+            <div className="mt-10 flex flex-wrap items-center gap-2">
+              {/* On the Upcoming section rather than the page, because that is
+                  all they touch — Live Now is live by definition, and a "next
+                  hour" control above it would imply otherwise. */}
+              <div className="flex gap-1 p-1 bg-brand-card rounded-xl border border-brand-border">
+                {([
+                  ['hour',  'Next hour'],
+                  ['today', 'Today'],
+                  ['week',  'This week'],
+                  ['all',   'All'],
+                ] as const).map(([key, label]) => (
+                  <button
+                    key={key}
+                    onClick={() => changeWindow(key)}
+                    className={`text-xs font-semibold px-3 py-1.5 min-h-[40px] rounded-lg transition-colors ${
+                      timeWindow === key ? 'bg-brand-purple text-white' : 'text-purple-200/75 hover:text-white'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+
+              <label className="flex items-center gap-2 ml-auto">
+                <span className="text-xs text-purple-200/60">Sort</span>
+                <select
+                  value={sortBy}
+                  onChange={e => changeSort(e.target.value as 'soon' | 'popular' | 'new')}
+                  className="input w-auto py-1.5"
+                >
+                  <option value="soon">Starting soonest</option>
+                  <option value="popular">Most joined</option>
+                  <option value="new">Recently added</option>
+                </select>
+              </label>
+            </div>
+
             <Section
               title={citySearch ? `Near "${citySearch}"` : locationStatus === 'granted' ? 'Nearby' : 'Upcoming'}
-              empty="No upcoming sessions here yet — try a different city."
-              className="mt-10"
+              empty={timeWindow === 'all'
+                ? 'No upcoming sessions here yet — try a different city.'
+                : 'Nothing in that window. Try a wider one.'}
+              className="mt-4"
             >
               {(data?.nearby ?? []).map(s => (
                 <SessionCard key={s.id} session={s} showDistance />

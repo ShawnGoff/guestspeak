@@ -26,6 +26,38 @@ router.get('/', optionalAuth, async (req: Request, res: Response, next: NextFunc
       ? req.query.city.slice(0, 100)
       : undefined;
 
+    /**
+     * How far ahead the Upcoming list reaches.
+     *
+     * A conference puts its whole programme up at once, so "everything
+     * upcoming" is a week of sessions on a page someone opened to find what is
+     * on this afternoon. Anything unrecognised falls through to 'all', which is
+     * the behaviour before this existed.
+     */
+    const WINDOWS: Record<string, string | null> = {
+      hour:  "s.starts_at <= NOW() + INTERVAL '1 hour'",
+      today: "s.starts_at <  date_trunc('day', NOW()) + INTERVAL '1 day'",
+      week:  "s.starts_at <= NOW() + INTERVAL '7 days'",
+      all:   null,
+    };
+    const windowKey = typeof req.query.window === 'string' ? req.query.window : 'all';
+    const windowClause = WINDOWS[windowKey] ?? null;
+
+    /**
+     * Ordering for the upcoming list. 'soon' is the default because a session
+     * with no audience yet is the normal state of an upcoming one — sorting
+     * those by popularity ranks noise.
+     */
+    const ORDERS: Record<string, string> = {
+      soon:    's.starts_at ASC NULLS LAST',
+      popular: 'participant_count DESC, s.starts_at ASC NULLS LAST',
+      new:     's.created_at DESC',
+    };
+    const sortKey = typeof req.query.sort === 'string' ? req.query.sort : 'soon';
+    const upcomingOrder = ORDERS[sortKey] ?? ORDERS.soon;
+    // Popularity needs the count, which the nearby queries do not select today.
+    const needsCount = sortKey === 'popular';
+
     const SESSION_FIELDS = `
       s.id, s.title, s.slug, s.description, s.status, s.is_featured,
       s.city, s.region, s.country, s.starts_at,
@@ -73,9 +105,29 @@ router.get('/', optionalAuth, async (req: Request, res: Response, next: NextFunc
     // distance, so it is above this section already.
     let nearbyResult;
 
+    // Shared by all four variants below. The participant count is joined in so
+    // the popularity sort has something to order by and the client can show it
+    // — Live Now already carried it and Upcoming did not.
+    const COUNTED = `
+         LEFT JOIN session_participants sp ON sp.session_id = s.id`;
+    const GROUPED = `
+         GROUP BY s.id, o.name, o.slug, o.is_verified, o.avatar_url, u.username`;
+    const COUNT_FIELD = `, COUNT(DISTINCT sp.id) AS participant_count`;
+    const windowSql = windowClause ? `AND ${windowClause}` : '';
+
+    /**
+     * Distance stays the default ordering when we know where the viewer is —
+     * that is the whole point of the section — but an explicit sort wins,
+     * because someone who picked "most popular" meant it.
+     */
+    const orderFor = (isGeo: boolean) =>
+      sortKey !== 'soon' ? upcomingOrder
+        : isGeo ? 'distance_km ASC, s.starts_at ASC NULLS LAST'
+        : 's.starts_at ASC NULLS LAST';
+
     if (lat !== null && lng !== null) {
       nearbyResult = await pool.query(
-        `SELECT ${SESSION_FIELDS},
+        `SELECT ${SESSION_FIELDS}${COUNT_FIELD},
                 s.lat, s.lng,
                 earth_distance(
                   ll_to_earth($1, $2),
@@ -83,28 +135,32 @@ router.get('/', optionalAuth, async (req: Request, res: Response, next: NextFunc
                 ) / 1000 AS distance_km
          FROM sessions s
          JOIN users u ON u.id = s.host_id
-         LEFT JOIN organizations o ON o.id = s.org_id
+         LEFT JOIN organizations o ON o.id = s.org_id${COUNTED}
          WHERE s.visibility = 'public'
            AND s.status = 'upcoming'
+           ${windowSql}
            AND s.lat IS NOT NULL AND s.lng IS NOT NULL
            AND earth_distance(
                  ll_to_earth($1, $2),
                  ll_to_earth(s.lat, s.lng)
                ) / 1000 <= $3
-         ORDER BY distance_km ASC, s.starts_at ASC NULLS LAST
+         ${GROUPED}, s.lat, s.lng
+         ORDER BY ${orderFor(true)}
          LIMIT 20`,
         [lat, lng, radiusKm],
       );
     } else if (city) {
       const cityRows = await pool.query(
-        `SELECT ${SESSION_FIELDS}
+        `SELECT ${SESSION_FIELDS}${COUNT_FIELD}
          FROM sessions s
          JOIN users u ON u.id = s.host_id
-         LEFT JOIN organizations o ON o.id = s.org_id
+         LEFT JOIN organizations o ON o.id = s.org_id${COUNTED}
          WHERE s.visibility = 'public'
            AND s.status = 'upcoming'
+           ${windowSql}
            AND s.city ILIKE $1
-         ORDER BY s.starts_at ASC NULLS LAST, s.created_at DESC
+         ${GROUPED}
+         ORDER BY ${orderFor(false)}
          LIMIT 20`,
         [`%${city}%`],
       );
@@ -113,23 +169,27 @@ router.get('/', optionalAuth, async (req: Request, res: Response, next: NextFunc
       } else {
         // Fallback: all public sessions globally
         nearbyResult = await pool.query(
-          `SELECT ${SESSION_FIELDS}
+          `SELECT ${SESSION_FIELDS}${COUNT_FIELD}
            FROM sessions s
            JOIN users u ON u.id = s.host_id
-           LEFT JOIN organizations o ON o.id = s.org_id
+           LEFT JOIN organizations o ON o.id = s.org_id${COUNTED}
            WHERE s.visibility = 'public' AND s.status = 'upcoming'
-           ORDER BY s.starts_at ASC NULLS LAST
+             ${windowSql}
+           ${GROUPED}
+           ORDER BY ${orderFor(false)}
            LIMIT 20`,
         );
       }
     } else {
       nearbyResult = await pool.query(
-        `SELECT ${SESSION_FIELDS}
+        `SELECT ${SESSION_FIELDS}${COUNT_FIELD}
          FROM sessions s
          JOIN users u ON u.id = s.host_id
-         LEFT JOIN organizations o ON o.id = s.org_id
+         LEFT JOIN organizations o ON o.id = s.org_id${COUNTED}
          WHERE s.visibility = 'public' AND s.status = 'upcoming'
-         ORDER BY s.starts_at ASC NULLS LAST
+           ${windowSql}
+         ${GROUPED}
+         ORDER BY ${orderFor(false)}
          LIMIT 20`,
       );
     }
