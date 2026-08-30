@@ -94,9 +94,15 @@ module.exports = withSentryConfig(nextConfig, {
   // whoever opens devtools on the marketing page.
   hideSourceMaps: true,
 
-  // Routes browser reports through the app's own origin, so an ad blocker
-  // cutting off Sentry's domain does not take error reporting with it.
-  tunnelRoute: '/monitoring',
+  // No tunnelRoute. It was set to '/monitoring' so an ad blocker cutting off
+  // sentry.io could not take error reporting with it — but the route was never
+  // generated, and the bundle still pointed every event at it. Deployed, that
+  // meant Sentry captured errors correctly and POSTed all of them to a 404:
+  // strictly worse than the problem it was added for, and silent, because a
+  // failed send is exactly what error reporting cannot report.
+  //
+  // Events go straight to ingest.us.sentry.io now. Some ad blockers will drop
+  // them; all of them arrived nowhere before.
 
   // sentry.client.config.ts is the right filename on Next 14. The SDK warns
   // about instrumentation-client.ts, which is a Next 15 / Turbopack
