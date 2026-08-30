@@ -167,6 +167,33 @@ function encode(event: SSEEvent): string {
 // replicas have somewhere to go before the first client connects.
 initBus(deliver);
 
+/**
+ * End every open stream, for shutdown.
+ *
+ * Sends a `server:closing` event before ending the response so the browser
+ * reconnects on purpose rather than discovering the silence. EventSource
+ * retries a dropped connection on its own, but only after its timeout — which
+ * on a phone mid-session is a stall the person reads as the app hanging.
+ *
+ * Returns how many it closed, so the shutdown log can say what it did.
+ */
+export function closeAllClients(): number {
+  let closed = 0;
+  for (const [, set] of clients) {
+    for (const { res } of set) {
+      try {
+        res.write('event: server:closing\ndata: {}\n\n');
+        res.end();
+        closed++;
+      } catch {
+        // Already gone. Nothing to do, and nothing worth logging per socket.
+      }
+    }
+  }
+  clients.clear();
+  return closed;
+}
+
 export function clientCount(sessionId: string): number {
   return clients.get(sessionId)?.size ?? 0;
 }

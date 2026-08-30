@@ -26,10 +26,18 @@ async function autoGoLive() {
   }
 }
 
+let schedulerTimer: ReturnType<typeof setInterval> | null = null;
+
+/** Stops the tick, so a shutting-down process has nothing left holding it open. */
+export function stopScheduler(): void {
+  if (schedulerTimer) clearInterval(schedulerTimer);
+  schedulerTimer = null;
+}
+
 export function startScheduler() {
   // Run immediately on boot (catches any that went live while server was down)
   autoGoLive();
   // Then every 60 seconds
-  setInterval(autoGoLive, 60_000);
+  schedulerTimer = setInterval(autoGoLive, 60_000);
   console.log('[scheduler] Auto-go-live scheduler started');
 }

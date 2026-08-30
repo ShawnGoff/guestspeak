@@ -398,7 +398,22 @@ export default function SessionPageClient({ params }: SessionPageProps) {
     // hammering an endpoint that will never accept them. Give up after a few
     // consecutive failures and switch to polling, which is what the server is
     // asking for anyway.
+    // The server says goodbye before it goes, on deploy or restart. Without
+    // this the drop that follows looks exactly like a network failure: it
+    // increments the counter, and enough deploys in a row would tip a perfectly
+    // healthy connection into the polling fallback for no reason.
+    //
+    // EventSource reconnects on its own after the stream ends, so there is
+    // nothing to do here but decline to hold it against the connection.
+    let serverClosing = false;
+    es.addEventListener('server:closing', () => {
+      serverClosing = true;
+      failures = 0;
+    });
+
     es.addEventListener('error', () => {
+      // The error that immediately follows a planned close is that close.
+      if (serverClosing) { serverClosing = false; return; }
       failures += 1;
       if (failures >= SSE_MAX_CONSECUTIVE_FAILURES) {
         es.close();

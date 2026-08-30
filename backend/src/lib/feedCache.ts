@@ -78,7 +78,3 @@ function evictExpired(): void {
   }
 }
 
-/** Test/ops helper. */
-export function cacheSize(): number {
-  return store.size;
-}
