@@ -15,12 +15,16 @@
 
 import * as Sentry from '@sentry/nextjs';
 
-const DSN = process.env.NEXT_PUBLIC_SENTRY_DSN ?? '';
+const DSN = process.env.NEXT_PUBLIC_SENTRY_DSN || '';
 
 if (DSN) {
   Sentry.init({
     dsn: DSN,
-    environment: process.env.NEXT_PUBLIC_SENTRY_ENV ?? process.env.NODE_ENV ?? 'development',
+    // `||` not `??`: an env var set to an empty string in a dashboard is not
+    // null, so `??` keeps the empty string and files every event under an
+    // environment with no name. `||` treats blank as absent, which is what a
+    // blank field means.
+    environment: process.env.NEXT_PUBLIC_SENTRY_ENV || process.env.NODE_ENV || 'development',
 
     // Same call as the server: a separate quota answering a separate question.
     tracesSampleRate: 0,
