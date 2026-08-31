@@ -63,8 +63,12 @@ export function verifyUnsubscribeToken(token: string): string | null {
 
 /** The link that goes in the mail. */
 export function unsubscribeUrl(userId: string): string {
-  const base = process.env.API_PUBLIC_URL
-    ?? process.env.APP_URL?.replace(/\/$/, '')
-    ?? 'http://localhost:3001';
+  // `||` not `??`: a variable cleared in a hosting dashboard is an empty
+  // string, not undefined, and `??` would keep it. An empty base turns every
+  // unsubscribe link into a relative path — which no mail client can resolve,
+  // which nothing logs, and which is only discoverable by reading a delivered
+  // email. Blank means absent here, the same call as sentry.client.config.ts.
+  const base = (process.env.API_PUBLIC_URL || process.env.APP_URL || 'http://localhost:3001')
+    .replace(/\/$/, '');
   return `${base}/api/unsubscribe?token=${encodeURIComponent(unsubscribeToken(userId))}`;
 }
