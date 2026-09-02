@@ -169,6 +169,18 @@ export default function OrgPage({ params }: OrgPageProps) {
             <div className="flex items-center gap-2 flex-shrink-0 w-full sm:w-auto">
               {isManager && (
                 <Link
+                  href={`/create?org=${org.id}`}
+                  className="flex items-center gap-1.5 text-sm font-semibold px-3 py-2 rounded-xl bg-orange-gradient text-white hover:opacity-90 transition-opacity whitespace-nowrap"
+                >
+                  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="12" y1="5" x2="12" y2="19" />
+                    <line x1="5" y1="12" x2="19" y2="12" />
+                  </svg>
+                  New session
+                </Link>
+              )}
+              {isManager && (
+                <Link
                   href={`/org/${params.slug}/settings`}
                   className="flex items-center gap-1.5 text-sm font-semibold px-3 py-2 rounded-xl border border-brand-border text-purple-200/75 hover:text-white hover:border-brand-purple/60 transition-colors"
                 >
@@ -202,12 +214,32 @@ export default function OrgPage({ params }: OrgPageProps) {
           </div>
         </div>
 
-        {/* No content empty state */}
+        {/* No content empty state.
+            Split by who is reading it. A visitor is told what following buys
+            them; the owner is told what to do next and given the button to do
+            it. The single visitor-shaped version invited the person who had
+            just built the channel to follow their own channel and wait for
+            sessions only they could create. */}
         {!hasContent && (
           <div className="text-center py-16 text-purple-200/70 border border-dashed border-brand-border/30 rounded-2xl">
             <p className="text-3xl mb-3">🎙</p>
-            <p className="font-medium text-white/60">No public sessions yet.</p>
-            <p className="text-sm mt-1">Follow to get notified when they go live.</p>
+            {isManager ? (
+              <>
+                <p className="font-medium text-white/60">No sessions yet.</p>
+                <p className="text-sm mt-1">Start one and your followers get told it is live.</p>
+                <Link
+                  href={`/create?org=${org.id}`}
+                  className="btn-primary inline-block mt-5 text-sm px-5 py-2.5"
+                >
+                  Create your first session
+                </Link>
+              </>
+            ) : (
+              <>
+                <p className="font-medium text-white/60">No public sessions yet.</p>
+                <p className="text-sm mt-1">Follow to get notified when they go live.</p>
+              </>
+            )}
           </div>
         )}
 

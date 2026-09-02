@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { api } from '@/lib/api';
 import { getUser, isLoggedIn, isGuest } from '@/lib/auth';
 import AppNav from '@/components/AppNav';
@@ -11,8 +11,12 @@ import QRCode from 'react-qr-code';
 
 interface Org { id: string; name: string; slug: string; }
 
-export default function CreateSessionPage() {
+function CreateSessionPageInner() {
   const router = useRouter();
+  // ?org= arrives from the Create session button on a channel page, so someone
+  // who started on their channel does not land here and have to pick it again
+  // out of a list they were just looking at.
+  const preselectedOrg = useSearchParams().get('org') ?? '';
   const [mounted, setMounted] = useState(false);
   const [orgs, setOrgs]       = useState<Org[]>([]);
 
@@ -20,7 +24,7 @@ export default function CreateSessionPage() {
   const [title, setTitle]               = useState('');
   const [description, setDescription]   = useState('');
   const [visibility, setVisibility]     = useState<'public' | 'unlisted' | 'private'>('public');
-  const [orgId, setOrgId]               = useState('');
+  const [orgId, setOrgId]               = useState(preselectedOrg);
   const [credits, setCredits]           = useState(6);
   const [city, setCity]                 = useState('');
   const [region, setRegion]             = useState('');
@@ -46,7 +50,13 @@ export default function CreateSessionPage() {
     setMounted(true);
     if (!isLoggedIn() || isGuest()) { router.push('/login?next=/create'); return; }
     // Load orgs the user belongs to as owner/admin
-    api.get<{ orgs: Org[] }>('/orgs/mine').then(r => setOrgs(r.orgs)).catch(() => {});
+    api.get<{ orgs: Org[] }>('/orgs/mine').then(r => {
+      setOrgs(r.orgs);
+      // Drop a preselection the caller does not actually manage. The id comes
+      // from a URL, so it can be anything; the server would reject it on
+      // submit, but only after the whole form had been filled in.
+      if (preselectedOrg && !r.orgs.some(o => o.id === preselectedOrg)) setOrgId('');
+    }).catch(() => {});
   }, [router]);
 
   if (!mounted) return null;
@@ -482,3 +492,15 @@ const VISIBILITY_OPTIONS = [
     desc: 'Invite-only. Attendees must be signed in and approved by you before they can join.',
   },
 ];
+
+// useSearchParams forces this route out of static rendering, and without a
+// Suspense boundary `next build` fails on it — a break that tsc cannot see and
+// that only shows up at deploy time. Same wrapper as /search, /reset-password
+// and /demo/session.
+export default function CreateSessionPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-brand-bg" />}>
+      <CreateSessionPageInner />
+    </Suspense>
+  );
+}
