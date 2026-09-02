@@ -162,3 +162,45 @@
     min-height: 44px;
   }
 }
+
+/*
+ * A question leaving the feed — answered, and so no longer part of the queue.
+ *
+ * Removing it outright jolted the whole page: the card vanished in one frame
+ * and everything below snapped up by its full height. Fading alone is not
+ * enough either, because the space stays until React unmounts it and the snap
+ * just arrives late.
+ *
+ * So the wrapper collapses as well as fades. grid-template-rows 1fr → 0fr is
+ * the one way to transition to a content-derived height without measuring it
+ * in JS, which here would mean a ref on every card in the list.
+ *
+ * margin-top is zeroed with !important because the list is spaced with
+ * `space-y-3` — margins on the children — so a card collapsed to no height
+ * would otherwise leave its gap behind, and the snap would come back smaller.
+ */
+.gs-collapse {
+  display: grid;
+  grid-template-rows: 1fr;
+  transition: grid-template-rows 360ms cubic-bezier(.4, 0, .2, 1),
+              opacity 200ms ease,
+              margin-top 360ms cubic-bezier(.4, 0, .2, 1);
+}
+
+/* min-height:0 is required — a grid item's automatic minimum size is its
+   content, which would stop the row collapsing however small the track gets. */
+.gs-collapse > * {
+  overflow: hidden;
+  min-height: 0;
+}
+
+.gs-collapse.is-leaving {
+  grid-template-rows: 0fr;
+  opacity: 0;
+  margin-top: 0 !important;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gs-collapse { transition: none; }
+}

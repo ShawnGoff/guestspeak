@@ -59,6 +59,16 @@ export default function SessionPageClient({ params }: SessionPageProps) {
   const [submitting, setSubmitting]         = useState(false);
   const [error, setError]                   = useState<string | null>(null);
   const [echoedIds, setEchoedIds]           = useState<Set<string>>(new Set());
+  /**
+   * Questions mid-exit: answered, filtered out of Top, still on screen for the
+   * length of one collapse so the feed does not jolt.
+   *
+   * Keyed by id rather than a flag on the question, because the question object
+   * is replaced wholesale on every feed refresh and a flag would not survive.
+   */
+  const [leaving, setLeaving] = useState<Set<string>>(new Set());
+  /** Last seen status per question, to spot the transition rather than the state. */
+  const seenStatusRef = useRef<Map<string, string>>(new Map());
   const [myQuestionIds, setMyQuestionIds]   = useState<Set<string>>(new Set());
   // Which questions are mine is client-side only, and the edit window is short
   // enough that an accidental reload would otherwise eat it. Persisted per
@@ -875,6 +885,36 @@ export default function SessionPageClient({ params }: SessionPageProps) {
     if (sort === 'hidden' && !(isMod && hostView)) setSort('echoes');
   }, [sort, isMod, hostView]);
 
+  // Spot questions that have just become answered, and hold them briefly.
+  //
+  // Compares against the previous status rather than the current one, so this
+  // fires on the transition and not on load — otherwise every question already
+  // answered when the page opened would animate itself out on arrival.
+  useEffect(() => {
+    const seen = seenStatusRef.current;
+    const justAnswered: string[] = [];
+    const next = new Map<string, string>();
+    for (const q of questions) {
+      next.set(q.id, q.status);
+      const before = seen.get(q.id);
+      if (before && before !== 'answered' && q.status === 'answered') justAnswered.push(q.id);
+    }
+    seenStatusRef.current = next;
+    if (!justAnswered.length) return;
+
+    setLeaving(prev => new Set([...prev, ...justAnswered]));
+    // Slightly longer than the 360ms collapse, so the card is unmounted after
+    // the animation has finished rather than partway through it.
+    const timer = setTimeout(() => {
+      setLeaving(prev => {
+        const rest = new Set(prev);
+        justAnswered.forEach(id => rest.delete(id));
+        return rest;
+      });
+    }, 420);
+    return () => clearTimeout(timer);
+  }, [questions]);
+
   const liveOrderedQuestions = [...questions].filter(q => {
     // Hidden questions are only ever visible to session staff, and only on the
     // Hidden tab. They used to sit inline in every tab for a moderator, which
@@ -898,8 +938,14 @@ export default function SessionPageClient({ params }: SessionPageProps) {
     // holding something up, and spotlight in particular means "answering this
     // now" — pulling it out mid-answer would take it off the screen of everyone
     // watching the answer happen.
+    //
+    // `leaving` holds it for one animation. Dropping it the instant its status
+    // changed made the page jolt: the card went in a single frame and the feed
+    // snapped up by its whole height, under the eyes of the person who had just
+    // been reading it.
     if (sort === 'echoes' && !searchQuery && q.status === 'answered'
-        && !(q as any).is_pinned && !(q as any).is_spotlighted) return false;
+        && !(q as any).is_pinned && !(q as any).is_spotlighted
+        && !leaving.has(q.id)) return false;
     if (!searchQuery) return true;
     return q.body.toLowerCase().includes(searchQuery.toLowerCase());
   }).sort((a, b) => {
@@ -1177,6 +1223,7 @@ export default function SessionPageClient({ params }: SessionPageProps) {
           <div className="space-y-3 mt-4">
             {/* Featured top question */}
             {featuredQuestion && (
+              <Collapsible leaving={leaving.has(featuredQuestion.id)}>
               <FeaturedQuestionCard
                 /* Keyed, and it matters more here than in a list. This slot
                    holds whichever root currently leads on echoes, so a question
@@ -1209,6 +1256,7 @@ export default function SessionPageClient({ params }: SessionPageProps) {
                 onFollowUp={(body) => askFollowUp(featuredQuestion.id, body)}
                 replies={threadReplies(featuredQuestion.id)}
               />
+              </Collapsible>
             )}
 
             {/* Remaining questions */}
@@ -1232,6 +1280,7 @@ export default function SessionPageClient({ params }: SessionPageProps) {
               </div>
             )}
             {listQuestions.map(q => (
+              <Collapsible key={q.id} leaving={leaving.has(q.id)}>
               <QuestionCard
                 key={q.id}
                 question={q}
@@ -1254,6 +1303,7 @@ export default function SessionPageClient({ params }: SessionPageProps) {
                 onFollowUp={(body) => askFollowUp(q.id, body)}
                 replies={threadReplies(q.id)}
               />
+              </Collapsible>
             ))}
           </div>
         </main>
@@ -1773,6 +1823,22 @@ function CreditDisplay({ credits, max, nextCreditSecs, creditCap, regenCap, isRe
 }
 
 // ─── Status badge ─────────────────────────────────────────────────────────────
+
+/**
+ * Holds a card on screen for one collapse before React unmounts it.
+ *
+ * Two elements, both needed: the outer animates its single grid track from 1fr
+ * to 0fr — the one way to transition to a content-derived height without
+ * measuring it in JS — and the inner clips its content while that happens. The
+ * rules are in globals.css, and neither element does anything until `leaving`.
+ */
+function Collapsible({ leaving, children }: { leaving: boolean; children: React.ReactNode }) {
+  return (
+    <div className={`gs-collapse ${leaving ? 'is-leaving' : ''}`}>
+      <div>{children}</div>
+    </div>
+  );
+}
 
 function StatusBadge({ status, isLiveSoon }: { status: string; isLiveSoon: boolean }) {
   if (status === 'live') return (
