@@ -41,14 +41,32 @@ backup system into a way of losing backups:
    The upload token cannot be reused — it is scoped to the uploads bucket, and
    the backup job needs delete permission to prune.
 
-3. **Add a new service in Railway** from the same repo:
+3. **Add a new service in Railway** from the same repo (New → GitHub Repo):
    - Root directory: `backend`
+   - Builder: **Railpack** (the default; Nixpacks is deprecated)
+   - Build command: **empty**
    - Start command: `npm run backup`
-   - Cron schedule: `0 4 * * *` (04:00 UTC — pick a quiet hour for your audience)
+   - Cron schedule: `0 11 * * *`
 
    Railway runs the container on that schedule and stops it when the process
    exits. The script exits non-zero on any failure, so a failed run shows as
    failed rather than silently succeeding.
+
+   **Start command, not build command.** Putting `npm run backup` in the build
+   field runs the dump while the image is being assembled — it failed the whole
+   deploy rather than one run, and the deploy command stayed the default
+   `npm run start`. The giveaway is in the build log: `npm run backup` should
+   appear under `Deploy`, never under `Steps ▸ build`.
+
+   **Cron times are UTC**, with no daylight-saving adjustment. `0 11 * * *` is
+   04:00 PDT / 03:00 PST — deliberately not evening, which is when a live-events
+   product is busiest. The obvious-looking `0 4 * * *` is 9pm Pacific, roughly
+   the worst hour available. At the current size the dump takes about a second
+   and would disturb nothing whenever it ran, but that stops being true as the
+   database grows.
+
+   Railway will warn that no port is exposed and that the healthcheck fails.
+   Ignore both — a cron job has no HTTP server.
 
 4. **Set these variables** on that service:
 
@@ -76,9 +94,23 @@ backup system into a way of losing backups:
 
 ## The Postgres version pin
 
-`backend/nixpacks.toml` installs `postgresql_17` so `pg_dump` exists in the
-image at all — Railway's Node image does not include it, and without this the
-first run fails with `pg_dump: not found`.
+`backend/railpack.json` installs `postgresql-client-17` so `pg_dump` exists in
+the image at all — Railway's Node image does not include it, and without this
+the run fails with `spawn pg_dump ENOENT`.
+
+It has to be Railpack's config file. `backend/nixpacks.toml` says the same
+thing and is read by nothing: Railway builds new services with Railpack, which
+does not understand it, and Nixpacks is deprecated. That file survives only
+because the older API service may still be built by Nixpacks; once that service
+is confirmed migrated, delete it rather than leave two build configs that
+disagree.
+
+`railpack.json` is shared by both services — they both root at `backend/` — so
+it must hold only what is true for both. In particular **no `startCommand`**:
+the API needs its server and the backup needs `npm run backup`, and a start
+command there would be picked up by whichever service Railway migrates next,
+leaving an API quietly running the backup script instead of listening. Start
+commands stay per-service in the Railway UI.
 
 **`pg_dump` must be the same version as the server or newer.** It can read older
 servers; it refuses newer ones outright:
@@ -95,8 +127,13 @@ running:
 SHOW server_version;
 ```
 
-If it reports 18 or higher, raise the pin in `backend/nixpacks.toml` to match
-and redeploy.
+As of 2026-09-02 it reports **17.6**, which `postgresql-client-17` covers —
+the check is on the major version, so a 17.x client dumps any 17.x server.
+
+If it ever reports 18 or higher, raise `postgresql-client-17` in
+`backend/railpack.json` to match and redeploy. Supabase moves its Postgres
+version without asking, and the pin is currently level with the server rather
+than ahead of it, so this will come up.
 
 ## Restoring
 
@@ -134,3 +171,30 @@ cd backend && DATABASE_URL="postgresql://localhost:5432/askaway" R2_ACCOUNT_ID=n
 **A backup nobody has restored is a hypothesis.** Restore one into a scratch
 database occasionally and confirm the table count and migration count match
 production.
+
+### The restore done on 2026-09-02
+
+The first nightly dump was pulled from R2 and restored locally, so these are
+real numbers to compare against rather than a guess:
+
+```
+archive:    297 KB, custom format
+            dumped from 17.6, by pg_dump 17.11 (Debian)
+restored:   24 public tables
+            users 5 · organizations 1 · sessions 1 · questions 4
+            banned_words 79
+```
+
+`pg_restore` exits 1 with three errors, all of them `supabase_vault` — a
+Supabase extension that does not exist in vanilla Postgres. Expected, and
+harmless: nothing in this app touches it, and restoring into a real Supabase
+project would not raise them. Do not treat that exit code as a failed restore;
+read the errors.
+
+That restore also caught something the dump made visible and nothing else
+would have: `session_reminders` existed in production while `schema_migrations`
+stopped at `043`. Migration 044 had been pasted into the Supabase SQL editor
+rather than applied by the runner, which creates the table without recording
+it. Harmless here because 044 is idempotent, but it is worth knowing that
+**pasting SQL and running the migrator are not equivalent** — the ledger only
+tracks the latter, and nothing runs the migrator automatically on deploy.
