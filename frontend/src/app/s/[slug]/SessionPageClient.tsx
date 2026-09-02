@@ -70,6 +70,16 @@ export default function SessionPageClient({ params }: SessionPageProps) {
   /** Last seen status per question, to spot the transition rather than the state. */
   const seenStatusRef = useRef<Map<string, string>>(new Map());
   const [myQuestionIds, setMyQuestionIds]   = useState<Set<string>>(new Set());
+  /**
+   * The caller's own questions awaiting approval.
+   *
+   * Kept apart from `questions` because they are not in the public feed and
+   * must not leak into anything derived from it — echo counts, the featured
+   * slot, the Top ordering. They belong to one person and are shown only to
+   * them, above the feed, so a question submitted for approval is visible to
+   * its author instead of vanishing.
+   */
+  const [myPending, setMyPending] = useState<Question[]>([]);
   // Which questions are mine is client-side only, and the edit window is short
   // enough that an accidental reload would otherwise eat it. Persisted per
   // session so the button survives a refresh. It is only a hint — the server
@@ -248,9 +258,11 @@ export default function SessionPageClient({ params }: SessionPageProps) {
   useEffect(() => {
     if (!sessionId) return;
     let cancelled = false;
-    api.get<{ ids: string[] }>(`/sessions/${sessionId}/mine`)
-      .then(({ ids }) => {
-        if (cancelled || !ids?.length) return;
+    api.get<{ ids: string[]; pending?: Question[] }>(`/sessions/${sessionId}/mine`)
+      .then(({ ids, pending }) => {
+        if (cancelled) return;
+        setMyPending(pending ?? []);
+        if (!ids?.length) return;
         setMyQuestionIds(prev => {
           const merged = new Set(prev);
           let added = false;
@@ -442,6 +454,13 @@ export default function SessionPageClient({ params }: SessionPageProps) {
     });
 
     es.addEventListener('question:new', (e) => {
+      // An approved question arrives here as an ordinary new question, so it
+      // has to leave the pending strip or the author sees it twice.
+      try {
+        const incoming = JSON.parse(e.data);
+        const arrivedId = incoming?.id ?? incoming?.data?.id;
+        if (arrivedId) setMyPending(prev => prev.filter(p => p.id !== arrivedId));
+      } catch { /* the handler below does the real work */ }
       const q: Question = JSON.parse(e.data);
       // An approved question arrives here as 'new' and leaves the pending queue.
       setPendingQuestions(prev => prev.filter(p => p.id !== q.id));
@@ -648,6 +667,10 @@ export default function SessionPageClient({ params }: SessionPageProps) {
         }
       }
       setMyQuestionIds(prev => new Set([...prev, q.id]));
+      // A pending question is not broadcast and is not in the feed, so nothing
+      // else will ever put it on the author's screen. Without this it lands
+      // nowhere and the page still reads "No questions yet".
+      if (q.status === 'pending') setMyPending(prev => [q, ...prev]);
     } catch (err: any) {
       // 429 burst limit — parse seconds from message and start local countdown
       const secsMatch = err.message?.match(/(\d+)s/);
@@ -1231,6 +1254,18 @@ export default function SessionPageClient({ params }: SessionPageProps) {
 
           <div className="space-y-3 mt-4">
             {/* Featured top question */}
+            {/* The caller's own questions waiting for approval. Only they see
+                these: the feed hides pending questions from everyone but session
+                staff, which used to mean hiding them from their author too. */}
+            {myPending.map(q => (
+              <PendingQuestionCard
+                key={q.id}
+                question={q}
+                editSecondsLeft={editSecondsLeft(q)}
+                onEditSave={(body) => editQuestion(q.id, body)}
+              />
+            ))}
+
             {featuredQuestion && (
               <Collapsible leaving={leaving.has(featuredQuestion.id)}>
               <FeaturedQuestionCard
@@ -1269,7 +1304,7 @@ export default function SessionPageClient({ params }: SessionPageProps) {
             )}
 
             {/* Remaining questions */}
-            {listQuestions.length === 0 && !featuredQuestion && (
+            {listQuestions.length === 0 && !featuredQuestion && myPending.length === 0 && (
               <div className="text-center py-16 text-purple-200/85">
                 <p className="text-4xl mb-3">
                   {sort === 'starred' ? '★' : sort === 'answered' ? '✓' : sort === 'hidden' ? '🚫' : '❓'}
@@ -2396,6 +2431,48 @@ function QuestionCard({ question, isEchoed, isMine, canAffordEcho, onEcho,
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+/**
+ * A question of your own that the host has not approved yet.
+ *
+ * Deliberately plain: no echo count, no moderation, no follow-up. None of that
+ * means anything until the room can see it. What it does carry is the edit
+ * window, which is the reason it is on screen at all — a question submitted for
+ * approval was invisible to its own author, so a typo could not be fixed and
+ * nothing said it had even been received.
+ */
+function PendingQuestionCard({ question, editSecondsLeft, onEditSave }: {
+  question: Question;
+  editSecondsLeft: number;
+  onEditSave: (body: string) => Promise<void>;
+}) {
+  // A pending question has no deadline — the server drops the window while it
+  // waits — so this passes a value that never runs out rather than the real
+  // countdown. Showing "Edit · 12s" on something sitting in a queue would be
+  // both wrong and a reason not to bother.
+  const edit = useInlineEdit(question, Number.MAX_SAFE_INTEGER, onEditSave);
+  return (
+    <div className="card p-4 border-amber-500/30 bg-amber-500/[0.04]">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mb-2">
+        <span className="text-[10px] font-bold uppercase tracking-widest text-amber-300">
+          Waiting for approval
+        </span>
+        <span className="text-xs text-purple-200/70">Only you can see this</span>
+      </div>
+      {edit.editing
+        ? <InlineEditForm edit={edit} />
+        : <p className="text-white text-sm leading-relaxed">{question.body}</p>}
+      {!edit.editing && (
+        <button
+          onClick={edit.start}
+          className="mt-2 text-xs font-semibold text-brand-orange/80 hover:text-brand-amber transition-colors min-h-[32px]"
+        >
+          Edit
+        </button>
+      )}
     </div>
   );
 }

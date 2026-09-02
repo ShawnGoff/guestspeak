@@ -1062,6 +1062,14 @@ const EditQuestionSchema = z.object({
  * Hidden questions are excluded outright. A removed question is not a draft to
  * revise, and an author must not be able to quietly rewrite one and have it
  * restored later as something else.
+ *
+ * Pending questions have no deadline. The window exists because a published
+ * question has already been read and echoed, so editing it rewrites something
+ * other people responded to. A question waiting for approval has been read by
+ * nobody but the host, so none of that holds — and the clock ran anyway, which
+ * made a typo permanent sixty seconds into a queue that might not be cleared
+ * for ten minutes. Approval sets the status, so the normal window applies from
+ * the moment the room can see it.
  */
 export async function updateQuestionBody(req: Request, res: Response, next: NextFunction) {
   try {
@@ -1082,7 +1090,8 @@ export async function updateQuestionBody(req: Request, res: Response, next: Next
           SET body = $1, edited_at = NOW(), updated_at = NOW()
         WHERE id = $2
           AND status <> 'hidden'
-          AND created_at > NOW() - INTERVAL '${EDIT_WINDOW_SECONDS} seconds'
+          AND (status = 'pending'
+               OR created_at > NOW() - INTERVAL '${EDIT_WINDOW_SECONDS} seconds')
           AND (author_id = $3 OR author_guest_token = $4)
         RETURNING session_id`,
       [cleanBody, id, userId, guestToken],
@@ -1094,7 +1103,8 @@ export async function updateQuestionBody(req: Request, res: Response, next: Next
     if (result.rowCount === 0) {
       const q = await pool.query(
         `SELECT author_id, author_guest_token, status,
-                created_at <= NOW() - INTERVAL '${EDIT_WINDOW_SECONDS} seconds' AS expired
+                status <> 'pending'
+                  AND created_at <= NOW() - INTERVAL '${EDIT_WINDOW_SECONDS} seconds' AS expired
            FROM questions WHERE id = $1`,
         [id],
       );
@@ -1161,7 +1171,37 @@ export async function listMyQuestionIds(req: Request, res: Response, next: NextF
       [sessionId, userId, guestToken],
     );
 
-    res.json({ ids: result.rows.map((r: { id: string }) => r.id) });
+    // The caller's own questions still waiting for approval, in full.
+    //
+    // The public feed hides pending questions from everyone but session staff,
+    // which is the point of an approval queue — but it hid them from their own
+    // author too. You asked something, the screen said "No questions yet", and
+    // there was nothing to edit and no sign it had been received at all.
+    //
+    // It goes here rather than into the feed because the feed is cached on
+    // (session, sort, limit, offset) with no caller in the key, so a row that
+    // belongs to one person would be served to whoever asked next. This
+    // endpoint is already per-caller and uncached.
+    const pending = await pool.query(
+      `SELECT q.id, q.body, q.status, q.is_pinned, q.is_spotlighted, q.vote_count,
+              q.host_reply, q.host_replied_at, q.created_at, q.edited_at,
+              q.parent_question_id, q.thread_root_id,
+              q.post_anonymously, q.anon_number,
+              ${QUESTION_AUTHOR_SQL} AS author_username
+         FROM questions q
+         ${QUESTION_AUTHOR_JOINS}
+        WHERE q.session_id = $1
+          AND q.status = 'pending'
+          AND (($2::uuid IS NOT NULL AND q.author_id = $2)
+            OR ($3::text IS NOT NULL AND q.author_guest_token = $3))
+        ORDER BY q.created_at DESC`,
+      [sessionId, userId, guestToken],
+    );
+
+    res.json({
+      ids: result.rows.map((r: { id: string }) => r.id),
+      pending: pending.rows,
+    });
   } catch (err) {
     next(err);
   }
