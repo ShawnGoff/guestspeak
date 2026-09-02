@@ -1,8 +1,32 @@
-import { Pool } from 'pg';
+import { Pool, types } from 'pg';
 import { envIntMin } from '../lib/env';
 import dotenv from 'dotenv';
 
 dotenv.config();
+
+/**
+ * Return NUMERIC columns as numbers rather than strings.
+ *
+ * node-postgres hands NUMERIC back as a string because the type is arbitrary
+ * precision and a double cannot always hold it — the same reason COUNT() comes
+ * back as a string, which once made three sessions of 15, 13 and 5 render as
+ * "01513 5".
+ *
+ * Here it meant a session with a location could not be edited at all. The API
+ * returned lat as "37.770000", the edit form put that straight back, and the
+ * schema rejected it: `lat: Expected number, received string`.
+ *
+ * Safe as a blanket setting because sessions.lat and sessions.lng are the only
+ * NUMERIC columns in the schema — organizations.lat/lng are already double
+ * precision, which is the inconsistency underneath all of this. Coordinates at
+ * numeric(9,6) fit a double exactly, so nothing is lost.
+ *
+ * If a NUMERIC column is ever added where precision genuinely matters — money,
+ * most obviously — this must not stay blanket. Give that column its own cast in
+ * SQL, or better, make sessions.lat/lng double precision to match
+ * organizations and delete this.
+ */
+types.setTypeParser(types.builtins.NUMERIC, (v) => (v === null ? null : parseFloat(v)));
 
 if (!process.env.DATABASE_URL) {
   throw new Error('DATABASE_URL environment variable is required');

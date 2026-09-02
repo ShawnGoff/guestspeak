@@ -41,8 +41,13 @@ const CreateSessionSchema = z.object({
   city: z.string().max(100).nullish(),
   region: z.string().max(100).nullish(),
   country: z.string().max(100).nullish(),
-  lat: z.number().min(-90).max(90).nullish(),
-  lng: z.number().min(-180).max(180).nullish(),
+  // coerce, because a browser holding the previously-deployed bundle still has
+  // lat as the string the API used to hand out, and Vercel and Railway deploy
+  // independently — so there is always a window where the two disagree. A
+  // non-numeric string coerces to NaN, which fails min() and is rejected, so
+  // this loosens the type without loosening the validation.
+  lat: z.coerce.number().min(-90).max(90).nullish(),
+  lng: z.coerce.number().min(-180).max(180).nullish(),
   is_online: z.boolean().optional(),
   stream_url: z.string().url().max(1000)
     .refine(u => new URL(u).protocol === 'https:', { message: 'stream_url must use https' })
