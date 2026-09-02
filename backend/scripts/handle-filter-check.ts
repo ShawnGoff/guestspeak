@@ -18,7 +18,7 @@ const SHOULD_BLOCK = [
   'heilhitler', 'kkk88', 'whitepower1',
 ];
 const SHOULD_ALLOW = [
-  'dana_ruiz', 'KGMZ_Morning', 'analysis_guy', 'DataAnalyst', 'scatterbrain',
+  'dana_ruiz', 'PBOX_Morning', 'analysis_guy', 'DataAnalyst', 'scatterbrain',
   'raccoon_fan', 'spicy_takes', 'Scunthorpe_FC', 'Hancock', 'Cockburn',
   'assassin_creed', 'Dickinson', 'Essex_Radio', 'shiitake_mushroom',
   'peacock_tv', 'Penistone', 'classic_rock', 'grass_roots', 'JadeRhino14',

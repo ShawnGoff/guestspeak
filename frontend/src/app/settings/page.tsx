@@ -247,7 +247,7 @@ export default function SettingsPage() {
                     <input
                       value={prefix}
                       onChange={e => setPrefix(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8))}
-                      placeholder="e.g. KGMZ or HDTGM"
+                      placeholder="e.g. PBOX or TMH"
                       maxLength={8}
                       className="flex-1 bg-brand-bg border border-brand-border rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-brand-purple transition-colors font-mono tracking-wider"
                     />

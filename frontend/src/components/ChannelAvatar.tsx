@@ -5,8 +5,8 @@ import { resolveAsset } from '@/lib/api';
  *
  * The fallback used to be the first letter of the name, written out in eight
  * places. That breaks precisely where it matters most: a station names its
- * shows "KGMZ Morning Drive", "KGMZ Newsroom", "KGMZ Weekend Edition", and all
- * three rendered an identical "K".
+ * shows "PBOX Morning Drive", "PBOX Newsroom", "PBOX Weekend Edition", and all
+ * three rendered an identical "P".
  *
  * So: up to two initials, set the way the GuestSpeak wordmark is — first letter
  * white, second orange. That ties every channel back to the product it is on
@@ -23,9 +23,9 @@ const SKIP = new Set(['the', 'a', 'an', 'of', 'and']);
 /**
  * Up to two initials.
  *
- *   KGMZ Morning Drive        → KM
- *   KGMZ 104.7 Morning Drive  → KM   (a token starting with a digit is skipped;
- *                                     "K1" identifies nothing)
+ *   PBOX Morning Drive        → PM
+ *   PBOX 104.3 Morning Drive  → PM   (a token starting with a digit is skipped;
+ *                                     "P1" identifies nothing)
  *   The Midnight Hour         → MH   (article dropped)
  *   StackConf                 → S    (one word gets one letter; "SC" would read
  *                                     as an acronym the name does not have)

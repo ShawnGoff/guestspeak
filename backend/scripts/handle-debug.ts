@@ -14,7 +14,7 @@ function buildPattern(word: string): RegExp {
 
 (async () => {
   const { rows } = await pool.query<{word:string;match_mode:string}>('SELECT word, match_mode FROM banned_words');
-  const cases = ['KGMZ_Morning','Hancock','Cockburn','Dickinson','shiitake_mushroom','peacock_tv','classic_rock','ren_takahashi','cocktail_hour'];
+  const cases = ['PBOX_Morning','Hancock','Cockburn','Dickinson','shiitake_mushroom','peacock_tv','classic_rock','ren_takahashi','cocktail_hour'];
   for (const h of cases) {
     const flat = normaliseHandle(h);
     const proseHits = rows.filter(r => buildPattern(r.word).test(h)).map(r => `${r.word}[prose]`);

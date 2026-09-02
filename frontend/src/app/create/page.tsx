@@ -209,7 +209,7 @@ export default function CreateSessionPage() {
               <input
                 value={title}
                 onChange={e => setTitle(e.target.value)}
-                placeholder="e.g. Morning Drive Q&A with KGMZ"
+                placeholder="e.g. Morning Drive Q&A with The Press Box"
                 maxLength={255}
                 className="input"
               />

@@ -52,7 +52,7 @@ function makeSlug(title: string): string {
 /**
  * Generates a unique join code.
  * If a prefix is provided (from host/org profile), appends 3 random
- * uppercase alphanumeric chars: "KGMZ" → "KGMZ7X4".
+ * uppercase alphanumeric chars: "PBOX" → "PBOX7X4".
  * Otherwise generates a random 6-char code: "AW3F9Q".
  */
 function makeJoinCode(prefix?: string | null): string {

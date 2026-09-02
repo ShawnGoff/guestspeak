@@ -39,7 +39,7 @@ function assertLocal() {
 // ─── Content ─────────────────────────────────────────────────────────────────
 
 const CHANNELS = [
-  { name: 'KGMZ Morning Drive', slug: 'kgmz-morning-drive', city: 'San Francisco', region: 'CA', country: 'US',
+  { name: 'PBOX Morning Drive', slug: 'pbox-morning-drive', city: 'San Francisco', region: 'CA', country: 'US',
     categories: ['Radio', 'News'], desc: 'Weekday mornings, 6–10. Traffic, politics and whoever wanders into the studio.' },
   { name: 'The Midnight Hour', slug: 'the-midnight-hour', city: 'Austin', region: 'TX', country: 'US',
     categories: ['Podcast', 'Entertainment'], desc: 'Long-form interviews recorded after dark. No topic off limits.' },

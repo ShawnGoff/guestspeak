@@ -14,7 +14,7 @@ CREATE TABLE users (
   username        VARCHAR(50)  UNIQUE,
   password_hash   VARCHAR(255),
   is_guest        BOOLEAN      NOT NULL DEFAULT false,
-  -- Saved join code prefix, e.g. "KGMZ" → sessions become "KGMZ7X4"
+  -- Saved join code prefix, e.g. "PBOX" → sessions become "PBOX7X4"
   -- UNIQUE so no two accounts can claim the same prefix (NULL values don't conflict)
   code_prefix     VARCHAR(20) UNIQUE,
   created_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
@@ -91,7 +91,7 @@ CREATE TABLE sessions (
                    CHECK (status IN ('upcoming', 'live', 'closed')),
   -- URL-safe slug, e.g. "tech-ama-001-abc123"
   slug             VARCHAR(100) UNIQUE NOT NULL,
-  -- Short speakable join code, e.g. "KGMZ7X4" — read on air, typed on phone
+  -- Short speakable join code, e.g. "PBOX7X4" — read on air, typed on phone
   join_code        VARCHAR(20)  UNIQUE NOT NULL,
   -- 1–5 credits per user; >5 requires a paid purchase (future monetization)
   credits_per_user INTEGER      NOT NULL DEFAULT 3

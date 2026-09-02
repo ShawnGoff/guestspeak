@@ -160,7 +160,7 @@ export default function NewOrgPage() {
             <input
               value={name}
               onChange={e => setName(e.target.value)}
-              placeholder="e.g. The Midnight Hour, Westside Records, KGMZ 99.1"
+              placeholder="e.g. The Midnight Hour, Westside Records, 104.3 The Press Box"
               maxLength={255}
               className={INPUT_CLASS}
             />
