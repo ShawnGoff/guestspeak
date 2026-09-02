@@ -1,0 +1,32 @@
+{
+  "$schema": "https://schema.railpack.com",
+  "_comment": [
+    "Railpack build config. Read by BOTH Railway services that point at this",
+    "directory — the API and the nightly backup cron — so it must contain only",
+    "things that are correct for both.",
+    "",
+    "That is why there is no startCommand here. The backup service needs",
+    "`npm run backup` and the API needs its server; a start command in this",
+    "shared file would eventually be picked up by whichever service Railway",
+    "migrated to Railpack next, and an API silently running the backup script",
+    "instead of listening is a total outage. Start commands stay per-service in",
+    "the Railway UI.",
+    "",
+    "postgresql-client-17 puts pg_dump in the image, which the base Node image",
+    "does not have — without it the backup fails with `spawn pg_dump ENOENT`.",
+    "The API does not use it and pays only a few MB for it, which is cheaper",
+    "than a second build config to keep in step.",
+    "",
+    "Pinned to 17 because the client must be the same major version as the",
+    "server or newer. Supabase is on 17.6 and moves without asking; when it",
+    "goes to 18, pg_dump fails with an explicit version-mismatch message and",
+    "the fix is to raise this number. Debian trixie carries 17 as its default.",
+    "",
+    "Replaces nixpacks.toml, which Railway's Railpack builder does not read.",
+    "That file stays until the API service is confirmed off the deprecated",
+    "Nixpacks builder, then it can go."
+  ],
+  "deploy": {
+    "aptPackages": ["postgresql-client-17"]
+  }
+}
