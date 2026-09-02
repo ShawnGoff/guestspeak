@@ -967,10 +967,29 @@ function SessionPageInner() {
             </div>
           )}
           {view === 'audience' ? (
-            <div className="px-4 sm:px-6 py-3 flex items-center gap-3 sm:gap-4">
-              <div className="hidden sm:block shrink-0 text-center">
-                <p className="text-xs text-white/55 mb-0.5">Credits</p>
-                <p className="text-lg font-bold text-brand-orange leading-none">{credits}</p>
+            <div className="px-4 sm:px-6 py-3 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
+              {/* On a phone too. This was `hidden sm:block`, so the one thing
+                  that explains why the room's questions are worth anything —
+                  that you only get a few — was invisible on the device the
+                  audience actually uses. Same gap the real session page had.
+
+                  Stacked above the input rather than beside it: inline, the
+                  label and meter took a third of a 375px row off the textarea.
+                  Dots on the phone, matching the live product's meter; the
+                  desktop layout is unchanged. */}
+              <div className="flex items-center gap-2 shrink-0 sm:flex-col sm:gap-0 sm:text-center">
+                <span className="text-xs text-white/55 sm:mb-0.5">Credits</span>
+                <div className="flex gap-1 sm:hidden" aria-hidden>
+                  {Array.from({ length: creditsParam }).map((_, i) => (
+                    <div
+                      key={i}
+                      className={`w-2 h-2 rounded-full transition-colors ${
+                        i < credits ? 'bg-brand-orange' : 'bg-brand-border/60'
+                      }`}
+                    />
+                  ))}
+                </div>
+                <span className="text-sm sm:text-lg font-bold text-brand-orange leading-none">{credits}</span>
               </div>
 
               {submitted ? (
