@@ -484,6 +484,15 @@ export default function SessionPageClient({ params }: SessionPageProps) {
     es.addEventListener('session:spotlight', (e) => {
       const { question_id } = JSON.parse(e.data);
       setQuestions(prev => prev.map(q => ({ ...q, is_spotlighted: q.id === question_id })));
+      // And let the list reorder, even mid-scroll.
+      //
+      // The frozen order exists so questions arriving on their own do not
+      // rearrange the feed under someone reading it. A spotlight is the
+      // opposite kind of event: the host saying "this is the one I am answering
+      // now". Holding the old order meant the host picked a question — which
+      // they do while scrolled down the list, because that is where the
+      // question is — and nothing moved for anyone.
+      setFrozenOrder(null);
     });
 
     return () => es.close();

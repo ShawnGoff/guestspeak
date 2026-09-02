@@ -24,12 +24,25 @@ const CreateSessionSchema = z.object({
   credits_per_user: z.number().int().min(1).max(6).default(6),
   starts_at: z.string().optional(),
   org_id: z.string().uuid().optional(),
-  submission_cutoff_at: z.string().optional(),
-  city: z.string().max(100).optional(),
-  region: z.string().max(100).optional(),
-  country: z.string().max(100).optional(),
-  lat: z.number().min(-90).max(90).optional(),
-  lng: z.number().min(-180).max(180).optional(),
+  // nullish, not optional. The update handler writes null and skips undefined,
+  // which is the right distinction — null clears a field, undefined leaves it
+  // alone — but `.optional()` only admits undefined, so the one value that
+  // means "clear this" was rejected before it reached the handler.
+  //
+  // The edit form sends null whenever "close questions before the event" is
+  // off, which is its default. Every edit made with that toggle off failed on
+  // `submission_cutoff_at: Expected string, received null`, and since the error
+  // named a field the person had not touched, it read as the form being broken
+  // rather than as anything they could act on.
+  submission_cutoff_at: z.string().nullish(),
+  // nullish for the same reason as submission_cutoff_at: these are the fields
+  // an edit clears. Switching a session to online, or emptying the location
+  // box, has to be able to say "no city" — and only null says that.
+  city: z.string().max(100).nullish(),
+  region: z.string().max(100).nullish(),
+  country: z.string().max(100).nullish(),
+  lat: z.number().min(-90).max(90).nullish(),
+  lng: z.number().min(-180).max(180).nullish(),
   is_online: z.boolean().optional(),
   stream_url: z.string().url().max(1000)
     .refine(u => new URL(u).protocol === 'https:', { message: 'stream_url must use https' })

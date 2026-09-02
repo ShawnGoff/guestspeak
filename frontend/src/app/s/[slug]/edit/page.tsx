@@ -130,11 +130,15 @@ export default function EditSessionPage({ params }: { params: { slug: string } }
         description: description.trim() || undefined,
         visibility,
         credits_per_user: credits,
-        city:    isOnline ? undefined : city.trim() || undefined,
-        region:  isOnline ? undefined : region.trim() || undefined,
-        country: isOnline ? undefined : country.trim() || undefined,
-        lat:     isOnline ? undefined : lat,
-        lng:     isOnline ? undefined : lng,
+        // null, not undefined. The server writes null and skips undefined, so
+        // undefined meant a session switched to online kept the city it had —
+        // still showing a place it was not at, and still eligible for Nearby.
+        // Emptying the location box by hand had the same problem.
+        city:    isOnline ? null : (city.trim()    || null),
+        region:  isOnline ? null : (region.trim()  || null),
+        country: isOnline ? null : (country.trim() || null),
+        lat:     isOnline ? null : (lat ?? null),
+        lng:     isOnline ? null : (lng ?? null),
         is_online: isOnline,
         stream_url: streamUrl.trim() || '',
         starts_at: startsAt,
