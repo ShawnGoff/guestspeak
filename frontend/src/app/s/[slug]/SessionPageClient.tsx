@@ -887,6 +887,19 @@ export default function SessionPageClient({ params }: SessionPageProps) {
     // Starred/Answered tabs are filters, not just sort orders
     if (sort === 'starred'  && !searchQuery && q.status !== 'starred')  return false;
     if (sort === 'answered' && !searchQuery && q.status !== 'answered') return false;
+
+    // Answered questions leave Top. Top is the queue — what the room still
+    // wants asked — and a question the host has already dealt with is no longer
+    // that. It kept its place regardless of echoes, so a 0-echo answered
+    // question sat in the TOP QUESTION slot above a live one with more, which
+    // reads as the ranking being broken.
+    //
+    // Pinned and spotlighted are the exceptions: both are the host deliberately
+    // holding something up, and spotlight in particular means "answering this
+    // now" — pulling it out mid-answer would take it off the screen of everyone
+    // watching the answer happen.
+    if (sort === 'echoes' && !searchQuery && q.status === 'answered'
+        && !(q as any).is_pinned && !(q as any).is_spotlighted) return false;
     if (!searchQuery) return true;
     return q.body.toLowerCase().includes(searchQuery.toLowerCase());
   }).sort((a, b) => {
