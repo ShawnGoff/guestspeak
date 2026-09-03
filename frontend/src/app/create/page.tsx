@@ -45,6 +45,19 @@ function CreateSessionPageInner() {
   const [joinCode, setJoinCode] = useState<{ code: string; slug: string; title: string } | null>(null);
   const [copiedCode, setCopiedCode] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
+  /**
+   * Whether the device can hand the invite to another app.
+   *
+   * Read after mount, not during render: there is no navigator on the server,
+   * and a value that differs between the server and the first client render is
+   * a hydration mismatch. Desktop browsers largely do not implement it, so the
+   * button is not shown at all there rather than shown and broken — Copy link
+   * already covers that case and takes the full width when it is alone.
+   */
+  const [canShare, setCanShare] = useState(false);
+  useEffect(() => {
+    setCanShare(typeof navigator !== 'undefined' && typeof navigator.share === 'function');
+  }, []);
 
   useEffect(() => {
     setMounted(true);
@@ -122,6 +135,22 @@ function CreateSessionPageInner() {
         setTimeout(() => setCopiedLink(false), 2000);
       });
     }
+    async function shareLink() {
+      try {
+        // The code goes in the text as well as the link. Half the people who
+        // get this will be looking at a screen where the URL is not tappable —
+        // read out on air, on a slide, in a photo of a phone — and the code is
+        // the way in from there.
+        await navigator.share({
+          title: joinCode!.title,
+          text: `Join "${joinCode!.title}" on GuestSpeak — code ${joinCode!.code}`,
+          url: joinUrl,
+        });
+      } catch {
+        // Dismissing the sheet rejects. That is not a failure and must not
+        // surface as one.
+      }
+    }
 
     return (
       <div className="min-h-screen bg-brand-bg flex flex-col items-center justify-center px-4 py-12">
@@ -166,7 +195,25 @@ function CreateSessionPageInner() {
 
             {/* Actions */}
             <div className="flex flex-col gap-2.5">
-              <button onClick={copyLink} className="btn-ghost py-2.5 text-sm flex items-center justify-center gap-2">
+              {/* Share and Copy sit side by side rather than stacking, so the
+                  primary action stays one thumb-reach from the join code
+                  instead of being pushed down by a third full-width button.
+                  With no share support Copy takes the row on its own. */}
+              <div className="flex gap-2.5">
+                {canShare && (
+                  <button
+                    onClick={shareLink}
+                    className="btn-ghost py-2.5 text-sm flex items-center justify-center gap-2 flex-1 min-h-[44px]"
+                  >
+                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8" />
+                      <polyline points="16 6 12 2 8 6" />
+                      <line x1="12" y1="2" x2="12" y2="15" />
+                    </svg>
+                    Share
+                  </button>
+                )}
+                <button onClick={copyLink} className="btn-ghost py-2.5 text-sm flex items-center justify-center gap-2 flex-1 min-h-[44px]">
                 {copiedLink ? (
                   <>
                     <svg className="w-4 h-4 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -181,12 +228,13 @@ function CreateSessionPageInner() {
                       <path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" />
                     </svg>
                     Copy link
-                  </>
-                )}
-              </button>
+                    </>
+                  )}
+                </button>
+              </div>
               <button
                 onClick={() => router.push(`/s/${joinCode.slug}`)}
-                className="btn-primary py-3 text-sm font-semibold"
+                className="btn-primary py-3 text-sm font-semibold min-h-[44px]"
               >
                 Open session →
               </button>
