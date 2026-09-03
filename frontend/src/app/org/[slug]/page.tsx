@@ -323,15 +323,22 @@ export default function OrgPage({ params }: OrgPageProps) {
                   <div className="w-8 h-8 rounded-full bg-brand-purple/20 border border-brand-purple/30 flex items-center justify-center text-xs font-bold text-brand-amber shrink-0">
                     {c.username.charAt(0).toUpperCase()}
                   </div>
+                  {/* Both figures on one line under the name, so they read as
+                      one description of a person. Split across the row — asked
+                      count under the name, echo count right-aligned opposite —
+                      they read as two unrelated stats at opposite ends, and
+                      nothing said which one decided the ranking.
+
+                      "received" is load-bearing: this counts echoes their
+                      questions got, not echoes they gave, and "3 echoes" beside
+                      a name reads as either. The ordering is by this figure. */}
                   <div className="flex-1 min-w-0">
                     <p className="text-white text-sm font-semibold truncate">@{c.username}</p>
-                    <p className="text-[10px] text-purple-200/60 mt-0.5">
-                      {c.question_count} {c.question_count === 1 ? 'question' : 'questions'}
+                    <p className="text-xs text-purple-200/60 mt-0.5 truncate">
+                      {plural(c.question_count, 'question')}
+                      {' · '}
+                      {plural(c.total_echoes, 'echo', 'echoes')} received
                     </p>
-                  </div>
-                  <div className="text-right shrink-0">
-                    <p className="text-sm font-bold text-brand-orange">{fmtNum(c.total_echoes)}</p>
-                    <p className="text-[10px] text-purple-200/60">echoes</p>
                   </div>
                 </div>
               ))}
