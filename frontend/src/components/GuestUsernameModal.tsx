@@ -40,7 +40,7 @@ function generateName(): string {
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 const USERNAME_RE = /^[a-zA-Z0-9_]+$/;
-type Availability = 'auto' | 'idle' | 'checking' | 'available' | 'taken' | 'invalid';
+type Availability = 'auto' | 'idle' | 'checking' | 'available' | 'taken' | 'disallowed' | 'invalid';
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
@@ -76,10 +76,14 @@ export default function GuestUsernameModal({
     setAvailability('checking');
     checkTimer.current = setTimeout(async () => {
       try {
-        const { available } = await api.get<{ available: boolean }>(
-          `/auth/check-username?username=${encodeURIComponent(trimmed)}`,
-        );
-        setAvailability(available ? 'available' : 'taken');
+        // The endpoint separates the two reasons on purpose. This read only
+        // `available` and reported every refusal as "taken by a registered
+        // user" — so a slur came back as someone else's name, which is both
+        // false and an accusation against a user who does not exist.
+        const { available, disallowed } = await api.get<{
+          available: boolean; taken: boolean; disallowed: boolean;
+        }>(`/auth/check-username?username=${encodeURIComponent(trimmed)}`);
+        setAvailability(available ? 'available' : disallowed ? 'disallowed' : 'taken');
       } catch {
         setAvailability('idle');
       }
@@ -199,7 +203,7 @@ export default function GuestUsernameModal({
                       <path d="M5 13l4 4L19 7" />
                     </svg>
                   )}
-                  {(availability === 'taken' || availability === 'invalid') && (
+                  {(availability === 'taken' || availability === 'disallowed' || availability === 'invalid') && (
                     <svg className="w-4 h-4 text-red-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
                       <path d="M18 6L6 18M6 6l12 12" />
                     </svg>
@@ -211,6 +215,11 @@ export default function GuestUsernameModal({
               <p className="text-xs min-h-[1rem] pl-1">
                 {availability === 'invalid' && <span className="text-red-400">2–30 chars, letters/numbers/underscores only</span>}
                 {availability === 'taken'   && <span className="text-red-400">That name is taken by a registered user</span>}
+                {/* Deliberately not saying which word or why. Naming the rule
+                    to someone testing the filter is a hint about how to get
+                    past it, and the people who hit this by accident only need
+                    to know to pick something else. */}
+                {availability === 'disallowed' && <span className="text-red-400">That name isn&apos;t allowed — try another</span>}
                 {availability === 'available' && <span className="text-emerald-400">Looks good!</span>}
                 {availability === 'idle'    && <span className="text-purple-200/60">Letters, numbers, and underscores only</span>}
               </p>
