@@ -1198,9 +1198,28 @@ export async function listMyQuestionIds(req: Request, res: Response, next: NextF
       [sessionId, userId, guestToken],
     );
 
+    // Which questions this caller has already echoed.
+    //
+    // The client used to know this only for echoes made in the current tab —
+    // nothing loaded it back. So a reload offered the Echo button again on
+    // questions you had already echoed, and pressing it earned an error from
+    // the server, which is the one place a person is certain they did nothing
+    // wrong. Same shape of bug as the follow-up right that did not survive a
+    // new tab.
+    const echoed = await pool.query(
+      `SELECT v.question_id
+         FROM votes v
+         JOIN questions q ON q.id = v.question_id
+        WHERE q.session_id = $1
+          AND (($2::uuid IS NOT NULL AND v.user_id = $2)
+            OR ($3::text IS NOT NULL AND v.guest_token = $3))`,
+      [sessionId, userId, guestToken],
+    );
+
     res.json({
       ids: result.rows.map((r: { id: string }) => r.id),
       pending: pending.rows,
+      echoed: echoed.rows.map((r: { question_id: string }) => r.question_id),
     });
   } catch (err) {
     next(err);

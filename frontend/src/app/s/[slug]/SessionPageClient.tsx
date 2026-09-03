@@ -258,10 +258,14 @@ export default function SessionPageClient({ params }: SessionPageProps) {
   useEffect(() => {
     if (!sessionId) return;
     let cancelled = false;
-    api.get<{ ids: string[]; pending?: Question[] }>(`/sessions/${sessionId}/mine`)
-      .then(({ ids, pending }) => {
+    api.get<{ ids: string[]; pending?: Question[]; echoed?: string[] }>(`/sessions/${sessionId}/mine`)
+      .then(({ ids, pending, echoed }) => {
         if (cancelled) return;
         setMyPending(pending ?? []);
+        // Merged, not replaced. This request can land after an echo made in
+        // the moment before it returned, and replacing would drop that one and
+        // show the button again on something already echoed.
+        if (echoed?.length) setEchoedIds(prev => new Set([...prev, ...echoed]));
         if (!ids?.length) return;
         setMyQuestionIds(prev => {
           const merged = new Set(prev);
