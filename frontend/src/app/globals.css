@@ -1,4 +1,9 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Fraunces:wght@700;800&display=swap');
+/* Fonts are linked from the document head, not imported here.
+   An @import is render-blocking AND serial: the browser has to download this
+   stylesheet, parse it, discover the import, and only then open a connection to
+   a third-party origin — so nothing paints until two round trips have finished,
+   one of them to a host it has never spoken to. In the head they start in
+   parallel with this file, with the connections already warmed. */
 
 @tailwind base;
 @tailwind components;

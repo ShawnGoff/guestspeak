@@ -64,6 +64,18 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
+      <head>
+        {/* Warm both origins before anything asks them for a file. Google
+            serves the CSS from one host and the font files from another, so
+            without these the browser pays two fresh DNS+TLS handshakes back to
+            back, at the point where it is already blocked on rendering. */}
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link
+          rel="stylesheet"
+          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Fraunces:wght@700;800&display=swap"
+        />
+      </head>
       <body>
         {children}
         <ServiceWorker />
