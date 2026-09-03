@@ -1033,6 +1033,15 @@ export default function SessionPageClient({ params }: SessionPageProps) {
     .filter(q => q.parent_question_id && (q.thread_root_id ?? q.parent_question_id) === rootId)
     .sort((a, b) => Date.parse(a.created_at) - Date.parse(b.created_at));
   const rootQuestions = displayedQuestions.filter(q => !q.parent_question_id);
+  // The similar-question panel, with counts read from live state rather than
+  // the snapshot fetched when the person started typing. The same question is
+  // on screen twice while they type — once in the feed, once in the panel — and
+  // the two showing different numbers makes the count look invented.
+  const similarWithLiveCounts = similarQuestions.map(q => {
+    const live = questions.find(x => x.id === q.id);
+    return live ? { ...q, vote_count: live.vote_count } : q;
+  });
+
   const listQuestions = featuredQuestion
     ? rootQuestions.filter(q => q.id !== featuredQuestion.id)
     : rootQuestions;
@@ -1433,7 +1442,8 @@ export default function SessionPageClient({ params }: SessionPageProps) {
           credits={credits}
           anonCredits={anonCredits}
           submitting={submitting}
-          similarQuestions={similarQuestions}
+          similarQuestions={similarWithLiveCounts}
+          echoedIds={echoedIds}
           onSubmit={submitQuestion}
           onEchoSimilar={addEcho}
           sessionStatus={session.status}
@@ -2542,10 +2552,11 @@ function ReplyModal({ question, reply, loading, onChange, onSubmit, onClose }: {
 
 // ─── Submit bar ───────────────────────────────────────────────────────────────
 
-function SubmitBar({ body, setBody, credits, anonCredits, submitting, similarQuestions, onSubmit, onEchoSimilar, sessionStatus, isRegistered, postAnonymously, onToggleAnon, isMod, burstCooldown }: {
+function SubmitBar({ body, setBody, credits, anonCredits, submitting, similarQuestions, echoedIds, onSubmit, onEchoSimilar, sessionStatus, isRegistered, postAnonymously, onToggleAnon, isMod, burstCooldown }: {
   body: string; setBody: (v: string) => void;
   credits: number; anonCredits: number; submitting: boolean;
   similarQuestions: Question[];
+  echoedIds: Set<string>;
   onSubmit: () => void; onEchoSimilar: (id: string) => void;
   sessionStatus: string;
   isRegistered: boolean;
@@ -2569,13 +2580,25 @@ function SubmitBar({ body, setBody, credits, anonCredits, submitting, similarQue
               <div key={q.id} className="flex items-center gap-3 bg-brand-card rounded-xl px-3 py-2 border border-brand-border/50">
                 <p className="flex-1 text-xs text-purple-200/90 leading-snug">{q.body}</p>
                 <div className="flex items-center gap-2 flex-shrink-0">
-                  <span className="text-xs text-brand-amber font-bold">{q.vote_count} Echoes</span>
-                  <button
-                    onClick={() => onEchoSimilar(q.id)}
-                    className="text-xs bg-brand-orange/20 text-brand-orange border border-brand-orange/30 px-2 py-1 rounded-lg font-semibold hover:bg-brand-orange/30 transition-colors"
-                  >
-                    Echo
-                  </button>
+                  <span className="text-xs text-brand-amber font-bold">
+                    {plural(q.vote_count, 'Echo', 'Echoes')}
+                  </span>
+                  {/* Already echoed says so, rather than offering the button
+                      again. The feed card for the same question is highlighted,
+                      so a live Echo button beside it invited a second press the
+                      server would only refuse. */}
+                  {echoedIds.has(q.id) ? (
+                    <span className="text-xs text-brand-amber/80 border border-brand-amber/30 px-2 py-1 rounded-lg font-semibold">
+                      ✓ Echoed
+                    </span>
+                  ) : (
+                    <button
+                      onClick={() => onEchoSimilar(q.id)}
+                      className="text-xs bg-brand-orange/20 text-brand-orange border border-brand-orange/30 px-2 py-1 rounded-lg font-semibold hover:bg-brand-orange/30 transition-colors"
+                    >
+                      Echo
+                    </button>
+                  )}
                 </div>
               </div>
             ))}
