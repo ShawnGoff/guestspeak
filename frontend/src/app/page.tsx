@@ -91,8 +91,51 @@ function MockQAWidget() {
   ]);
   const frameRef = useRef(0);
 
+  /**
+   * Whether the hero animations should run at all.
+   *
+   * Two loops drive this hero: an echo counter every 2.2s and a typing effect
+   * that sets state once per character. One typing cycle is ~96 renders of this
+   * component, and it repeats for as long as the tab is open — so the page never
+   * goes idle. On a phone that is felt rather than seen: the first load competes
+   * with hydration, and scrolling stays sticky afterwards.
+   *
+   * So: not before the page has finished loading, not while the tab is hidden,
+   * and not at all for someone who has asked for reduced motion. When it does
+   * run it is unchanged — this gates the loops, it does not slow them down.
+   */
+  const [animate, setAnimate] = useState(false);
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+
+    // Start regardless of what document.hidden says right now, and only stop on
+    // an explicit switch away. Reading hidden at startup looked tidier and is
+    // the riskier order: anything that reports hidden at mount — an embedded
+    // view, a restored background tab, a prerender — leaves the hero frozen,
+    // and a still hero on the first screen someone sees is a worse failure than
+    // a few seconds of animation in a tab nobody is looking at.
+    const onVisibility = () => setAnimate(!document.hidden);
+    const start = () => {
+      setAnimate(true);
+      document.addEventListener('visibilitychange', onVisibility);
+    };
+
+    // After load, so the loops are not competing with hydration for the main
+    // thread at the exact moment the page is trying to become interactive.
+    let t: number | undefined;
+    if (document.readyState === 'complete') t = window.setTimeout(start, 300);
+    else window.addEventListener('load', () => { t = window.setTimeout(start, 300); }, { once: true });
+
+    return () => {
+      if (t) clearTimeout(t);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, []);
+
   // Animate echo counts up
   useEffect(() => {
+    if (!animate) return;
     const interval = setInterval(() => {
       const idx = Math.floor(Math.random() * 3);
       setEchoes(prev => {
@@ -104,11 +147,12 @@ function MockQAWidget() {
       setTimeout(() => setFlash(null), 700);
     }, 2200);
     return () => clearInterval(interval);
-  }, []);
+  }, [animate]);
 
   // Simulate typing in the ask field
   const DEMO_TEXT = 'Is there a song that almost didn\'t make the album?';
   useEffect(() => {
+    if (!animate) return;
     let i = 0;
     let typing = true;
     const tick = () => {
@@ -133,7 +177,7 @@ function MockQAWidget() {
     };
     frameRef.current = window.setTimeout(tick, 1500);
     return () => clearTimeout(frameRef.current);
-  }, []);
+  }, [animate]);
 
   return (
     <div className="relative">
