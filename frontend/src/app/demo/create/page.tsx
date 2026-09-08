@@ -11,6 +11,10 @@ export default function DemoCreatePage() {
   const [visibility, setVisibility] = useState<'public' | 'unlisted'>('public');
   const [credits, setCredits]       = useState(6);
   const [startNow, setStartNow]     = useState(true);
+  // Mirrors the real create form. Approval is the control a broadcaster asks
+  // about first — nothing reaches the room until someone on their team lets it
+  // through — so a demo that omits it argues against the product.
+  const [requiresApproval, setRequiresApproval] = useState(false);
   const [launching, setLaunching]   = useState(false);
 
   function handleLaunch(e: React.FormEvent) {
@@ -83,7 +87,7 @@ export default function DemoCreatePage() {
               required
               value={title}
               onChange={e => setTitle(e.target.value)}
-              placeholder="e.g. Q3 Product Roadmap AMA"
+              placeholder="e.g. Morning Drive Q&amp;A with The Press Box"
               maxLength={80}
               className="w-full bg-brand-card border border-brand-border rounded-xl px-4 py-3.5
                          text-white text-base
@@ -221,6 +225,31 @@ export default function DemoCreatePage() {
                 />
               </div>
             )}
+          </div>
+
+          {/* Require approval — same control and copy as /create */}
+          <div className="flex items-start gap-3">
+            <button
+              type="button"
+              role="switch"
+              aria-checked={requiresApproval}
+              onClick={() => setRequiresApproval(v => !v)}
+              className={`relative w-11 h-6 rounded-full transition-colors shrink-0 mt-0.5 ${
+                requiresApproval ? 'bg-brand-orange' : 'bg-brand-purple/40'
+              }`}
+            >
+              <span
+                className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-transform ${
+                  requiresApproval ? 'translate-x-6' : 'translate-x-1'
+                }`}
+              />
+            </button>
+            <div>
+              <p className="text-sm font-semibold text-white">Require approval for questions</p>
+              <p className="text-xs text-white/65 mt-0.5">
+                Questions stay hidden until you approve them
+              </p>
+            </div>
           </div>
 
           {/* Preview */}
