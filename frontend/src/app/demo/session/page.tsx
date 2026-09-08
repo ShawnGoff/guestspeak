@@ -586,6 +586,15 @@ function SessionPageInner() {
 
   function echo(id: number) {
     if (view === 'audience' && credits <= 0) return;
+    // Bail before spending anything if the echo would not land. The map below
+    // already ignored an-already-echoed question, but the credit was taken
+    // regardless — so a second press cost a credit and changed nothing. Every
+    // echo button is disabled once echoed, so this was unreachable through the
+    // UI; it is the kind of thing that stops being unreachable the moment a new
+    // control forgets the disabled prop.
+    const target = qs.find(q => q.id === id);
+    if (!target || target.echoed) return;
+
     setQs(prev => prev.map(q => q.id === id && !q.echoed ? { ...q, echoes: q.echoes + 1, echoed: true } : q));
     if (view === 'audience') setCredits(c => c - 1);
     setEchoFlash(prev => ({ ...prev, [id]: true }));
@@ -638,17 +647,35 @@ function SessionPageInner() {
     return b.echoes - a.echoes;
   });
 
-  const spotlightedQ = spotlightedId ? qs.find(q => q.id === spotlightedId) ?? null : null;
-  const unanswered   = allSorted.filter(q => !q.answered && q.id !== spotlightedId);
-  const answeredList = allSorted.filter(q => q.answered);
-  const starredList  = allSorted.filter(q => q.starred);
-  const featuredQ    = sort === 'top' && !spotlightedQ ? (unanswered[0] ?? null) : null;
+  // visibleQs, not qs: a hidden question that happened to be spotlighted was
+  // still drawn at the top of the audience view, which is the one thing hiding
+  // is for.
+  const spotlightedQ = spotlightedId ? visibleQs.find(q => q.id === spotlightedId) ?? null : null;
+
+  // The spotlight card sits above the list, so it has to obey the same tab
+  // filter the list does. It did not, so a question marked Now Answering was
+  // pinned to the top of every tab — including Answered, where it had not been
+  // answered, and Starred, where it was not starred.
+  const pinned =
+    !spotlightedQ                ? null :
+    sort === 'answered'          ? (spotlightedQ.answered ? spotlightedQ : null) :
+    sort === 'starred'           ? (spotlightedQ.starred  ? spotlightedQ : null) :
+    spotlightedQ;
+
+  // Only exclude it from the list when it is actually drawn above. Excluding on
+  // spotlightedId regardless meant a spotlighted question vanished from the tabs
+  // that were not showing the card — visible on none of them at once.
+  const pinnedId     = pinned ? pinned.id : -1;
+  const unanswered   = allSorted.filter(q => !q.answered && q.id !== pinnedId);
+  const answeredList = allSorted.filter(q => q.answered && q.id !== pinnedId);
+  const starredList  = allSorted.filter(q => q.starred  && q.id !== pinnedId);
+  const featuredQ    = sort === 'top' && !pinned ? (unanswered[0] ?? null) : null;
   const listQs       = sort === 'answered'
     ? answeredList
     : sort === 'starred'
     ? starredList
     : sort === 'top'
-      ? [...unanswered.slice(spotlightedQ ? 0 : 1), ...answeredList]
+      ? [...unanswered.slice(pinned ? 0 : 1), ...answeredList]
       : [...unanswered, ...answeredList];
 
   const totalAsked  = visibleQs.length;
@@ -836,17 +863,17 @@ function SessionPageInner() {
 
             <main className="flex-1 lg:overflow-y-auto">
             <div className="p-4 sm:p-5 flex flex-col gap-3 pb-28 lg:pb-6">
-              {spotlightedQ && (
+              {pinned && (
                 <SpotlightCard
-                  q={spotlightedQ}
+                  q={pinned}
                   view={view}
-                  showFlash={!!echoFlash[spotlightedQ.id]}
+                  showFlash={!!echoFlash[pinned.id]}
                   noCredits={credits === 0 && view === 'audience'}
-                  onEcho={() => echo(spotlightedQ.id)}
-                  onStar={() => toggleStar(spotlightedQ.id)}
-                  onAnswer={() => toggleAnswer(spotlightedQ.id)}
-                  onSpotlight={() => toggleSpotlight(spotlightedQ.id)}
-                  onHide={() => toggleHide(spotlightedQ.id)}
+                  onEcho={() => echo(pinned.id)}
+                  onStar={() => toggleStar(pinned.id)}
+                  onAnswer={() => toggleAnswer(pinned.id)}
+                  onSpotlight={() => toggleSpotlight(pinned.id)}
+                  onHide={() => toggleHide(pinned.id)}
                 />
               )}
 

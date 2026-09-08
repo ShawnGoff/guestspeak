@@ -234,13 +234,22 @@ export default function DemoCreatePage() {
               role="switch"
               aria-checked={requiresApproval}
               onClick={() => setRequiresApproval(v => !v)}
-              className={`relative w-11 h-6 rounded-full transition-colors shrink-0 mt-0.5 ${
+              className={`relative w-10 h-6 rounded-full transition-colors shrink-0 mt-0.5 ${
                 requiresApproval ? 'bg-brand-orange' : 'bg-brand-purple/40'
               }`}
             >
+              {/* Positioned with `left`, not a transform.
+                  A <button> centres its content, so an absolutely positioned
+                  knob with no `left` starts mid-pill rather than at its edge —
+                  which is what threw it onto the label. Anchoring it fixed that,
+                  but the translate then refused to resolve: the class landed on
+                  the element and --tw-translate-x read 1.25rem while the
+                  computed transform stayed at 4px in both states.
+                  `left` needs no custom property and no transform stack, so
+                  there is nothing left to resolve incorrectly. */}
               <span
-                className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-transform ${
-                  requiresApproval ? 'translate-x-6' : 'translate-x-1'
+                className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-all ${
+                  requiresApproval ? 'left-5' : 'left-1'
                 }`}
               />
             </button>
