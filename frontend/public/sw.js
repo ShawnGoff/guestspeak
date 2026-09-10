@@ -49,7 +49,25 @@ self.addEventListener('fetch', (event) => {
 
   if (request.mode === 'navigate') {
     event.respondWith(
-      fetch(request).catch(() => caches.match(OFFLINE_URL)),
+      fetch(request).catch(async () => {
+        // caches.match resolves to undefined when nothing matches, and
+        // respondWith(undefined) is not a valid response — so a failed
+        // navigation on a client whose offline page was never cached, or was
+        // evicted, or was dropped by a version bump mid-install, produced a
+        // navigation with no Response at all rather than the offline page.
+        // Whatever the browser does with that, it is not what this handler was
+        // written to do.
+        const cached = await caches.match(OFFLINE_URL);
+        return cached ?? new Response(
+          '<!doctype html><meta charset="utf-8">'
+          + '<title>Offline — GuestSpeak</title>'
+          + '<body style="font-family:system-ui;background:#1A0A2E;color:#F3F0FF;'
+          + 'display:grid;place-items:center;height:100vh;margin:0;text-align:center">'
+          + '<div><p style="font-weight:700">Guest<span style="color:#F5921E">Speak</span></p>'
+          + '<p>You are offline. This page will work again once you reconnect.</p></div>',
+          { status: 503, headers: { 'Content-Type': 'text/html; charset=utf-8' } },
+        );
+      }),
     );
   }
 });
