@@ -17,13 +17,22 @@
  * them, or told to stream while it refuses them.
  */
 
-export const LIVE_FEED_MAX_PARTICIPANTS = parseInt(
-  process.env.LIVE_FEED_MAX_PARTICIPANTS ?? '400', 10,
-);
+// envIntMin, not parseInt. lib/env.ts was written to stop exactly this, and
+// quotes this shape in its own doc comment: `parseInt(process.env.X ?? '50')`
+// only covers an unset variable, so a blank or misspelt one ("", "4OO", "400 ")
+// parses to NaN and sails into the config it feeds.
+//
+// NaN here is quiet and strange rather than loud. Every comparison against it
+// is false, so a session would be told to poll while the stream still accepted
+// it, or to stream while the stream refused it — the exact disagreement the
+// comment above says this file exists to prevent.
+import { envIntMin } from './env';
 
-export const FEED_POLL_INTERVAL_MS = parseInt(
-  process.env.FEED_POLL_INTERVAL_MS ?? '5000', 10,
-);
+export const LIVE_FEED_MAX_PARTICIPANTS = envIntMin('LIVE_FEED_MAX_PARTICIPANTS', 400, 1);
+
+// A poll interval of zero is a client hammering the API as fast as it can
+// answer, so the floor is a second rather than one.
+export const FEED_POLL_INTERVAL_MS = envIntMin('FEED_POLL_INTERVAL_MS', 5000, 1000);
 
 export type FeedMode = 'live' | 'polling';
 

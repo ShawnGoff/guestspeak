@@ -10,7 +10,7 @@ import ServiceWorker from '@/components/ServiceWorker';
 // that became a redirect to the real domain, every page still advertised it as
 // canonical — telling search engines the site lives at a URL that immediately
 // bounces, which is the damage moving to a real domain is meant to undo.
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://guestspeak.app';
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://guestspeak.app';
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),

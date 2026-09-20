@@ -5,7 +5,7 @@ export const alt    = 'GuestSpeak session';
 export const size   = { width: 1200, height: 630 };
 export const contentType = 'image/png';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 interface Props {
   params: { slug: string };

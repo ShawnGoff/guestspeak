@@ -420,7 +420,7 @@ export async function forgotPassword(req: Request, res: Response, next: NextFunc
       [user.id, tokenHash],
     );
 
-    const appUrl = process.env.APP_URL ?? 'http://localhost:3000';
+    const appUrl = process.env.APP_URL || 'http://localhost:3000';
     const resetUrl = `${appUrl}/reset-password?token=${rawToken}`;
 
     // Fire-and-forget, like the go-live fan-out. Two reasons, and the second

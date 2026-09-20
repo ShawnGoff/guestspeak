@@ -1,6 +1,6 @@
 // NEXT_PUBLIC_API_URL should be the base domain only, e.g. https://api.guestspeak.app
 // The /api prefix is appended here so all callers stay consistent.
-const BACKEND = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
+const BACKEND = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 const API = BACKEND + '/api';
 
 /**

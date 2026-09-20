@@ -30,7 +30,7 @@ export function initSentry(): void {
 
   Sentry.init({
     dsn: DSN,
-    environment: process.env.NODE_ENV ?? 'development',
+    environment: process.env.NODE_ENV || 'development',
 
     // Traces are a separate quota and a separate question from "is anything
     // broken". Off until there is a performance problem worth measuring.

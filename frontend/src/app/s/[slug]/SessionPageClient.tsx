@@ -12,7 +12,7 @@ import { api, sseUrl } from '@/lib/api';
 import { saveAuth } from '@/lib/auth';
 import type { Question, Session, CallerRole } from '@ask-away/shared/types';
 
-const API_BASE = (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001');
+const API_BASE = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001');
 import ModeratorPanel from '@/components/ModeratorPanel';
 import GuestUsernameModal from '@/components/GuestUsernameModal';
 import QRCode from 'react-qr-code';

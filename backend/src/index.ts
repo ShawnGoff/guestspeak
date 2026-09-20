@@ -17,14 +17,18 @@ import { closeBus } from './sse/bus';
 import { pool } from './db/pool';
 
 const app = express();
-const PORT = process.env.PORT ?? 3001;
+const PORT = process.env.PORT || 3001;
 
 // Trust Railway's proxy so express-rate-limit sees the real client IP
 app.set('trust proxy', 1);
 
 app.use(helmet());
 app.use(cors({
-  origin: process.env.FRONTEND_URL ?? 'http://localhost:3000',
+  // `||` not `??`. Clearing this field in a dashboard stores an empty
+  // string, which `??` keeps — and an empty CORS origin matches nothing, so
+  // every browser request to this API is refused. The whole product is down,
+  // with the API itself healthy and nothing in its logs.
+  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
   credentials: true,
   exposedHeaders: ['Content-Disposition'],
 }));

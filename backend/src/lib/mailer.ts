@@ -126,7 +126,7 @@ function createTransport() {
   });
 }
 
-const FROM = process.env.SMTP_FROM ?? 'GuestSpeak <noreply@guestspeak.app>';
+const FROM = process.env.SMTP_FROM || 'GuestSpeak <noreply@guestspeak.app>';
 
 export async function sendSessionLive(
   to: string,

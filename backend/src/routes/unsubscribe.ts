@@ -69,7 +69,7 @@ router.post('/', async (req: Request, res: Response) => {
 
 router.get('/', async (req: Request, res: Response) => {
   const ok = await optOut(String(req.query.token ?? ''));
-  const appUrl = process.env.APP_URL ?? 'http://localhost:3000';
+  const appUrl = process.env.APP_URL || 'http://localhost:3000';
 
   res.status(200).type('html').send(
     ok

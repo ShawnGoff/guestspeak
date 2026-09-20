@@ -18,7 +18,7 @@ const PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY ?? '';
 const PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY ?? '';
 // Push services require a contact so they can reach you about a misbehaving
 // sender. mailto: or https: only.
-const SUBJECT = process.env.VAPID_SUBJECT ?? 'mailto:support@guestspeak.app';
+const SUBJECT = process.env.VAPID_SUBJECT || 'mailto:support@guestspeak.app';
 
 export const pushEnabled = Boolean(PUBLIC_KEY && PRIVATE_KEY);
 

@@ -402,7 +402,7 @@ async function notifyOrgFollowers(session: {
 }) {
   if (!session.org_id) return;
 
-  const appUrl = process.env.APP_URL ?? 'http://localhost:3000';
+  const appUrl = process.env.APP_URL || 'http://localhost:3000';
 
   // Fetch org name + all registered followers (with email for mailer)
   // email_opted_out is carried rather than filtered in SQL: the in-app

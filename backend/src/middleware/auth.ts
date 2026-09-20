@@ -145,6 +145,6 @@ function extractToken(req: Request, allowQuery: boolean): string | null {
 export function signToken(payload: JwtPayload): string {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return jwt.sign(payload, JWT_SECRET, {
-    expiresIn: (process.env.JWT_EXPIRES_IN ?? '7d') as any,
+    expiresIn: (process.env.JWT_EXPIRES_IN || '7d') as any,
   });
 }
