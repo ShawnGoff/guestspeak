@@ -36,3 +36,6 @@ backend/uploads/
 
 # Vercel
 .vercel
+
+# The real blocklist — see database/seeds/banned-words.example.sql
+database/seeds/banned-words.sql

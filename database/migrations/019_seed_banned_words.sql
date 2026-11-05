@@ -4,54 +4,15 @@
 -- Common letter substitutions are handled at query time by the word filter logic,
 -- so we store the base forms here.
 
-INSERT INTO banned_words (word) VALUES
-  -- Racial / ethnic slurs
-  ('nigger'),
-  ('nigga'),
-  ('chink'),
-  ('gook'),
-  ('spic'),
-  ('spick'),
-  ('wetback'),
-  ('beaner'),
-  ('kike'),
-  ('hymie'),
-  ('raghead'),
-  ('towelhead'),
-  ('camel jockey'),
-  ('sand nigger'),
-  ('paki'),
-  ('coon'),
-  ('jigaboo'),
-  ('jungle bunny'),
-  ('porchmonkey'),
-  ('zipperhead'),
-  ('slope'),
-  ('nip'),
-  ('kraut'),
-  ('greaseball'),
-  ('wop'),
-  ('dago'),
-  ('guinea'),
-  ('polack'),
-  ('redskin'),
-  ('squaw'),
-  ('half-breed'),
-  ('mulatto'),
-  -- Homophobic / transphobic slurs
-  ('faggot'),
-  ('fag'),
-  ('dyke'),
-  ('tranny'),
-  ('shemale'),
-  ('heshe'),
-  ('troon'),
-  ('sodomite'),
-  -- Ableist slurs
-  ('retard'),
-  ('retarded'),
-  ('spaz'),
-  -- General hate
-  ('subhuman'),
-  ('vermin')
-ON CONFLICT (word) DO NOTHING;
+-- The list itself is not in this repository.
+--
+-- It lives in database/seeds/banned-words.sql, which is gitignored, alongside
+-- the terms that were originally seeded in 042. Apply it with:
+--
+--   psql "$DATABASE_URL" -f database/seeds/banned-words.sql
+--
+-- See database/seeds/banned-words.example.sql for the shape, and 042 for the
+-- same note where the second batch used to be.
+--
+-- Intentionally a no-op, kept so the numbering stays stable.
+SELECT 1;
