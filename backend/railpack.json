@@ -22,9 +22,9 @@
     "goes to 18, pg_dump fails with an explicit version-mismatch message and",
     "the fix is to raise this number. Debian trixie carries 17 as its default.",
     "",
-    "Replaces nixpacks.toml, which Railway's Railpack builder does not read.",
-    "That file stays until the API service is confirmed off the deprecated",
-    "Nixpacks builder, then it can go."
+    "Replaced nixpacks.toml, which the Railpack builder does not read. Both",
+    "services are on Railpack now and Nixpacks is deprecated, so the toml is",
+    "gone; this file is the only place the image's extra packages are set."
   ],
   "deploy": {
     "aptPackages": ["postgresql-client-17"]

@@ -98,12 +98,10 @@ backup system into a way of losing backups:
 the image at all — Railway's Node image does not include it, and without this
 the run fails with `spawn pg_dump ENOENT`.
 
-It has to be Railpack's config file. `backend/nixpacks.toml` says the same
-thing and is read by nothing: Railway builds new services with Railpack, which
-does not understand it, and Nixpacks is deprecated. That file survives only
-because the older API service may still be built by Nixpacks; once that service
-is confirmed migrated, delete it rather than leave two build configs that
-disagree.
+It has to be Railpack's config file. There was a `backend/nixpacks.toml` saying
+the same thing for the older Nixpacks builder; both services are on Railpack
+now, so it is gone. Do not add it back — two build configs that can disagree is
+worse than one, and only this one is read.
 
 `railpack.json` is shared by both services — they both root at `backend/` — so
 it must hold only what is true for both. In particular **no `startCommand`**:

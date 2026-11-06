@@ -94,8 +94,8 @@ async function main() {
     if (/server version|version mismatch/i.test(detail)) {
       console.error(
         '[backup] The pg_dump in this image is older than the server. '
-        + 'Raise the postgresql pin in backend/nixpacks.toml to at least the '
-        + 'server version and redeploy — pg_dump can read older servers but '
+        + 'Raise the postgresql-client pin in backend/railpack.json to at '
+        + 'least the server version and redeploy — pg_dump reads older but '
         + 'never newer ones.',
       );
     }
