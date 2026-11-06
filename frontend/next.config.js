@@ -86,16 +86,15 @@ module.exports = withSentryConfig(nextConfig, {
   project: process.env.SENTRY_PROJECT,
   authToken: process.env.SENTRY_AUTH_TOKEN,
 
-  // Quiet once this is known to work, loud while it is not.
+  // Quiet, now that uploads are known to work.
   //
-  // `silent: true` hides the upload step entirely — including its failures —
-  // which is the wrong default while nobody has yet seen a source map arrive.
-  // A build that uploads nothing and a build that fails to upload look
-  // identical from the outside, and the whole point of the upload is to stop
-  // guessing at stack traces.
-  //
-  // Set this back to true once Sentry shows an artifact bundle for a release.
-  silent: false,
+  // This was false for one build on purpose. `silent: true` hides the upload
+  // step entirely — including its failures — so a build that uploads nothing
+  // and a build that fails to upload look identical from the outside, which is
+  // how source maps stayed missing without anyone noticing. If maps ever stop
+  // arriving, set this to false and read the build log before changing
+  // anything else.
+  silent: true,
 
   // Strip the injected source map comments so the maps are uploaded to Sentry
   // but not served to the public — readable stack traces for us, not for
