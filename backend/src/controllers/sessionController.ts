@@ -49,8 +49,24 @@ const CreateSessionSchema = z.object({
   lat: z.coerce.number().min(-90).max(90).nullish(),
   lng: z.coerce.number().min(-180).max(180).nullish(),
   is_online: z.boolean().optional(),
+  // The try/catch is load-bearing, not defensive habit. Zod v3 still runs a
+  // .refine() after an earlier check has failed — the value is marked dirty,
+  // not invalid — so new URL() here was reached with strings .url() had already
+  // rejected, and threw a raw TypeError straight out of safeParse. safeParse is
+  // supposed to return { success: false } rather than throw, so nothing caught
+  // it and the request 500'd. The empty string was the common case: .or(literal(''))
+  // exists to allow clearing the field, but the refine ran first and crashed on it.
   stream_url: z.string().url().max(1000)
-    .refine(u => new URL(u).protocol === 'https:', { message: 'stream_url must use https' })
+    .refine(
+      (u) => {
+        try {
+          return new URL(u).protocol === 'https:';
+        } catch {
+          return false;
+        }
+      },
+      { message: 'stream_url must use https' },
+    )
     .optional().or(z.literal('')),
   requires_approval: z.boolean().optional(),
 });
