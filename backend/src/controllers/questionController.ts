@@ -663,7 +663,9 @@ export async function searchSimilar(req: Request, res: Response, next: NextFunct
       `SELECT id, body, vote_count, status
        FROM questions
        WHERE session_id = $1
-         AND status != 'hidden'
+         -- Pending as well as hidden: this route is public, and a question
+         -- awaiting approval must not be readable before a host approves it.
+         AND status NOT IN ('hidden', 'pending')
          AND to_tsvector('english', body) @@ websearch_to_tsquery('english', $2)
        ORDER BY vote_count DESC
        LIMIT 5`,
@@ -1029,6 +1031,12 @@ async function refundQuestionCredit(
  */
 function transitionToPermColumn(currentStatus: string, nextStatus: string): string {
   if (currentStatus === 'hidden') return 'can_hide';
+
+  // Moving a pending question to any visible status publishes it, which is
+  // approval by another name. Without this a moderator denied can_approve could
+  // approve anyway by setting the status to 'new'. Rejecting (→ hidden) stays
+  // on can_hide below.
+  if (currentStatus === 'pending' && nextStatus !== 'hidden') return 'can_approve';
 
   const map: Record<string, string> = {
     answered: 'can_mark_answered',

@@ -229,14 +229,14 @@ export async function removeParticipant(req: Request, res: Response, next: NextF
 
     // Fetch the participant; also grab host_id so we can protect the host
     const pResult = await pool.query(
-      `SELECT sp.user_id, sp.guest_token, s.host_id
+      `SELECT sp.user_id, sp.guest_token, sp.ip_address, s.host_id
        FROM session_participants sp
        JOIN sessions s ON s.id = sp.session_id
        WHERE sp.id = $1 AND sp.session_id = $2`,
       [participantId, sessionId],
     );
     if (!pResult.rows[0]) throw new AppError(404, 'Participant not found');
-    const { user_id, guest_token, host_id } = pResult.rows[0];
+    const { user_id, guest_token, host_id, ip_address } = pResult.rows[0];
 
     if (user_id && user_id === host_id) {
       throw new AppError(400, 'Cannot remove the session host');
@@ -244,10 +244,14 @@ export async function removeParticipant(req: Request, res: Response, next: NextF
 
     // Record the ban so they cannot rejoin
     await pool.query(
-      `INSERT INTO session_bans (session_id, user_id, guest_token, banned_by, reason)
-       VALUES ($1, $2, $3, $4, $5)
+      // The IP is kept for guests only: it lets joinSession turn away a new
+      // guest token from the same address (see there). Registered users are
+      // banned by account, so a shared venue address never locks out signed-in
+      // people.
+      `INSERT INTO session_bans (session_id, user_id, guest_token, banned_by, reason, ip_address)
+       VALUES ($1, $2, $3, $4, $5, $6)
        ON CONFLICT DO NOTHING`,
-      [sessionId, user_id, guest_token, callerId, reason ?? null],
+      [sessionId, user_id, guest_token, callerId, reason ?? null, guest_token ? ip_address : null],
     );
 
     // Remove them from participants

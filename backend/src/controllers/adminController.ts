@@ -33,8 +33,13 @@ export async function listFlags(req: Request, res: Response, next: NextFunction)
          COUNT(f.id) OVER (PARTITION BY f.question_id)::int AS flag_count,
          q.id AS question_id, q.body, q.status, q.session_id,
          s.title AS session_title, s.slug AS session_slug,
-         COALESCE(q.author_display_name, u.username, sp.guest_username, 'Removed participant') AS author_username,
-         sp.id AS participant_id
+         -- Anonymous posts stay anonymous here. Naming the author in this list
+         -- bypassed revealIdentity, which is the one path that writes to the
+         -- audit log.
+         CASE WHEN q.post_anonymously THEN 'Anon' || q.anon_number
+              ELSE COALESCE(q.author_display_name, u.username, sp.guest_username, 'Removed participant')
+         END AS author_username,
+         CASE WHEN q.post_anonymously THEN NULL ELSE sp.id END AS participant_id
        FROM flags f
        JOIN questions q ON q.id = f.question_id
        JOIN sessions  s ON s.id = q.session_id

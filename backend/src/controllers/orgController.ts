@@ -7,13 +7,39 @@ import { AppError } from '../middleware/errorHandler';
 import { QUESTION_AUTHOR_SQL, QUESTION_AUTHOR_JOINS } from '../lib/questionHelpers';
 import { rejectIfBanned, rejectIfBannedHandle } from '../lib/wordFilter';
 
+function isHttpUrl(value: string): boolean {
+  try {
+    const { protocol } = new URL(value);
+    return protocol === 'https:' || protocol === 'http:';
+  } catch {
+    return false;
+  }
+}
+
+function isOwnUploadUrl(value: string): boolean {
+  if (/^\/(api\/)?uploads\/[A-Za-z0-9._-]+$/.test(value)) return true;
+  const r2 = (process.env.R2_PUBLIC_URL ?? '').replace(/\/$/, '');
+  return Boolean(r2) && value.startsWith(`${r2}/`) && !value.slice(r2.length + 1).includes('/');
+}
+
 const CreateOrgSchema = z.object({
   name: z.string().min(1).max(255),
   description: z.string().optional(),
-  // avatar_url is a relative path from our own upload system — not user-entered, no URL format required
-  avatar_url: z.string().optional(),
-  // website is user-entered; strip empty strings before validating
-  website: z.preprocess(v => (v === '' ? undefined : v), z.string().url().optional()),
+  // avatar_url must be something our own upload route returned: a local
+  // /api/uploads path, or a URL under the R2 bucket. Accepting any string let a
+  // channel owner point it at their own server and log every visitor's IP.
+  avatar_url: z.string().max(500).refine(isOwnUploadUrl, {
+    message: 'avatar_url must come from the upload endpoint',
+  }).optional(),
+  // website is user-entered; strip empty strings before validating. http(s)
+  // only — z.string().url() alone accepts javascript: and data: URLs, and this
+  // value is rendered as a link.
+  website: z.preprocess(
+    v => (v === '' ? undefined : v),
+    z.string().url().max(500).refine(isHttpUrl, {
+      message: 'website must be an http or https URL',
+    }).optional(),
+  ),
   city:    z.string().max(100).optional(),
   region:  z.string().max(100).optional(),
   country: z.string().max(100).optional(),

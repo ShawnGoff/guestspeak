@@ -596,6 +596,26 @@ export async function joinSession(req: Request, res: Response, next: NextFunctio
       }
     }
 
+    // Session-level bans. Joining used to skip this, so a removed participant
+    // could rejoin and only found out when posting failed. Guests are also
+    // matched on the IP recorded at removal, because a guest identity costs one
+    // request to mint. Signed-in users are matched by account only, so a shared
+    // venue address does not lock out registered attendees.
+    {
+      const banParams: unknown[] = [id];
+      const banConds: string[] = [];
+      if (userId)     { banParams.push(userId);     banConds.push(`user_id = $${banParams.length}`); }
+      if (guestToken) { banParams.push(guestToken); banConds.push(`guest_token = $${banParams.length}`); }
+      if (!userId && ipAddress) { banParams.push(ipAddress); banConds.push(`ip_address = $${banParams.length}`); }
+      if (banConds.length) {
+        const sb = await pool.query(
+          `SELECT 1 FROM session_bans WHERE session_id = $1 AND (${banConds.join(' OR ')}) LIMIT 1`,
+          banParams,
+        );
+        if (sb.rows[0]) throw new AppError(403, 'You have been removed from this session');
+      }
+    }
+
     // Block non-elevated callers from joining private sessions.
     // Mirrors getSession's check: org owners/admins and assigned moderators can
     // enter, otherwise they'd load the page and then fail to join it.

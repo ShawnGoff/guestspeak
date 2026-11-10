@@ -211,8 +211,30 @@ export async function deleteNotification(req: Request, res: Response, next: Next
 
 // ─── Push subscriptions ───────────────────────────────────────────────────────
 
+// The server POSTs to this URL whenever a notification fires, so an arbitrary
+// value is a request-forgery primitive (cloud metadata, internal services).
+// Only the browser vendors' push services are accepted.
+const PUSH_HOSTS = [
+  'fcm.googleapis.com',
+  'updates.push.services.mozilla.com',
+  'push.apple.com',
+  'notify.windows.com',
+];
+
+function isPushServiceUrl(value: string): boolean {
+  try {
+    const u = new URL(value);
+    if (u.protocol !== 'https:' || u.port) return false;
+    return PUSH_HOSTS.some(h => u.hostname === h || u.hostname.endsWith(`.${h}`));
+  } catch {
+    return false;
+  }
+}
+
 const SubscriptionSchema = z.object({
-  endpoint: z.string().url().max(2000),
+  endpoint: z.string().url().max(2000).refine(isPushServiceUrl, {
+    message: 'endpoint is not a recognised push service',
+  }),
   keys: z.object({
     p256dh: z.string().min(1).max(255),
     auth:   z.string().min(1).max(255),
@@ -236,6 +258,9 @@ export function getPushKey(_req: Request, res: Response) {
  */
 export async function subscribePush(req: Request, res: Response, next: NextFunction) {
   try {
+    // Guests have no notifications to receive; refusing them also removes a
+    // free, unauthenticated-in-practice way to register endpoints.
+    if (req.user!.isGuest) throw new AppError(403, 'You must have an account to do this');
     const sub = SubscriptionSchema.parse(req.body);
     await pool.query(
       `INSERT INTO push_subscriptions (user_id, endpoint, p256dh, auth)

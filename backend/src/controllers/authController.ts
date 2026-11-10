@@ -137,7 +137,7 @@ export async function login(req: Request, res: Response, next: NextFunction) {
 
     const result = await pool.query(
       `SELECT id, email, username, is_guest, password_hash, token_version FROM users
-       WHERE (email = $1 OR LOWER(username) = LOWER($1))
+       WHERE (LOWER(email) = LOWER($1) OR LOWER(username) = LOWER($1))
          AND is_guest = false AND deleted_at IS NULL`,
       [email],
     );
@@ -393,7 +393,7 @@ export async function forgotPassword(req: Request, res: Response, next: NextFunc
     const { email } = z.object({ email: z.string().email() }).parse(req.body);
 
     const userResult = await pool.query(
-      `SELECT id, email FROM users WHERE email = $1 AND is_guest = false`,
+      `SELECT id, email FROM users WHERE LOWER(email) = LOWER($1) AND is_guest = false`,
       [email],
     );
 
