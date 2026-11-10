@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { pool } from '../db/pool';
 import { AppError } from '../middleware/errorHandler';
 import { filterText } from '../lib/wordFilter';
+import { intParam } from '../lib/params';
 import { createNotificationsForUsers } from './notificationController';
 
 /**
@@ -278,8 +279,8 @@ export async function listReplies(req: Request, res: Response, next: NextFunctio
     const newestFirst = req.query.sort === 'newest';
     // Clamped rather than trusted. A caller asking for a million rows should
     // get a page, not a timeout.
-    const limit = Math.min(Math.max(parseInt(req.query.limit as string) || 50, 1), 100);
-    const offset = Math.max(parseInt(req.query.offset as string) || 0, 0);
+    const limit = intParam(req.query.limit, 50, 1, 100);
+    const offset = intParam(req.query.offset, 0, 0, 100_000);
 
     const result = await pool.query(
       `SELECT r.id, r.prompt_id, r.body, r.status, r.created_at, r.edited_at,

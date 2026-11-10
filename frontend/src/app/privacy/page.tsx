@@ -31,6 +31,18 @@ export default function PrivacyPage() {
           </section>
 
           <section>
+            <h2 className="text-xl font-semibold text-white mb-3">1a. Services we rely on</h2>
+            <p className="mb-3">Some features involve other companies. We list them so you know where your data can travel:</p>
+            <ul className="list-disc list-inside space-y-1 text-purple-200/90">
+              <li><span className="text-white font-medium">Google Fonts</span> — your browser fetches our typefaces from Google, which therefore sees your IP address and browser details when a page loads.</li>
+              <li><span className="text-white font-medium">OpenStreetMap Nominatim</span> — when you type a location while creating a session or channel, that text is sent to OpenStreetMap&apos;s search service from your browser.</li>
+              <li><span className="text-white font-medium">Sentry</span> — if the site crashes, a technical error report is sent to Sentry. We configure it not to send request bodies, cookies, authorization headers or query strings.</li>
+              <li><span className="text-white font-medium">YouTube and Twitch</span> — if a host adds a stream to a session, the embedded player loads from that service and is subject to its own privacy policy.</li>
+              <li><span className="text-white font-medium">Email delivery and browser push services</span> — your email address is passed to our email provider to deliver messages, and notification subscriptions are delivered through your browser vendor&apos;s push service.</li>
+            </ul>
+          </section>
+
+          <section>
             <h2 className="text-xl font-semibold text-white mb-3">2. How we use your information</h2>
             <p className="mb-3">We use your information solely to provide and improve GuestSpeak. Specifically:</p>
             <ul className="list-disc list-inside space-y-1 text-purple-200/90">
@@ -52,7 +64,7 @@ export default function PrivacyPage() {
 
           <section>
             <h2 className="text-xl font-semibold text-white mb-3">4. Data retention and account deletion</h2>
-            <p className="mb-3">Guest tokens expire after the session ends. Session content (questions, echoes) is retained unless removed by the host or by us following a moderation action.</p>
+            <p className="mb-3">IP addresses recorded for a session are deleted automatically 30 days after the session closes, and a guest account&apos;s IP address is deleted 30 days after it is created. Guest tokens stop working for a closed session. Session content (questions, echoes) is retained unless removed by the host or by us following a moderation action.</p>
             <p className="mb-3">You can delete your account yourself at any time from Settings. We are specific about what that does, because it is not a blanket erasure:</p>
             <ul className="list-disc list-inside space-y-1 text-purple-200/90 mb-3">
               <li>Your email, username, password, join-code prefix and stored IP address are permanently erased, and your notification subscriptions are deleted</li>

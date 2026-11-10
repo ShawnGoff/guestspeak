@@ -346,7 +346,7 @@ export async function deleteAccount(req: Request, res: Response, next: NextFunct
 
     // Guest display names recorded against their participation.
     await client.query(
-      `UPDATE session_participants SET guest_username = NULL WHERE user_id = $1`,
+      `UPDATE session_participants SET guest_username = NULL, ip_address = NULL WHERE user_id = $1`,
       [userId],
     );
 
@@ -467,25 +467,39 @@ export async function resetPassword(req: Request, res: Response, next: NextFunct
 
     const tokenHash = createHash('sha256').update(token).digest('hex');
 
-    const tokenResult = await pool.query(
-      `SELECT id, user_id, expires_at, used_at
-       FROM password_reset_tokens
-       WHERE token_hash = $1`,
-      [tokenHash],
-    );
-
-    const row = tokenResult.rows[0];
-    if (!row) throw new AppError(400, 'Invalid or expired reset link.');
-    if (row.used_at) throw new AppError(400, 'This reset link has already been used.');
-    if (new Date(row.expires_at) < new Date()) throw new AppError(400, 'This reset link has expired.');
-
     const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
 
-    await pool.query(
-      `UPDATE users SET password_hash = $1, token_version = token_version + 1 WHERE id = $2`,
-      [passwordHash, row.user_id],
-    );
-    await pool.query(`UPDATE password_reset_tokens SET used_at = NOW() WHERE id = $1`, [row.id]);
+    // Claim the token and change the password in one transaction, with the
+    // claim as a single conditional UPDATE. Checking "unused" in one query and
+    // marking it used in another let two simultaneous requests both pass the
+    // check and both set a password — the second one wins, and an attacker
+    // holding a leaked link could race the owner.
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const claimed = await client.query(
+        `UPDATE password_reset_tokens
+            SET used_at = NOW()
+          WHERE token_hash = $1 AND used_at IS NULL AND expires_at > NOW()
+        RETURNING user_id`,
+        [tokenHash],
+      );
+      if (!claimed.rows[0]) {
+        await client.query('ROLLBACK');
+        throw new AppError(400, 'Invalid, expired or already used reset link.');
+      }
+      await client.query(
+        `UPDATE users SET password_hash = $1, token_version = token_version + 1
+          WHERE id = $2 AND deleted_at IS NULL`,
+        [passwordHash, claimed.rows[0].user_id],
+      );
+      await client.query('COMMIT');
+    } catch (err) {
+      await client.query('ROLLBACK').catch(() => {});
+      throw err;
+    } finally {
+      client.release();
+    }
 
     res.json({ message: 'Password updated. You can now sign in.' });
   } catch (err) {

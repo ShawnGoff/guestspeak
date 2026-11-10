@@ -410,8 +410,8 @@ async function notifyOrgFollowers(session: {
   // as leaving the channel, and someone who did the first still wants the bell.
   const { rows } = await pool.query(
     `SELECT of2.user_id, u.email, o.name AS org_name, o.slug AS org_slug,
-            COALESCE((u.notification_prefs->>'email_session_live')::boolean, true) = false
-              AS email_opted_out
+            (COALESCE((u.notification_prefs->>'email_session_live')::boolean, true) = false
+              OR u.email_verified_at IS NULL) AS email_opted_out
      FROM org_followers of2
      JOIN users u ON u.id = of2.user_id AND u.is_guest = false AND u.deleted_at IS NULL
      JOIN organizations o ON o.id = of2.org_id

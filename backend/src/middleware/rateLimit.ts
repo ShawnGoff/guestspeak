@@ -197,3 +197,38 @@ export const flagLimiter = rateLimit({
   legacyHeaders: false,
   message: { error: 'Too many reports. Try again shortly.' },
 });
+
+/**
+ * Uploads — every one is decoded and re-encoded, which is real CPU, and the
+ * general limit (600/min) would let one account send hundreds of 5 MB files.
+ * 20 per 10 minutes is far above anyone changing an avatar.
+ */
+export const uploadLimiter = rateLimit({
+  windowMs: 10 * 60_000,
+  max: 20,
+  keyGenerator: callerKey,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many uploads. Try again in a few minutes.' },
+});
+
+/**
+ * Per-account login throttle, on top of the per-IP one. Without it, guessing
+ * one account's password from many addresses is limited only by how many
+ * addresses the attacker has. Keyed on the identifier typed into the form;
+ * only failed attempts count, so a user who signs in correctly is never
+ * counted against. Trade-off: someone can deliberately burn a victim's
+ * attempts and make them wait 15 minutes — a nuisance, not a breach.
+ */
+export const loginAccountLimiter = rateLimit({
+  windowMs: 15 * 60_000,
+  max: 10,
+  skipSuccessfulRequests: true,
+  keyGenerator: (req: Request) => {
+    const id = typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : '';
+    return `acct:${id.slice(0, 255) || 'none'}`;
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many attempts for this account. Try again in 15 minutes.' },
+});

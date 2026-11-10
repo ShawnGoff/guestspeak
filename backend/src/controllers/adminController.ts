@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { pool } from '../db/pool';
 import { AppError } from '../middleware/errorHandler';
 import { invalidateWordCache } from '../lib/wordFilter';
+import { intParam } from '../lib/params';
 
 // ─── Flags ────────────────────────────────────────────────────────────────────
 
@@ -15,8 +16,8 @@ export async function listFlags(req: Request, res: Response, next: NextFunction)
   try {
     const sessionId = req.query.sessionId as string | undefined;
     const reason    = req.query.reason    as string | undefined;
-    const limit  = Math.min(parseInt(req.query.limit  as string) || 50, 200);
-    const offset = parseInt(req.query.offset as string) || 0;
+    const limit  = intParam(req.query.limit, 50, 1, 200);
+    const offset = intParam(req.query.offset, 0, 0, 100_000);
 
     const conditions: string[] = [];
     const params: unknown[] = [];
@@ -85,8 +86,8 @@ const CreateBanSchema = z.object({
 export async function listBans(req: Request, res: Response, next: NextFunction) {
   try {
     const includeExpired = req.query.includeExpired === 'true';
-    const limit  = Math.min(parseInt(req.query.limit  as string) || 50, 200);
-    const offset = parseInt(req.query.offset as string) || 0;
+    const limit  = intParam(req.query.limit, 50, 1, 200);
+    const offset = intParam(req.query.offset, 0, 0, 100_000);
 
     const activeFilter = includeExpired ? '' : `AND (pb.expires_at IS NULL OR pb.expires_at > NOW())`;
 
@@ -298,7 +299,7 @@ export async function revealIdentity(req: Request, res: Response, next: NextFunc
 export async function listSessionsAdmin(req: Request, res: Response, next: NextFunction) {
   try {
     const q = ((req.query.q as string) ?? '').trim();
-    const limit = Math.min(parseInt(req.query.limit as string) || 50, 100);
+    const limit = intParam(req.query.limit, 50, 1, 100);
     const params: unknown[] = [];
     let where = '';
     if (q) { params.push(`%${q}%`); where = `WHERE s.title ILIKE $${params.length}`; }

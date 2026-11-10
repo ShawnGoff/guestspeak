@@ -56,7 +56,7 @@ export default function CookiesPage() {
 
           <section>
             <h2 className="text-xl font-semibold text-white mb-3">How to opt out</h2>
-            <p>You can clear or block cookies in your browser settings at any time. If you clear the authentication token, you will be signed out. Guest participants do not need to accept any cookies to use GuestSpeak — the guest token is stored in <code className="text-brand-orange text-xs bg-brand-card px-1.5 py-0.5 rounded">localStorage</code>, not a cookie, and is cleared when you close the browser or when the session ends.</p>
+            <p>You can clear or block cookies in your browser settings at any time. If you clear the authentication token, you will be signed out. Guest participants do not need to accept any cookies to use GuestSpeak — the guest token is stored in <code className="text-brand-orange text-xs bg-brand-card px-1.5 py-0.5 rounded">localStorage</code>, not a cookie, and stays on your device until you clear your browser&apos;s site data. Once a session has ended it no longer lets you do anything in that session.</p>
           </section>
 
           <section>

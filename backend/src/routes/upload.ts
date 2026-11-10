@@ -3,7 +3,9 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 import { randomBytes } from 'crypto';
+import sharp from 'sharp';
 import { requireRegistered } from '../middleware/auth';
+import { uploadLimiter } from '../middleware/rateLimit';
 
 const router = Router();
 
@@ -72,15 +74,11 @@ function storedFilename(mimetype: string): string {
   return `${Date.now()}-${randomBytes(8).toString('hex')}${ALLOWED_TYPES[mimetype]}`;
 }
 
-const diskStorage = multer.diskStorage({
-  destination: (_req, _file, cb) => cb(null, UPLOADS_DIR),
-  filename: (_req, file, cb) => cb(null, storedFilename(file.mimetype)),
-});
 
 // ─── Multer instance ──────────────────────────────────────────────────────────
 
 const upload = multer({
-  storage: USE_R2 ? multer.memoryStorage() : diskStorage,
+  storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB
   fileFilter: (_req, file, cb) => {
     if (!(file.mimetype in ALLOWED_TYPES)) {
@@ -92,7 +90,7 @@ const upload = multer({
 
 // ─── R2 upload helper ─────────────────────────────────────────────────────────
 
-async function uploadToR2(file: Express.Multer.File): Promise<string> {
+async function uploadToR2(file: Express.Multer.File, body: Buffer): Promise<string> {
   // Lazy-import so S3 SDK isn't required in dev when USE_R2 is false
   const { S3Client, PutObjectCommand } = await import('@aws-sdk/client-s3');
 
@@ -110,7 +108,7 @@ async function uploadToR2(file: Express.Multer.File): Promise<string> {
   await client.send(new PutObjectCommand({
     Bucket:             process.env.R2_BUCKET!,
     Key:                filename,
-    Body:               file.buffer,
+    Body:               body,
     ContentType:        file.mimetype,
     // Belt and braces: never let the CDN sniff a different type, and never let
     // a stored object render inline as a document.
@@ -126,38 +124,52 @@ async function uploadToR2(file: Express.Multer.File): Promise<string> {
 
 // ─── Route ────────────────────────────────────────────────────────────────────
 
-router.post('/', requireRegistered, upload.single('file'), async (req: Request, res: Response) => {
+/**
+ * Re-encode the image before it is stored.
+ *
+ * Phone photos carry EXIF — often GPS coordinates, device model and capture
+ * time — and avatars are served publicly. sharp drops all metadata on output
+ * unless asked to keep it; rotate() first bakes the orientation tag into the
+ * pixels so photos do not come out sideways once it is gone. Re-encoding also
+ * means whatever is stored was produced by us, not by the uploader, and a
+ * file that is not really an image fails here rather than being served.
+ */
+async function sanitiseImage(input: Buffer, mimetype: string): Promise<Buffer> {
+  const img = sharp(input, { animated: mimetype === 'image/gif', limitInputPixels: 25_000_000 })
+    .rotate()
+    .resize({ width: 1024, height: 1024, fit: 'inside', withoutEnlargement: true });
+  switch (mimetype) {
+    case 'image/jpeg': return img.jpeg({ quality: 85 }).toBuffer();
+    case 'image/png':  return img.png().toBuffer();
+    case 'image/webp': return img.webp({ quality: 85 }).toBuffer();
+    default:           return img.gif().toBuffer();
+  }
+}
+
+router.post('/', requireRegistered, uploadLimiter, upload.single('file'), async (req: Request, res: Response) => {
   if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
 
   try {
-    if (USE_R2) {
-      // Memory storage — verify the bytes really are the image type claimed.
-      if (sniffMimeType(req.file.buffer) !== req.file.mimetype) {
-        return res.status(400).json({ error: 'File contents do not match a supported image format' });
-      }
-      const url = await uploadToR2(req.file);
-      return res.json({ url });
-    }
-
-    // Disk storage — multer has already streamed it, so verify and clean up.
-    const diskPath = path.join(UPLOADS_DIR, req.file.filename);
-    const head = await fs.promises.open(diskPath, 'r').then(async fh => {
-      try {
-        const buf = Buffer.alloc(12);
-        const { bytesRead } = await fh.read(buf, 0, 12, 0);
-        return buf.subarray(0, bytesRead);
-      } finally {
-        await fh.close();
-      }
-    });
-
-    if (sniffMimeType(head) !== req.file.mimetype) {
-      await fs.promises.unlink(diskPath).catch(() => {});
+    if (sniffMimeType(req.file.buffer) !== req.file.mimetype) {
       return res.status(400).json({ error: 'File contents do not match a supported image format' });
     }
 
+    let clean: Buffer;
+    try {
+      clean = await sanitiseImage(req.file.buffer, req.file.mimetype);
+    } catch {
+      return res.status(400).json({ error: 'That image could not be processed' });
+    }
+
+    if (USE_R2) {
+      const url = await uploadToR2(req.file, clean);
+      return res.json({ url });
+    }
+
+    const filename = storedFilename(req.file.mimetype);
+    await fs.promises.writeFile(path.join(UPLOADS_DIR, filename), clean, { flag: 'wx' });
     // Local disk — return a path that resolveAsset() will prepend BACKEND to
-    return res.json({ url: `/api/uploads/${req.file.filename}` });
+    return res.json({ url: `/api/uploads/${filename}` });
   } catch (err: any) {
     console.error('[upload] failed:', err);
     return res.status(500).json({ error: 'Upload failed' });

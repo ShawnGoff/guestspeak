@@ -67,6 +67,16 @@ export const QUESTION_MOD_COLUMNS = `
  * Fetch a single question with the same author-masking projection used in
  * getQuestions. Safe to broadcast or return directly to any client.
  */
+/**
+ * Same column names with nothing in them, for callers who are not hosts or
+ * moderators. participant_id and mute state are moderation tools: handing them
+ * to every viewer told anyone which participant row wrote which question, and
+ * whether the host had muted them.
+ */
+export const QUESTION_MOD_COLUMNS_HIDDEN = `
+  NULL::uuid AS participant_id,
+  NULL::boolean AS author_is_muted`;
+
 export async function fetchPublicQuestion(
   id: string,
   sessionId: string,

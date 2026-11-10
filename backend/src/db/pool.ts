@@ -48,7 +48,10 @@ function sslConfig() {
   const ca = process.env.DATABASE_CA_CERT?.replace(/\\n/g, '\n');
   if (ca) return { ca, rejectUnauthorized: true };
 
-  console.warn(
+  if (process.env.DATABASE_REQUIRE_CA === 'true') {
+    throw new Error('DATABASE_REQUIRE_CA is set but DATABASE_CA_CERT is not');
+  }
+  console.error(
     '[db] DATABASE_CA_CERT is not set — the database connection is encrypted ' +
     'but the server certificate is NOT verified. Set DATABASE_CA_CERT to your ' +
     "provider's CA bundle to close this gap.",

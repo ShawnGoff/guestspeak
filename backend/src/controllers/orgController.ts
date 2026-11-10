@@ -6,6 +6,7 @@ import { pool } from '../db/pool';
 import { AppError } from '../middleware/errorHandler';
 import { QUESTION_AUTHOR_SQL, QUESTION_AUTHOR_JOINS } from '../lib/questionHelpers';
 import { rejectIfBanned, rejectIfBannedHandle } from '../lib/wordFilter';
+import { floatParam } from '../lib/params';
 
 function isHttpUrl(value: string): boolean {
   try {
@@ -346,6 +347,19 @@ export async function addMember(req: Request, res: Response, next: NextFunction)
     );
     if (targetMembership.rows[0]?.role === 'owner') {
       await requireOrgOwner(id, req.user!.userId);
+      // An owner's role is theirs to change. Letting one co-owner demote
+      // another meant a single compromised or disgruntled owner could take the
+      // channel over. Stepping down yourself is fine while another owner remains.
+      if (user_id !== req.user!.userId && role !== 'owner') {
+        throw new AppError(403, 'An owner can only step down themselves');
+      }
+      if (user_id === req.user!.userId && role !== 'owner') {
+        const others = await pool.query(
+          `SELECT 1 FROM organization_members WHERE org_id = $1 AND role = 'owner' AND user_id <> $2 LIMIT 1`,
+          [id, user_id],
+        );
+        if (!others.rows[0]) throw new AppError(400, 'A channel needs at least one owner');
+      }
     }
 
     const userCheck = await pool.query(
@@ -417,6 +431,14 @@ export async function removeMember(req: Request, res: Response, next: NextFuncti
 
     if (targetId === req.user!.userId) throw new AppError(400, 'Cannot remove yourself as owner');
 
+    const target = await pool.query(
+      `SELECT role FROM organization_members WHERE org_id = $1 AND user_id = $2`,
+      [id, targetId],
+    );
+    if (target.rows[0]?.role === 'owner') {
+      throw new AppError(403, 'An owner cannot be removed by another owner');
+    }
+
     const result = await pool.query(
       `DELETE FROM organization_members WHERE org_id = $1 AND user_id = $2 RETURNING id`,
       [id, targetId],
@@ -434,9 +456,9 @@ export async function searchOrgs(req: Request, res: Response, next: NextFunction
     const q        = typeof req.query.q        === 'string' ? req.query.q.slice(0, 100)        : null;
     const city     = typeof req.query.city     === 'string' ? req.query.city.slice(0, 100)     : null;
     const category = typeof req.query.category === 'string' ? req.query.category.slice(0, 50)  : null;
-    const lat      = req.query.lat  ? parseFloat(req.query.lat  as string) : null;
-    const lng      = req.query.lng  ? parseFloat(req.query.lng  as string) : null;
-    const radiusKm = parseFloat(req.query.radius_km as string) || 100;
+    const lat      = floatParam(req.query.lat, -90, 90);
+    const lng      = floatParam(req.query.lng, -180, 180);
+    const radiusKm = floatParam(req.query.radius_km, 0.1, 20_000) ?? 100;
 
     let rows;
 

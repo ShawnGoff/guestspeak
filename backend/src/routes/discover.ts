@@ -1,6 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { pool } from '../db/pool';
 import { optionalAuth } from '../middleware/auth';
+import { floatParam } from '../lib/params';
 
 const router = Router();
 
@@ -19,9 +20,9 @@ const router = Router();
  */
 router.get('/', optionalAuth, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const lat = req.query.lat ? parseFloat(req.query.lat as string) : null;
-    const lng = req.query.lng ? parseFloat(req.query.lng as string) : null;
-    const radiusKm = parseFloat(req.query.radius_km as string) || 50;
+    const lat = floatParam(req.query.lat, -90, 90);
+    const lng = floatParam(req.query.lng, -180, 180);
+    const radiusKm = floatParam(req.query.radius_km, 0.1, 20_000) ?? 50;
     const city = typeof req.query.city === 'string'
       ? req.query.city.slice(0, 100)
       : undefined;

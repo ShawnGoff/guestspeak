@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { pool } from '../db/pool';
 import { AppError } from '../middleware/errorHandler';
 import { z } from 'zod';
+import { intParam } from '../lib/params';
 import { sendToUsers, publicKey, type PushPayload } from '../lib/push';
 
 // ─── Public helper (used by sessionController) ────────────────────────────────
@@ -126,8 +127,8 @@ function pushCopy(type: string, p: Record<string, unknown>): PushPayload | null 
  */
 export async function listNotifications(req: Request, res: Response, next: NextFunction) {
   try {
-    const limit  = Math.min(parseInt(req.query.limit  as string ?? '30'), 50);
-    const offset = Math.max(parseInt(req.query.offset as string ?? '0'),  0);
+    const limit  = intParam(req.query.limit, 30, 1, 50);
+    const offset = intParam(req.query.offset, 0, 0, 100_000);
     const userId = req.user!.userId;
 
     const [rows, unread] = await Promise.all([

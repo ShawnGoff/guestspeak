@@ -8,9 +8,10 @@ import { filterText } from '../lib/wordFilter';
 import { createNotificationsForUsers } from './notificationController';
 import {
   fetchPublicQuestion,
-  QUESTION_AUTHOR_SQL, QUESTION_AUTHOR_JOINS, QUESTION_MOD_COLUMNS,
+  QUESTION_AUTHOR_SQL, QUESTION_AUTHOR_JOINS, QUESTION_MOD_COLUMNS, QUESTION_MOD_COLUMNS_HIDDEN,
 } from '../lib/questionHelpers';
 import { spendCredit } from '../lib/credits';
+import { intParam } from '../lib/params';
 import { cacheKey, getCached, setCached, invalidateSession } from '../lib/feedCache';
 type SortOption = 'echoes' | 'recent' | 'answered' | 'starred';
 
@@ -42,8 +43,8 @@ export async function getQuestions(req: Request, res: Response, next: NextFuncti
     const sessionId = req.query.sessionId as string;
     const sort = (req.query.sort as SortOption) ?? 'echoes';
     const status = req.query.status as string | undefined;
-    const limit = Math.min(parseInt(req.query.limit as string) || 50, 100);
-    const offset = parseInt(req.query.offset as string) || 0;
+    const limit = intParam(req.query.limit, 50, 1, 100);
+    const offset = intParam(req.query.offset, 0, 0, 100_000);
 
     if (!sessionId) throw new AppError(400, 'sessionId is required');
 
@@ -110,7 +111,7 @@ export async function getQuestions(req: Request, res: Response, next: NextFuncti
               q.parent_question_id, q.thread_root_id,
               q.post_anonymously, q.anon_number,
               ${QUESTION_AUTHOR_SQL} AS author_username,
-              ${QUESTION_MOD_COLUMNS}
+              ${isElevated ? QUESTION_MOD_COLUMNS : QUESTION_MOD_COLUMNS_HIDDEN}
        FROM questions q
        ${QUESTION_AUTHOR_JOINS}
        WHERE ${conditions.join(' AND ')}

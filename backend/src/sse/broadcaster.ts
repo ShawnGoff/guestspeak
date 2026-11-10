@@ -120,11 +120,19 @@ export function broadcastTo(
  * session drops the message, which is the common case once several replicas
  * are running.
  */
+/** Moderation-only fields, removed from what non-elevated listeners receive. */
+function withoutModFields(event: SSEEvent): SSEEvent {
+  const d = event.data as Record<string, unknown> | null;
+  if (!d || typeof d !== 'object' || !('participant_id' in d)) return event;
+  return { ...event, data: { ...d, participant_id: null, author_is_muted: null } };
+}
+
 function deliver(msg: BusMessage): void {
   const set = clients.get(msg.sessionId);
   if (!set) return;
 
   const primary = encode(msg.event as SSEEvent);
+  const publicPrimary = encode(withoutModFields(msg.event as SSEEvent));
   const audience = msg.mode === 'byRole' ? encode(msg.audienceEvent as SSEEvent) : null;
 
   for (const entry of set) {
@@ -132,7 +140,7 @@ function deliver(msg: BusMessage): void {
 
     switch (msg.mode) {
       case 'all':
-        payload = primary;
+        payload = entry.elevated ? primary : publicPrimary;
         break;
       case 'elevated':
         payload = entry.elevated ? primary : null;

@@ -21,7 +21,7 @@
  * trade.
  */
 
-import { Router, type Request, type Response } from 'express';
+import { Router, type NextFunction, type Request, type Response } from 'express';
 import { pool } from '../db/pool';
 import { verifyUnsubscribeToken } from '../lib/unsubscribe';
 
@@ -42,6 +42,27 @@ async function optOut(token: string): Promise<boolean> {
   return (result.rowCount ?? 0) > 0;
 }
 
+function escAttr(v: string): string {
+  return v.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function resultPage(ok: boolean): string {
+  const appUrl = process.env.APP_URL || 'http://localhost:3000';
+  return ok
+    ? page(
+      'Unsubscribed',
+      'You will no longer be emailed when a channel you follow goes live.<br><br>'
+      + 'You still get these in the app, and you are still following the channel. '
+      + `<a href="${appUrl}/settings" style="color:#F5921E;">Change this in settings</a>.`,
+    )
+    : page(
+      'That link did not work',
+      'It may have been broken by your mail client. You can turn these emails off in '
+      + `<a href="${appUrl}/settings" style="color:#F5921E;">your settings</a>, `
+      + 'or unfollow the channel.',
+    );
+}
+
 function page(title: string, body: string): string {
   return `<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -57,34 +78,50 @@ function page(title: string, body: string): string {
 </body></html>`;
 }
 
-/** One-click, from the mail client. Body carries the token; query works too. */
-router.post('/', async (req: Request, res: Response) => {
-  const token = String(req.body?.token ?? req.query.token ?? '');
-  await optOut(token);
-  // Always 200. Telling a mail client the unsubscribe failed earns a spam
-  // complaint, and a bad token means the link was mangled, not that the person
-  // still wants the mail.
-  res.status(200).send('OK');
+/**
+ * One-click, from the mail client (body carries `List-Unsubscribe=One-Click`),
+ * and the confirm button on the page below (body carries `confirm=1`).
+ */
+router.post('/', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const token = String(req.body?.token ?? req.query.token ?? '');
+    const ok = await optOut(token);
+    if (req.body?.confirm === '1') {
+      res.status(200).type('html').send(resultPage(ok));
+      return;
+    }
+    // Always 200 for the mail client. Telling it the unsubscribe failed earns a
+    // spam complaint, and a bad token means the link was mangled, not that the
+    // person still wants the mail.
+    res.status(200).send('OK');
+  } catch (err) {
+    next(err);
+  }
 });
 
-router.get('/', async (req: Request, res: Response) => {
-  const ok = await optOut(String(req.query.token ?? ''));
-  const appUrl = process.env.APP_URL || 'http://localhost:3000';
-
+/**
+ * A GET only asks. Mail security scanners and link previewers fetch every URL
+ * in a message, and acting on GET meant they unsubscribed people who never
+ * clicked anything. The change happens when the button posts.
+ */
+router.get('/', (req: Request, res: Response) => {
+  const token = String(req.query.token ?? '');
+  const valid = verifyUnsubscribeToken(token) !== null;
+  if (!valid) {
+    res.status(200).type('html').send(resultPage(false));
+    return;
+  }
   res.status(200).type('html').send(
-    ok
-      ? page(
-        'Unsubscribed',
-        'You will no longer be emailed when a channel you follow goes live.<br><br>'
-        + 'You still get these in the app, and you are still following the channel. '
-        + `<a href="${appUrl}/settings" style="color:#F5921E;">Change this in settings</a>.`,
-      )
-      : page(
-        'That link did not work',
-        'It may have been broken by your mail client. You can turn these emails off in '
-        + `<a href="${appUrl}/settings" style="color:#F5921E;">your settings</a>, `
-        + 'or unfollow the channel.',
-      ),
+    page(
+      'Stop go-live emails?',
+      'You will no longer be emailed when a channel you follow goes live. '
+      + 'You will still get these in the app.<br><br>'
+      + `<form method="post" action="/api/unsubscribe">`
+      + `<input type="hidden" name="token" value="${escAttr(token)}">`
+      + `<input type="hidden" name="confirm" value="1">`
+      + `<button type="submit" style="background:#F5921E;color:#fff;border:0;padding:.7rem 1.4rem;`
+      + `border-radius:.5rem;font-weight:700;font-size:1rem;cursor:pointer;">Unsubscribe</button></form>`,
+    ),
   );
 });
 
