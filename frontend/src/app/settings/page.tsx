@@ -15,6 +15,7 @@ interface MeResponse {
   code_prefix: string | null;
   created_at: string;
   notification_prefs: NotificationPrefs;
+  email_verified?: boolean;
 }
 
 /** Opt-outs. An absent key means on, so {} is "everything". */
@@ -42,6 +43,7 @@ export default function SettingsPage() {
   const [mounted, setMounted] = useState(false);
   const [me, setMe] = useState<MeResponse | null>(null);
   const [loading, setLoading] = useState(true);
+  const [verifySent, setVerifySent] = useState(false);
 
   // Join code prefix
   const [prefs, setPrefs]           = useState<NotificationPrefs>({});
@@ -173,6 +175,20 @@ export default function SettingsPage() {
           <h1 className="text-2xl font-extrabold text-white">Settings</h1>
           {me && <p className="text-purple-200/70 text-sm mt-0.5">@{me.username} · {me.email}</p>}
         </div>
+
+        {me && me.email_verified === false && (
+          <div className="bg-amber-900/20 border border-amber-700/40 text-amber-200 text-sm rounded-xl px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
+            <span>Your email is not confirmed yet, so we will not send you go-live emails.</span>
+            <button
+              type="button"
+              disabled={verifySent}
+              onClick={() => api.post('/auth/resend-verification', {}).then(() => setVerifySent(true)).catch(() => {})}
+              className="btn-ghost text-sm py-1.5 px-3 disabled:opacity-50"
+            >
+              {verifySent ? 'Sent — check your inbox' : 'Send confirmation email'}
+            </button>
+          </div>
+        )}
 
         {loading ? (
           <div className="space-y-4">

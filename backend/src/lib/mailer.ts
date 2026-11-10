@@ -224,3 +224,36 @@ export async function sendPasswordReset(to: string, resetUrl: string) {
 
   return info;
 }
+
+export async function sendEmailVerification(to: string, verifyUrl: string) {
+  warnIfUnconfigured();
+
+  const msg = {
+    from: FROM,
+    to,
+    subject: 'Confirm your GuestSpeak email address',
+    text: `Confirm this email address for your GuestSpeak account (link expires in 24 hours):\n${verifyUrl}\n\nIf you didn't create an account, ignore this email.`,
+    html: `
+      <div style="font-family:sans-serif;max-width:480px;margin:0 auto;">
+        <h2 style="color:#F5921E;">GuestSpeak</h2>
+        <p>Confirm this email address for your account.</p>
+        <p>
+          <a href="${esc(verifyUrl)}" style="display:inline-block;background:#F5921E;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold;">
+            Confirm email
+          </a>
+        </p>
+        <p style="color:#888;font-size:13px;">This link expires in 24 hours. If you didn't create an account, ignore this email.</p>
+      </div>
+    `,
+  };
+
+  const info = await deliver(msg);
+
+  if (!IS_PROD && !mailConfigured) {
+    console.log('\n📧 [DEV] Email verification (not actually sent):');
+    console.log(`   To: ${to}`);
+    console.log(`   Verify URL: ${verifyUrl}\n`);
+  }
+
+  return info;
+}

@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { pool } from '../db/pool';
 import { signToken } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
-import { sendPasswordReset } from '../lib/mailer';
+import { sendPasswordReset, sendEmailVerification } from '../lib/mailer';
 import { rejectIfBanned, rejectIfBannedHandle } from '../lib/wordFilter';
 
 /** Single source of truth — changing a password must not weaken its hash. */
@@ -115,6 +115,12 @@ export async function register(req: Request, res: Response, next: NextFunction) 
 
     await client.query('COMMIT');
 
+    // Prove the address is theirs. Fire-and-forget: registration must not wait
+    // on, or fail because of, the mail provider.
+    issueEmailVerification(user.id, user.email).catch(err =>
+      console.error('[register] verification email failed:', err),
+    );
+
     const token = signToken({ userId: user.id, isGuest: false, v: user.token_version });
     const { token_version: _tv, ...safeUser } = user;
 
@@ -183,7 +189,8 @@ export async function searchUsers(req: Request, res: Response, next: NextFunctio
 export async function getMe(req: Request, res: Response, next: NextFunction) {
   try {
     const result = await pool.query(
-      `SELECT id, email, username, code_prefix, created_at, notification_prefs
+      `SELECT id, email, username, code_prefix, created_at, notification_prefs,
+              (email_verified_at IS NOT NULL) AS email_verified
          FROM users WHERE id = $1`,
       [req.user!.userId],
     );
@@ -350,6 +357,8 @@ export async function deleteAccount(req: Request, res: Response, next: NextFunct
     // deleted account would otherwise keep receiving push on their devices.
     await client.query('DELETE FROM push_subscriptions WHERE user_id = $1', [userId]);
     await client.query('DELETE FROM password_reset_tokens WHERE user_id = $1', [userId]);
+    // Holds a copy of the email address, so it has to go with the account.
+    await client.query('DELETE FROM email_verification_tokens WHERE user_id = $1', [userId]);
     await client.query('DELETE FROM org_followers WHERE user_id = $1', [userId]);
     await client.query('DELETE FROM organization_members WHERE user_id = $1', [userId]);
     await client.query('DELETE FROM session_moderators WHERE user_id = $1', [userId]);
@@ -551,6 +560,72 @@ export async function guestToken(req: Request, res: Response, next: NextFunction
 
     const token = signToken({ userId, isGuest: true, guestToken });
     res.json({ token, guestToken });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// ─── Email verification ───────────────────────────────────────────────────────
+
+/** Create a fresh token for this address and mail the link. Older ones are void. */
+async function issueEmailVerification(userId: string, email: string): Promise<void> {
+  await pool.query(
+    `DELETE FROM email_verification_tokens WHERE user_id = $1 AND used_at IS NULL`,
+    [userId],
+  );
+  const raw = randomUUID();
+  await pool.query(
+    `INSERT INTO email_verification_tokens (user_id, token_hash, email) VALUES ($1, $2, $3)`,
+    [userId, createHash('sha256').update(raw).digest('hex'), email],
+  );
+  const appUrl = process.env.APP_URL || 'http://localhost:3000';
+  await sendEmailVerification(email, `${appUrl}/verify-email?token=${raw}`);
+}
+
+/** POST /api/auth/verify-email — no login needed: the link is opened from an inbox. */
+export async function verifyEmail(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { token } = z.object({ token: z.string().uuid() }).parse(req.body);
+    const hash = createHash('sha256').update(token).digest('hex');
+
+    // One conditional claim, as with password reset. The address must still be
+    // the account's current one, so a link for an old address cannot verify a
+    // new one.
+    const claimed = await pool.query(
+      `UPDATE email_verification_tokens t
+          SET used_at = NOW()
+         FROM users u
+        WHERE t.token_hash = $1 AND t.used_at IS NULL AND t.expires_at > NOW()
+          AND u.id = t.user_id AND u.deleted_at IS NULL AND LOWER(u.email) = LOWER(t.email)
+       RETURNING t.user_id`,
+      [hash],
+    );
+    if (!claimed.rows[0]) throw new AppError(400, 'Invalid, expired or already used link.');
+
+    await pool.query(
+      `UPDATE users SET email_verified_at = NOW() WHERE id = $1 AND email_verified_at IS NULL`,
+      [claimed.rows[0].user_id],
+    );
+    res.json({ verified: true });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/** POST /api/auth/resend-verification */
+export async function resendVerification(req: Request, res: Response, next: NextFunction) {
+  try {
+    const r = await pool.query(
+      `SELECT email, email_verified_at FROM users WHERE id = $1 AND deleted_at IS NULL`,
+      [req.user!.userId],
+    );
+    const row = r.rows[0];
+    if (!row?.email) throw new AppError(404, 'Account not found');
+    if (row.email_verified_at) { res.json({ sent: false, already_verified: true }); return; }
+    issueEmailVerification(req.user!.userId, row.email).catch(err =>
+      console.error('[resendVerification] failed:', err),
+    );
+    res.json({ sent: true });
   } catch (err) {
     next(err);
   }

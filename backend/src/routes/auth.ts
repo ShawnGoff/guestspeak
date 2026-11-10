@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { register, login, guestToken, getMe, updateMe, deleteAccount, searchUsers, checkUsername, forgotPassword, resetPassword } from '../controllers/authController';
+import { verifyEmail, resendVerification, register, login, guestToken, getMe, updateMe, deleteAccount, searchUsers, checkUsername, forgotPassword, resetPassword } from '../controllers/authController';
 import { loginLimiter, registerLimiter, guestLimiter, checkUsernameLimiter } from '../middleware/rateLimit';
 import { requireAuth, requireRegistered, optionalAuth } from '../middleware/auth';
 
@@ -16,6 +16,12 @@ router.post('/login', loginLimiter, login);
 // POST /api/auth/guest  — issues a guest JWT + guest_token
 // guestLimiter is permissive: conference venues have many attendees behind one IP
 router.post('/guest', guestLimiter, guestToken);
+
+// POST /api/auth/verify-email — token from the confirmation email
+router.post('/verify-email', registerLimiter, verifyEmail);
+
+// POST /api/auth/resend-verification
+router.post('/resend-verification', registerLimiter, requireRegistered, resendVerification);
 
 // GET  /api/auth/me
 router.get('/me', requireRegistered, getMe);
